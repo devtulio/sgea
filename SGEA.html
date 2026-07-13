@@ -110,6 +110,10 @@
   .view.active { display: block; }
   .dash-top { display: flex; align-items: center; justify-content: space-between; margin-bottom: 20px; flex-wrap: wrap; gap: 10px; }
   .dash-top h2 { font-size: 1.05rem; font-weight: 700; letter-spacing: .8px; text-transform: uppercase; }
+  .skeleton-card { background: #fff; border-radius: var(--radius); padding: 16px 18px; box-shadow: var(--shadow); border: 1px solid var(--gray-200); margin-bottom: 10px; height: 90px; }
+  .skeleton { background: linear-gradient(90deg, var(--gray-100) 25%, var(--gray-200) 50%, var(--gray-100) 75%); background-size: 200% 100%; animation: shimmer 1.4s infinite; border-radius: var(--radius); }
+  @keyframes shimmer { 0% { background-position: 200% 0; } 100% { background-position: -200% 0; } }
+  body.dark .skeleton, body.dark .skeleton-card { background: #232323; }
   .view-actions { display: flex; gap: 8px; align-items: center; flex-wrap: wrap; }
   .search-box { display: flex; align-items: center; gap: 6px; background: #fff; border: 1px solid var(--gray-200); border-radius: 6px; padding: 6px 10px; }
   body.dark .search-box { background: #232323; border-color: #383838; }
@@ -377,7 +381,11 @@
         <button class="btn btn-primary" onclick="openProdutoModal()">+ Novo Produto</button>
       </div>
     </div>
-    <div id="produtos-list"></div>
+    <div id="produtos-list">
+      <div class="skeleton skeleton-card"></div>
+      <div class="skeleton skeleton-card"></div>
+      <div class="skeleton skeleton-card"></div>
+    </div>
   </div>
 
   <!-- ── Entradas ── -->
@@ -879,7 +887,7 @@
 // ══════════════════════════════════════════════════════════════
 // API / SESSÃO
 // ══════════════════════════════════════════════════════════════
-const SGEA_VERSION = '0.5.1';
+const SGEA_VERSION = '0.6.0';
 document.title = `SGEA v${SGEA_VERSION}`;
 
 let _apiToken = localStorage.getItem('sgea-token') || null;
@@ -1255,6 +1263,11 @@ function setNavActive(id) {
   document.querySelectorAll('.nav-item').forEach(b => b.classList.remove('active'));
   document.getElementById(id)?.classList.add('active');
 }
+function _showView(viewId, navId) {
+  _hideAllViews();
+  document.getElementById(viewId).classList.add('active');
+  setNavActive(navId);
+}
 
 // ══════════════════════════════════════════════════════════════
 // CRUD GENÉRICO — Centros de Custo, Fornecedores, Funcionários, Frota, Pedidos
@@ -1323,11 +1336,9 @@ let _crudAtual = null;
 let _crudCache = [];
 
 function showCrud(modKey) {
-  _hideAllViews();
-  document.getElementById('view-crud').classList.add('active');
   _crudAtual = modKey;
   const cfg = CRUD_MODULES[modKey];
-  setNavActive(cfg.navId);
+  _showView('view-crud', cfg.navId);
   document.getElementById('crud-titulo').textContent = cfg.titulo;
   document.getElementById('crud-btn-novo').textContent = '+ Novo';
   document.getElementById('crud-search').value = '';
@@ -1443,9 +1454,7 @@ async function deleteCrudItem(id) {
 let _produtosCache = [];
 
 function showProdutos() {
-  _hideAllViews();
-  document.getElementById('view-produtos').classList.add('active');
-  setNavActive('nav-produtos');
+  _showView('view-produtos', 'nav-produtos');
   renderProdutos();
 }
 
@@ -1581,9 +1590,7 @@ async function deleteProduto(id) {
 // ENTRADAS
 // ══════════════════════════════════════════════════════════════
 function showEntradas() {
-  _hideAllViews();
-  document.getElementById('view-entradas').classList.add('active');
-  setNavActive('nav-entradas');
+  _showView('view-entradas', 'nav-entradas');
   renderEntradas();
 }
 
@@ -1702,9 +1709,7 @@ async function deleteEntrada(id) {
 // SAÍDAS
 // ══════════════════════════════════════════════════════════════
 function showSaidas() {
-  _hideAllViews();
-  document.getElementById('view-saidas').classList.add('active');
-  setNavActive('nav-saidas');
+  _showView('view-saidas', 'nav-saidas');
   renderSaidas();
 }
 
@@ -1804,9 +1809,7 @@ async function deleteSaida(id) {
 // ALERTAS DE VALIDADE
 // ══════════════════════════════════════════════════════════════
 function showAlertas() {
-  _hideAllViews();
-  document.getElementById('view-alertas').classList.add('active');
-  setNavActive('nav-alertas');
+  _showView('view-alertas', 'nav-alertas');
   renderAlertas();
 }
 
@@ -1900,9 +1903,7 @@ async function deleteUsuario(id) {
 // CONFIGURAÇÕES — Interface / Organização / Comunicação / Dados / Segurança / Diagnóstico / Usuários
 // ══════════════════════════════════════════════════════════════
 function showConfiguracoes() {
-  _hideAllViews();
-  document.getElementById('view-config').classList.add('active');
-  setNavActive('nav-config');
+  _showView('view-config', 'nav-config');
   document.getElementById('cfg-tema').value = localStorage.getItem('sgea-theme') === 'dark' ? 'dark' : 'light';
   document.getElementById('cfg-layout').value = localStorage.getItem('sgea-layout-width') || 'compacto';
   document.getElementById('cfg-fonte').value = localStorage.getItem('sgea-font-size') || 'normal';
@@ -2285,9 +2286,7 @@ let _auditPage = 0;
 let _auditFiltros = { q: '', tipo: '', de: '', ate: '' };
 
 function showAuditoria() {
-  _hideAllViews();
-  document.getElementById('view-auditoria').classList.add('active');
-  setNavActive('nav-auditoria');
+  _showView('view-auditoria', 'nav-auditoria');
   const sel = document.getElementById('aud-tipo');
   if (sel.options.length <= 1) {
     sel.innerHTML = '<option value="">Todos os tipos</option>' + _AUDIT_TIPOS.map(t => `<option value="${t}">${t}</option>`).join('');
@@ -2345,9 +2344,7 @@ async function _auditCarregar(append) {
 // LIXEIRA
 // ══════════════════════════════════════════════════════════════
 function showLixeira() {
-  _hideAllViews();
-  document.getElementById('view-lixeira').classList.add('active');
-  setNavActive('nav-lixeira');
+  _showView('view-lixeira', 'nav-lixeira');
   renderLixeira();
 }
 

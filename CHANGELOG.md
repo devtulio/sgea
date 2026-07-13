@@ -5,6 +5,13 @@
 
 ---
 
+## [0.6.0] — 2026-07-13
+
+### Alterado — Padronização do esqueleto de navegação (padrão SGCD)
+- **Cabeçalho de tela renomeado de `.view-top` para `.dash-top`** — alinhando à nomenclatura já usada no SGCD/SGCA/SGDP
+- **Navegação entre telas consolidada em um único helper `_showView(viewId, navId)`** — elimina a repetição do trio "esconder todas as views → ativar a view alvo → marcar item de menu" que existia em cada uma das 8 funções de navegação
+- **Skeleton de carregamento na tela de Estoque** — placeholder animado exibido só na primeira carga (padrão idêntico ao Dashboard do SGCD/SGDP), substituído automaticamente assim que os dados chegam
+
 ## [0.5.1] — 2026-07-13
 
 ### Adicionado
