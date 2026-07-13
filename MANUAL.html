@@ -1,0 +1,184 @@
+<!DOCTYPE html>
+<html lang="pt-BR">
+<head>
+<meta charset="UTF-8">
+<meta name="viewport" content="width=device-width, initial-scale=1.0">
+<title>Manual Operacional — SGEA v0.5.1</title>
+<style>
+  * { box-sizing: border-box; margin: 0; padding: 0; }
+  body { font-family: 'Times New Roman', Times, serif; font-size: 12pt; color: #000; background: #f5f5f5; }
+  .page { background: #fff; width: 210mm; min-height: 297mm; margin: 20px auto; padding: 25mm 20mm; box-shadow: 0 2px 8px rgba(0,0,0,.15); }
+  .cover { display: flex; flex-direction: column; align-items: center; justify-content: center; min-height: 240mm; text-align: center; border: 3px double #1a6b4a; padding: 30mm 20mm; }
+  .cover-logo img { width: 96pt; height: 96pt; object-fit: contain; }
+  .cover-title { font-size: 24pt; font-weight: bold; color: #1a6b4a; margin-bottom: 8pt; }
+  .cover-subtitle { font-size: 16pt; color: #2a9268; margin-bottom: 6pt; }
+  .cover-system { font-size: 13pt; color: #333; margin-bottom: 30pt; }
+  .cover-version { font-size: 11pt; color: #666; border: 1px solid #ccc; padding: 4pt 12pt; border-radius: 20px; display: inline-block; margin-bottom: 16pt; }
+  .cover-legal { font-size: 10pt; color: #888; margin-top: 30pt; font-style: italic; border-top: 1px solid #ddd; padding-top: 12pt; }
+  .cover-date { font-size: 10pt; color: #999; margin-top: 8pt; }
+  h1, h2, h3, h4 { font-family: 'Times New Roman', serif; }
+  h1 { font-size: 20pt; }
+  h2 { font-size: 15pt; border-bottom: 2px solid #1a6b4a; padding-bottom: 4pt; margin: 20pt 0 10pt; color: #1a6b4a; }
+  h3 { font-size: 13pt; margin: 14pt 0 6pt; color: #2a9268; }
+  h4 { font-size: 11pt; margin: 10pt 0 4pt; }
+  p { line-height: 1.7; text-align: justify; margin-bottom: 8pt; }
+  ul, ol { margin: 6pt 0 10pt 20pt; line-height: 1.7; }
+  li { margin-bottom: 3pt; }
+  strong { font-weight: bold; }
+  code { font-family: 'Courier New', monospace; font-size: 10pt; background: #f5f5f5; padding: 1px 4px; border-radius: 3px; }
+  .toc { margin: 10pt 0; }
+  .toc a { color: #1a6b4a; text-decoration: none; }
+  .toc a:hover { text-decoration: underline; }
+  .toc-item { display: flex; justify-content: space-between; align-items: baseline; padding: 2pt 0; border-bottom: 1px dotted #ccc; }
+  .toc-item.h2 { font-weight: 700; margin-top: 6pt; }
+  .nota { background: #fff8e1; border-left: 4px solid #f59e0b; padding: 8pt 12pt; margin: 10pt 0; font-size: 10.5pt; border-radius: 0 4px 4px 0; }
+  .aviso { background: #fef2f2; border-left: 4px solid #ef4444; padding: 8pt 12pt; margin: 10pt 0; font-size: 10.5pt; border-radius: 0 4px 4px 0; }
+  .dica { background: #f0fdf4; border-left: 4px solid #22c55e; padding: 8pt 12pt; margin: 10pt 0; font-size: 10.5pt; border-radius: 0 4px 4px 0; }
+  table { width: 100%; border-collapse: collapse; margin: 10pt 0; font-size: 10.5pt; }
+  th { background: #1a6b4a; color: #fff; padding: 6pt 8pt; text-align: left; font-weight: bold; }
+  td { padding: 5pt 8pt; border: 1px solid #ddd; vertical-align: top; }
+  tr:nth-child(even) td { background: #f9f9f9; }
+  .btn-print { position: fixed; top: 20px; right: 20px; background: #1a6b4a; color: #fff; border: none; border-radius: 6px; padding: 10px 18px; cursor: pointer; font-size: 11pt; font-family: sans-serif; z-index: 100; box-shadow: 0 2px 8px rgba(0,0,0,.3); }
+  .btn-print:hover { background: #2a9268; }
+  @media print {
+    body { background: #fff; }
+    .btn-print { display: none; }
+    .page { margin: 0; padding: 0; box-shadow: none; width: 100%; }
+    .cover { page-break-after: always; }
+    .toc-page { page-break-after: always; }
+    h2 { page-break-before: always; }
+    h2:first-of-type { page-break-before: avoid; }
+    .nota, .aviso, .dica { page-break-inside: avoid; }
+    @page { margin: 20mm 20mm 25mm; size: A4; }
+  }
+</style>
+</head>
+<body>
+
+<button class="btn-print no-print" onclick="window.print()">🖨 Imprimir / Salvar PDF</button>
+
+<div class="page">
+  <div class="cover">
+    <div class="cover-logo"><img src="sgea.ico" alt="SGEA"></div>
+    <div class="cover-title">Manual Operacional</div>
+    <div class="cover-subtitle">SGEA — Sistema de Gestão de Estoque do Almoxarifado</div>
+    <div class="cover-system">Entradas, Saídas, Lotes/Validade e cadastros de apoio</div>
+    <div class="cover-version">Versão v0.5.1</div>
+    <br>
+    <div style="font-size:11pt; color:#555; line-height:1.8;">
+      Aplicação web multiusuário para o Almoxarifado<br>
+      Armazenamento local via SQLite · Autenticação server-side · Sem instalação necessária
+    </div>
+    <div class="cover-legal" style="border-top:none;margin-top:6pt;padding-top:0">
+      Este sistema é distribuído sob a licença <strong>MIT</strong> — software livre, de código aberto, que pode ser usado, copiado, modificado e redistribuído livremente, inclusive para fins comerciais, desde que mantido o aviso de copyright original. Veja o arquivo <code>LICENSE</code> no repositório para o texto completo.
+    </div>
+    <div class="cover-date">Julho de 2026</div>
+  </div>
+</div>
+
+<div class="page toc-page">
+  <h2 style="page-break-before: avoid;">Sumário</h2>
+  <div class="toc">
+    <div class="toc-item h2"><a href="#sec1">1. Introdução</a></div>
+    <div class="toc-item h2"><a href="#sec2">2. Primeiro Acesso</a></div>
+    <div class="toc-item h2"><a href="#sec3">3. Visão Geral da Interface</a></div>
+    <div class="toc-item h2"><a href="#sec4">4. Cadastro de Produtos e Estoque</a></div>
+    <div class="toc-item h2"><a href="#sec5">5. Entradas</a></div>
+    <div class="toc-item h2"><a href="#sec6">6. Saídas e Consumo por Lote (FEFO)</a></div>
+    <div class="toc-item h2"><a href="#sec7">7. Alertas de Validade</a></div>
+    <div class="toc-item h2"><a href="#sec8">8. Cadastros de Apoio</a></div>
+    <div class="toc-item h2"><a href="#sec9">9. Configurações</a></div>
+    <div class="toc-item h2"><a href="#sec10">10. Auditoria e Lixeira</a></div>
+    <div class="toc-item h2"><a href="#sec11">11. Diagnóstico de Rede</a></div>
+    <div class="toc-item h2"><a href="#sec12">12. Histórico de Versões</a></div>
+  </div>
+</div>
+
+<div class="page">
+  <h2 id="sec1" style="page-break-before: avoid;">1. Introdução</h2>
+  <p>O SGEA controla o estoque do almoxarifado a partir de três operações centrais: <strong>cadastro de produtos</strong> (com seu fator de conversão embalagem → unidade), <strong>entradas</strong> (recebimento de mercadoria, com ou sem pedido de licitação) e <strong>saídas</strong> (retirada de itens para um centro de custo/solicitante). O sistema mantém o saldo de cada produto sempre em <strong>unidade de consumo</strong>, e não em embalagem — isso resolve o problema mais comum do controle manual: retirar poucas unidades de uma caixa fechada sem precisar "quebrar" a caixa na conta.</p>
+  <p>Cada entrada gera um ou mais <strong>lotes</strong>, que podem ter uma data de validade. Ao registrar uma saída, o sistema escolhe automaticamente de qual lote tirar o produto, priorizando sempre o lote que vence primeiro (regra conhecida como <strong>FEFO</strong> — <em>first-expire, first-out</em>).</p>
+
+  <h2 id="sec2">2. Primeiro Acesso</h2>
+  <p>Ao abrir o sistema pela primeira vez, use as credenciais padrão:</p>
+  <table>
+    <tr><th>Usuário</th><th>Senha</th></tr>
+    <tr><td><code>admin</code></td><td><code>admin123</code></td></tr>
+  </table>
+  <div class="aviso">No primeiro login, o sistema exige a troca imediata da senha padrão. Escolha uma senha com pelo menos 6 caracteres.</div>
+
+  <h2 id="sec3">3. Visão Geral da Interface</h2>
+  <p>A navegação principal fica na barra lateral esquerda, dividida em três grupos: as telas operacionais do dia a dia (Estoque, Entradas, Saídas, Alertas de Validade), os cadastros de apoio (Centros de Custo, Fornecedores, Funcionários, Frota, Pedidos) e, por último, Configurações.</p>
+  <p>Depois do login, o sistema abre direto na tela <strong>Estoque</strong>, que lista todos os produtos com seu saldo físico atual, valor financeiro e a validade mais próxima entre os lotes com saldo.</p>
+  <p>No topo da barra lateral fica o botão <strong>Buscar</strong> (atalho <code>Ctrl+K</code>) — abre uma busca que procura ao mesmo tempo em produtos, centros de custo, fornecedores, funcionários, frota e pedidos; clicar num resultado leva direto à tela e abre o item para edição. Logo abaixo, a data de hoje é exibida por extenso. Junto ao usuário, no rodapé da barra lateral, fica o <strong>sino de notificações</strong>, que mostra quantos lotes estão vencidos ou vencendo nos próximos 7 dias e um atalho para a tela de Alertas de Validade.</p>
+
+  <h2 id="sec4">4. Cadastro de Produtos e Estoque</h2>
+  <p>Cada produto precisa de um <strong>Código Fiorilli</strong> (a chave usada no sistema oficial do município) e de um nome. Os campos mais importantes:</p>
+  <ul>
+    <li><strong>Unidade Licitada</strong> — a embalagem de compra (ex.: CAIXA, FRASCO)</li>
+    <li><strong>Unidades por Embalagem</strong> — quantas unidades de consumo cabem em uma embalagem de compra (ex.: uma caixa com 12 unidades). É esse número que permite à saída ser lançada em unidade mesmo quando a compra é por caixa</li>
+    <li><strong>Unidade de Consumo</strong> — a unidade em que o estoque e as saídas são sempre contados (normalmente "UN")</li>
+    <li><strong>Saldo Inicial</strong> — só aparece ao criar um produto novo; usado para lançar um saldo de partida (ex.: ao migrar de outro controle), gerando um lote sem data de validade</li>
+  </ul>
+  <p>Clicar em uma linha da lista de produtos expande um painel com o detalhamento por lote (número do lote, validade, quantidade recebida e saldo atual), na mesma ordem em que serão consumidos numa saída (lotes com validade mais próxima primeiro).</p>
+  <div class="nota">Um produto só pode ser excluído se não tiver nenhum lote ou movimentação vinculada — o sistema bloqueia a exclusão nesse caso para preservar o histórico.</div>
+
+  <h2 id="sec5">5. Entradas</h2>
+  <p>Uma entrada registra o recebimento de mercadoria e pode seguir dois fluxos:</p>
+  <ul>
+    <li><strong>Com pedido</strong> — vincula a entrada a um Pedido previamente cadastrado (número + código de licitação), refletindo o fluxo formal: o setor faz o pedido, o fornecedor entrega, o almoxarifado confirma o recebimento</li>
+    <li><strong>Compra direta</strong> — sem vínculo com pedido algum, usada para compras avulsas; exige apenas nota fiscal, fornecedor e os itens recebidos</li>
+  </ul>
+  <p>Cada item da entrada informa a quantidade em <strong>embalagens</strong> (ex.: 5 caixas) — o sistema converte automaticamente para unidades usando o fator cadastrado no produto, e mostra essa conversão em tempo real no formulário. Cada item também pode receber um número de lote e uma data de validade, que passam a valer para o lote gerado.</p>
+  <div class="nota">Depois de criada, uma entrada só permite editar os dados de cabeçalho (NF, observação, recebedor) — quantidades e valores dos itens são imutáveis, porque já viraram saldo de lote. Para corrigir uma quantidade errada, exclua a entrada (se ainda não tiver sido consumida por nenhuma saída) e registre novamente.</div>
+
+  <h2 id="sec6">6. Saídas e Consumo por Lote (FEFO)</h2>
+  <p>A saída é lançada diretamente pelo almoxarife: produto, quantidade (sempre em unidade), solicitante, centro de custo de destino e, opcionalmente, um veículo da Frota (para correlacionar saídas de combustível ou peças).</p>
+  <p>Ao salvar, o sistema decide automaticamente de qual lote tirar a quantidade pedida, seguindo a regra <strong>FEFO</strong>: primeiro os lotes com validade mais próxima, depois os lotes sem validade cadastrada (na ordem em que entraram no estoque). Se um único lote não tiver saldo suficiente, o sistema divide o consumo entre dois ou mais lotes automaticamente — o usuário não precisa se preocupar com isso.</p>
+  <div class="aviso">Se o estoque total do produto for menor que a quantidade pedida, a saída é recusada por inteiro (nenhum lote é alterado) e o sistema informa o saldo disponível.</div>
+  <div class="dica">Excluir uma saída devolve exatamente as quantidades consumidas aos mesmos lotes de origem — é seguro reverter um lançamento feito por engano.</div>
+
+  <h2 id="sec7">7. Alertas de Validade</h2>
+  <p>Esta tela lista todos os lotes com saldo que estão vencidos ou vencendo dentro de uma janela configurável (30, 60 ou 90 dias), mostrando o produto, o lote, a data de validade, o saldo restante e o centro de custo de origem do produto. Use-a periodicamente para priorizar o consumo de itens perto do vencimento.</p>
+
+  <h2 id="sec8">8. Cadastros de Apoio</h2>
+  <p>As telas de <strong>Centros de Custo</strong>, <strong>Fornecedores</strong>, <strong>Funcionários</strong>, <strong>Frota</strong> e <strong>Pedidos</strong> seguem o mesmo padrão de lista + formulário. No cadastro de Fornecedores, o campo CNPJ pode ser preenchido manualmente; a consulta automática de dados do CNPJ está disponível via a API pública da ReceitaWS.</p>
+  <p><strong>Funcionários</strong> são usados como solicitantes de saída (nome, cargo e unidade). <strong>Frota</strong> cadastra os veículos do município (número, placa, marca/modelo) para permitir vincular uma saída de combustível ou peça a um veículo específico.</p>
+
+  <h2 id="sec9">9. Configurações</h2>
+  <p>A tela <strong>Configurações</strong> reúne, em sete abas, tudo que não é operação de estoque no dia a dia. Um único botão <strong>Salvar</strong>, fixo no topo, grava as alterações das abas Interface/Organização/Comunicação/Dados de uma só vez — ele pulsa quando há alterações não salvas. O botão "← Voltar" retorna para o Estoque.</p>
+  <ul>
+    <li><strong>Interface</strong> — tema claro/escuro; <strong>largura do conteúdo</strong> (compacta ou expandida); <strong>tamanho da fonte</strong> (Normal/Pequena/Grande); e <strong>cor de destaque</strong> (Institucional, Azul, Verde ou Roxo). Essas escolhas ficam salvas no navegador de cada usuário e só entram em vigor ao clicar em Salvar</li>
+    <li><strong>Organização</strong> — nome do órgão, município, CNPJ do órgão e autoridade competente (nome e cargo); e o <strong>brasão do município</strong> (upload de imagem, até 3 MB), exibido na barra lateral e sincronizado entre navegadores</li>
+    <li><strong>Comunicação</strong> <em>(somente administradores)</em> — configuração do servidor SMTP (host, porta, TLS/SSL, usuário, senha, remetente e destinatário interno) e botão "Testar conexão", que envia um e-mail de teste real</li>
+    <li><strong>Dados</strong> <em>(somente administradores)</em> — pasta de backup customizável (diálogo nativo do Windows), backup manual, restauração a partir de um backup JSON ou de um banco `.db`, alternância de backup automático e quantidade de backups mantidos; e a <strong>Zona de Perigo</strong>, que apaga produtos, lotes, entradas, saídas e todos os cadastros — mantendo usuários e configurações — através de um fluxo de três confirmações (diálogo, digitar a frase "APAGAR TUDO" e uma contagem regressiva de 5 segundos), baixando um backup de segurança automaticamente antes de executar</li>
+    <li><strong>Segurança</strong> — permite a qualquer usuário trocar a própria senha a qualquer momento (informando a senha atual), sem precisar esperar um novo primeiro-acesso</li>
+    <li><strong>Diagnóstico</strong> <em>(somente administradores)</em> — roda checagens de consistência entre estoque, lotes, entradas e saídas (ex.: saldo de lote maior que o recebido, código Fiorilli duplicado, produto sem centro de custo), agrupadas por severidade</li>
+    <li><strong>Usuários</strong> <em>(somente administradores)</em> — criação de novos acessos, marcação/desmarcação do privilégio de administrador e redefinição de senha de outros usuários. Um usuário não pode excluir a própria conta</li>
+  </ul>
+  <p>A tela de login também segue o mesmo padrão visual dos demais sistemas da família: cartão institucional com identificação do órgão (nome cadastrado em Organização), alternância de mostrar/ocultar senha, aviso quando o Caps Lock está ativo e a data do último backup automático, para facilitar perceber rapidamente se os backups estão em dia.</p>
+  <div class="nota">Quando o SMTP está configurado, o sistema envia automaticamente, uma vez por dia, um e-mail para o destinatário interno resumindo os lotes vencidos ou vencendo nos próximos 7 dias.</div>
+
+  <h2 id="sec10">10. Auditoria e Lixeira</h2>
+  <p>A tela <strong>Auditoria</strong> <em>(somente administradores)</em> registra todo evento de criação, edição ou exclusão nos módulos de Produtos, Entradas, Saídas, cadastros de apoio e Usuários — quem fez, quando e o quê, com filtros por texto, tipo de evento e período. O autor de cada evento é sempre o usuário autenticado no momento, nunca um dado enviado pela tela.</p>
+  <p>A tela <strong>Lixeira</strong> lista as Entradas e Saídas excluídas, com o botão <strong>Restaurar</strong> disponível por até 30 dias (depois disso, o registro é apagado de vez automaticamente). Restaurar uma entrada devolve o saldo aos lotes que ela gerou; restaurar uma saída consome o estoque novamente pela regra FEFO — podendo, se o estoque tiver mudado nesse meio-tempo, sair de lotes diferentes dos originais, mas com o mesmo efeito final na quantidade.</p>
+  <div class="aviso">Excluir uma entrada zera o saldo dos lotes que ela gerou (não é permitido se algum lote já foi parcialmente consumido por uma saída) — o efeito no estoque é imediato, não só uma remoção da lista.</div>
+
+  <h2 id="sec11">11. Diagnóstico de Rede</h2>
+  <p>Ao usar o SGEA em rede local (um computador como servidor, outros acessando pelo navegador), execute <code>Diagnostico SGEA.bat</code> na máquina servidora sempre que outra máquina não conseguir acessar o sistema. Ele verifica automaticamente o IP local, a porta, o perfil de rede do Windows e a regra de firewall, corrigindo o que for possível.</p>
+
+  <h2 id="sec12">12. Histórico de Versões</h2>
+  <table>
+    <tr><th>Versão</th><th>Data</th><th>Resumo</th></tr>
+    <tr><td>0.5.1</td><td>13/07/2026</td><td>Data de hoje na barra lateral; correção dos campos de Interface na aba Configurações, que aplicavam a mudança direto no navegador em vez de esperar o clique em Salvar.</td></tr>
+    <tr><td>0.5.0</td><td>13/07/2026</td><td>Busca global (Ctrl+K) e sino de notificações de validade na barra lateral; alinhamento fino do sistema de design (cores, tipografia, tabelas, abas) com o padrão exato dos sistemas irmãos.</td></tr>
+    <tr><td>0.4.1</td><td>12/07/2026</td><td>Paridade visual da tela de Configurações com os sistemas irmãos: cabeçalho fixo com "← Voltar" e botão "Salvar" único (com indicador de alterações não salvas), abas renomeadas/reordenadas (Interface, Organização, Comunicação, Dados, Segurança, Diagnóstico, Usuários), campos agrupados em fieldsets com legenda e texto de ajuda, cor de destaque com amostra de cor ("Laranja" trocado por "Verde").</td></tr>
+    <tr><td>0.4.0</td><td>12/07/2026</td><td>Auditoria, Lixeira (Entradas/Saídas), SMTP com alerta diário de validade, aba Dados com restauração e Zona de Perigo, aba Diagnóstico, Organização ampliada, cor de destaque; correção do zeramento de lotes ao excluir entrada.</td></tr>
+    <tr><td>0.3.0</td><td>12/07/2026</td><td>Login no padrão visual dos sistemas irmãos; visualização compacta/expandida; tamanho de fonte; upload de brasão do município; correção de bug de mensagem de erro no login.</td></tr>
+    <tr><td>0.2.0</td><td>12/07/2026</td><td>Tela de Configurações em abas (Geral, Aparência, Segurança, Backup, Usuários), no mesmo padrão dos sistemas irmãos; troca de senha própria a qualquer momento.</td></tr>
+    <tr><td>0.1.0</td><td>12/07/2026</td><td>Primeira versão: produtos, lotes, entradas (com/sem pedido), saídas com FEFO, alertas de validade, cadastros de apoio, usuários e backup.</td></tr>
+  </table>
+</div>
+
+</body>
+</html>

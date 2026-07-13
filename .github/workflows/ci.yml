@@ -1,0 +1,41 @@
+# CI — roda a cada push/PR na main, numa VM Windows temporária do GitHub
+# (mesmo SO do ambiente real da prefeitura). Não faz deploy nem toca em
+# dados: executa o lint, os testes de backend (unittest, banco isolado via
+# SGEA_DATA_DIR) e os testes E2E (Playwright, navegador real).
+name: CI
+
+on:
+  push:
+    branches: [main]
+  pull_request:
+    branches: [main]
+
+jobs:
+  test:
+    runs-on: windows-latest
+    steps:
+      - uses: actions/checkout@v4
+
+      - uses: actions/setup-python@v5
+        with:
+          python-version: '3.12'
+
+      - uses: actions/setup-node@v4
+        with:
+          node-version: 'lts/*'
+          cache: npm
+
+      - name: Instalar ferramentas de desenvolvimento
+        run: npm ci
+
+      - name: Lint
+        run: npm run lint
+
+      - name: Testes de backend (unittest)
+        run: python -m unittest discover -s tests -v
+
+      - name: Instalar navegador do Playwright
+        run: npx playwright install chromium
+
+      - name: Testes E2E (Playwright)
+        run: npx playwright test

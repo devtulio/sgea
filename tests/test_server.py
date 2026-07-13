@@ -1,0 +1,370 @@
+# Suíte de testes do backend (server.py) — sobe o servidor real contra um
+# banco/backups temporários e bate nos endpoints REST via http.client.
+# python -m unittest discover -s tests   (ou: python tests/test_server.py)
+import http.client
+import json
+import os
+import shutil
+import socketserver
+import sys
+import tempfile
+import threading
+import unittest
+import uuid
+
+sys.path.insert(0, os.path.dirname(os.path.dirname(os.path.abspath(__file__))))
+import server  # noqa: E402
+
+PORT = 3093
+_tmpdir = None
+_httpd = None
+_thread = None
+
+
+def setUpModule():
+    global _tmpdir, _httpd, _thread
+    _tmpdir = tempfile.mkdtemp(prefix='sgea_test_')
+    server.DB_PATH = os.path.join(_tmpdir, 'sgea.db')
+    server.BACKUP_DIR = os.path.join(_tmpdir, 'backups')
+    os.makedirs(server.BACKUP_DIR, exist_ok=True)
+    server.init_db()
+
+    socketserver.ThreadingTCPServer.allow_reuse_address = True
+    _httpd = socketserver.ThreadingTCPServer(('127.0.0.1', PORT), server.SGEAHandler)
+    _thread = threading.Thread(target=_httpd.serve_forever, daemon=True)
+    _thread.start()
+
+
+def tearDownModule():
+    _httpd.shutdown()
+    _httpd.server_close()
+    shutil.rmtree(_tmpdir, ignore_errors=True)
+
+
+class SGEATestCase(unittest.TestCase):
+
+    def request(self, method, path, body=None, token=None):
+        conn = http.client.HTTPConnection('127.0.0.1', PORT, timeout=5)
+        hdrs = {'Content-Type': 'application/json'}
+        if token:
+            hdrs['Authorization'] = f'Bearer {token}'
+        payload = json.dumps(body, ensure_ascii=False).encode('utf-8') if body is not None else None
+        conn.request(method, path, body=payload, headers=hdrs)
+        resp = conn.getresponse()
+        data = resp.read()
+        conn.close()
+        try:
+            parsed = json.loads(data) if data else None
+        except ValueError:
+            parsed = data
+        return resp.status, parsed
+
+    def login(self, username='admin', password='admin123'):
+        status, data = self.request('POST', '/api/auth/login', {'username': username, 'password': password})
+        self.assertEqual(status, 200, data)
+        return data['token']
+
+    def _criar_produto(self, token, qtd_por_embalagem=1):
+        cod = f'TESTE.{uuid.uuid4().hex[:8]}'
+        status, prod = self.request('POST', '/api/produtos', {
+            'codigo_fiorilli': cod, 'nome': 'Produto de Teste',
+            'qtd_por_embalagem': qtd_por_embalagem, 'unidade_consumo': 'UN',
+        }, token)
+        self.assertEqual(status, 201, prod)
+        return prod['id']
+
+
+class TestAuth(SGEATestCase):
+
+    def test_login_ok(self):
+        status, data = self.request('POST', '/api/auth/login', {'username': 'admin', 'password': 'admin123'})
+        self.assertEqual(status, 200)
+        self.assertIn('token', data)
+        self.assertTrue(data['user']['admin'])
+
+    def test_login_senha_errada(self):
+        status, data = self.request('POST', '/api/auth/login', {'username': 'admin', 'password': 'errada'})
+        self.assertEqual(status, 401)
+
+    def test_rota_protegida_sem_token(self):
+        status, data = self.request('GET', '/api/produtos')
+        self.assertEqual(status, 401)
+
+
+class TestConfiguracoes(SGEATestCase):
+
+    def test_org_info_e_last_backup_sao_publicos(self):
+        status, data = self.request('GET', '/api/public/org-info')
+        self.assertEqual(status, 200)
+        self.assertIn('orgao', data)
+        status, data = self.request('GET', '/api/public/last-backup')
+        self.assertEqual(status, 200)
+        self.assertIn('ts', data)
+
+    def test_salvar_e_ler_orgao(self):
+        token = self.login()
+        status, _ = self.request('PUT', '/api/settings/org', {'orgao': 'Prefeitura de Teste', 'municipio': 'Teste/SP'}, token)
+        self.assertEqual(status, 200)
+        status, data = self.request('GET', '/api/settings', token=token)
+        self.assertEqual(data['orgao'], 'Prefeitura de Teste')
+        status, data = self.request('GET', '/api/public/org-info')
+        self.assertEqual(data['orgao'], 'Prefeitura de Teste')
+
+    def test_brasao_upload_e_remocao(self):
+        token = self.login()
+        status, data = self.request('PUT', '/api/settings/brasao', {'brasao_dataurl': 'data:image/png;base64,ABC'}, token)
+        self.assertEqual(status, 200)
+        status, data = self.request('GET', '/api/settings/brasao', token=token)
+        self.assertEqual(data['brasao_dataurl'], 'data:image/png;base64,ABC')
+        status, _ = self.request('PUT', '/api/settings/brasao', {'brasao_dataurl': ''}, token)
+        self.assertEqual(status, 200)
+        status, data = self.request('GET', '/api/settings/brasao', token=token)
+        self.assertEqual(data['brasao_dataurl'], '')
+
+
+class TestCrudCadastros(SGEATestCase):
+
+    def test_centro_custo_crud(self):
+        token = self.login()
+        status, cc = self.request('POST', '/api/centros-custo', {'codigo': 'CC1', 'nome': 'Educação'}, token)
+        self.assertEqual(status, 201, cc)
+        status, listado = self.request('GET', '/api/centros-custo', token=token)
+        self.assertEqual(status, 200)
+        self.assertTrue(any(i['id'] == cc['id'] for i in listado['items']))
+        status, atualizado = self.request('PUT', f'/api/centros-custo/{cc["id"]}', {'nome': 'Educação e Cultura'}, token)
+        self.assertEqual(status, 200)
+        self.assertEqual(atualizado['nome'], 'Educação e Cultura')
+
+    def test_centro_custo_codigo_duplicado(self):
+        token = self.login()
+        self.request('POST', '/api/centros-custo', {'codigo': 'DUP1', 'nome': 'A'}, token)
+        status, data = self.request('POST', '/api/centros-custo', {'codigo': 'DUP1', 'nome': 'B'}, token)
+        self.assertEqual(status, 409, data)
+
+    def test_produto_codigo_fiorilli_duplicado(self):
+        token = self.login()
+        self.request('POST', '/api/produtos', {'codigo_fiorilli': 'DUPFIO', 'nome': 'X'}, token)
+        status, data = self.request('POST', '/api/produtos', {'codigo_fiorilli': 'DUPFIO', 'nome': 'Y'}, token)
+        self.assertEqual(status, 409, data)
+
+
+class TestFefoDireto(unittest.TestCase):
+    """Testa _consumir_fefo diretamente contra o banco, sem passar pela camada
+    HTTP — feedback mais rápido na lógica de maior risco do sistema."""
+
+    def setUp(self):
+        self.pid = str(uuid.uuid4())
+        with server.get_db() as conn:
+            conn.execute(
+                'INSERT INTO produtos (id,codigo_fiorilli,nome,qtd_por_embalagem) VALUES (?,?,?,1)',
+                (self.pid, f'FEFO.{uuid.uuid4().hex[:8]}', 'Produto FEFO')
+            )
+
+    def _add_lote(self, qtd, validade=None, custo=10.0):
+        with server.get_db() as conn:
+            cur = conn.execute(
+                '''INSERT INTO lotes (produto_id,lote_numero,data_validade,quantidade_recebida,quantidade_atual,valor_unitario_custo)
+                   VALUES (?,?,?,?,?,?)''',
+                (self.pid, 'L', validade, qtd, qtd, custo)
+            )
+            return cur.lastrowid
+
+    def _saldo(self):
+        with server.get_db() as conn:
+            row = conn.execute('SELECT estoque_fisico FROM v_estoque WHERE produto_id=?', (self.pid,)).fetchone()
+            return row['estoque_fisico'] if row else 0
+
+    def test_consome_lote_mais_proximo_de_vencer_primeiro(self):
+        lote_longe = self._add_lote(10, '2027-12-31')
+        lote_perto = self._add_lote(10, '2026-08-01')
+        with server.get_db() as conn:
+            consumos, valor_medio, valor_total = server._consumir_fefo(conn, self.pid, 5)
+        self.assertEqual(consumos, [(lote_perto, 5, 10.0)])
+        with server.get_db() as conn:
+            self.assertEqual(conn.execute('SELECT quantidade_atual FROM lotes WHERE id=?', (lote_longe,)).fetchone()[0], 10)
+            self.assertEqual(conn.execute('SELECT quantidade_atual FROM lotes WHERE id=?', (lote_perto,)).fetchone()[0], 5)
+
+    def test_divide_consumo_entre_lotes_quando_um_nao_cobre(self):
+        lote_a = self._add_lote(3, '2026-08-01', custo=10.0)
+        lote_b = self._add_lote(10, '2026-09-01', custo=20.0)
+        lote_sem_validade = self._add_lote(100, None, custo=5.0)
+        with server.get_db() as conn:
+            consumos, valor_medio, valor_total = server._consumir_fefo(conn, self.pid, 8)
+        # consome lote_a inteiro (3) + parte de lote_b (5); lote sem validade intocado
+        self.assertEqual(consumos, [(lote_a, 3, 10.0), (lote_b, 5, 20.0)])
+        self.assertEqual(valor_total, 3 * 10.0 + 5 * 20.0)
+        self.assertAlmostEqual(valor_medio, valor_total / 8)
+        with server.get_db() as conn:
+            self.assertEqual(conn.execute('SELECT quantidade_atual FROM lotes WHERE id=?', (lote_sem_validade,)).fetchone()[0], 100)
+
+    def test_lotes_sem_validade_consumidos_por_ordem_de_chegada(self):
+        primeiro = self._add_lote(5, None, custo=1.0)
+        segundo = self._add_lote(5, None, custo=2.0)
+        with server.get_db() as conn:
+            consumos, _, _ = server._consumir_fefo(conn, self.pid, 5)
+        self.assertEqual(consumos, [(primeiro, 5, 1.0)])
+        with server.get_db() as conn:
+            self.assertEqual(conn.execute('SELECT quantidade_atual FROM lotes WHERE id=?', (segundo,)).fetchone()[0], 5)
+
+    def test_estoque_insuficiente_nao_decrementa_nada(self):
+        self._add_lote(5, '2026-08-01')
+        with server.get_db() as conn:
+            with self.assertRaises(server.EstoqueInsuficiente):
+                server._consumir_fefo(conn, self.pid, 100)
+        self.assertEqual(self._saldo(), 5)  # rollback: nada foi decrementado
+
+
+class TestEntradasSaidas(SGEATestCase):
+
+    def test_entrada_compra_direta_converte_caixa_para_unidade(self):
+        token = self.login()
+        pid = self._criar_produto(token, qtd_por_embalagem=12)
+        status, ent = self.request('POST', '/api/entradas', {
+            'tipo': 'compra_direta', 'data_entrega': '2026-07-01',
+            'itens': [{'produto_id': pid, 'quantidade_embalagem': 5, 'valor_unitario': 13.55,
+                       'lote_numero': 'L1', 'data_validade': '2026-08-01'}]
+        }, token)
+        self.assertEqual(status, 201, ent)
+        self.assertEqual(ent['itens'][0]['quantidade_unidades'], 60)
+        status, prod = self.request('GET', f'/api/produtos/{pid}', token=token)
+        self.assertEqual(prod['estoque_fisico'], 60)
+        self.assertAlmostEqual(prod['estoque_financeiro'], 60 * 13.55)
+
+    def test_entrada_com_pedido(self):
+        token = self.login()
+        pid = self._criar_produto(token)
+        status, ped = self.request('POST', '/api/pedidos', {'numero': f'{uuid.uuid4().hex[:6]}/2026'}, token)
+        self.assertEqual(status, 201, ped)
+        status, ent = self.request('POST', '/api/entradas', {
+            'tipo': 'pedido', 'pedido_id': ped['id'], 'data_entrega': '2026-07-01',
+            'itens': [{'produto_id': pid, 'quantidade_unidades': 10, 'valor_unitario': 2.0}]
+        }, token)
+        self.assertEqual(status, 201, ent)
+        self.assertEqual(ent['pedido_id'], ped['id'])
+
+    def test_saida_fracionada_e_reversao_no_delete(self):
+        token = self.login()
+        pid = self._criar_produto(token, qtd_por_embalagem=12)
+        self.request('POST', '/api/entradas', {
+            'tipo': 'compra_direta', 'data_entrega': '2026-07-01',
+            'itens': [{'produto_id': pid, 'quantidade_embalagem': 1, 'valor_unitario': 10}]
+        }, token)
+        status, sai = self.request('POST', '/api/saidas', {
+            'data': '2026-07-12', 'itens': [{'produto_id': pid, 'quantidade': 2}]
+        }, token)
+        self.assertEqual(status, 201, sai)
+        status, prod = self.request('GET', f'/api/produtos/{pid}', token=token)
+        self.assertEqual(prod['estoque_fisico'], 10)  # 12 - 2
+
+        status, _ = self.request('DELETE', f'/api/saidas/{sai["id"]}', token=token)
+        self.assertEqual(status, 200)
+        status, prod = self.request('GET', f'/api/produtos/{pid}', token=token)
+        self.assertEqual(prod['estoque_fisico'], 12)  # revertido
+
+    def test_saida_estoque_insuficiente_retorna_409(self):
+        token = self.login()
+        pid = self._criar_produto(token)
+        status, data = self.request('POST', '/api/saidas', {
+            'data': '2026-07-12', 'itens': [{'produto_id': pid, 'quantidade': 5}]
+        }, token)
+        self.assertEqual(status, 409, data)
+
+    def test_delete_entrada_bloqueado_apos_consumo_parcial(self):
+        token = self.login()
+        pid = self._criar_produto(token)
+        status, ent = self.request('POST', '/api/entradas', {
+            'tipo': 'compra_direta', 'data_entrega': '2026-07-01',
+            'itens': [{'produto_id': pid, 'quantidade_unidades': 10, 'valor_unitario': 1}]
+        }, token)
+        self.request('POST', '/api/saidas', {
+            'data': '2026-07-12', 'itens': [{'produto_id': pid, 'quantidade': 3}]
+        }, token)
+        status, data = self.request('DELETE', f'/api/entradas/{ent["id"]}', token=token)
+        self.assertEqual(status, 409, data)
+
+
+class TestLixeiraEWipe(SGEATestCase):
+    # ponytail: test_wipe_* apaga o banco compartilhado da suíte — depende de
+    # unittest descobrir as classes em ordem alfabética ("L" já é a última classe
+    # hoje). Se uma nova classe de teste for adicionada depois de "L" no alfabeto,
+    # mova o teste de wipe para o final do arquivo ou isole-o em módulo próprio.
+
+    def test_entrada_excluida_zera_lote_e_restaurar_devolve(self):
+        token = self.login()
+        pid = self._criar_produto(token)
+        status, ent = self.request('POST', '/api/entradas', {
+            'tipo': 'compra_direta', 'data_entrega': '2026-07-01',
+            'itens': [{'produto_id': pid, 'quantidade_unidades': 10, 'valor_unitario': 1}]
+        }, token)
+        self.assertEqual(status, 201, ent)
+
+        self.request('DELETE', f'/api/entradas/{ent["id"]}', token=token)
+        status, prod = self.request('GET', f'/api/produtos/{pid}', token=token)
+        self.assertEqual(prod['estoque_fisico'], 0)  # exclusão zera o efeito no estoque, não só some da lista
+
+        status, trash = self.request('GET', '/api/entradas?trash=1', token=token)
+        self.assertTrue(any(e['id'] == ent['id'] for e in trash['items']))
+
+        status, restored = self.request('PUT', f'/api/entradas/{ent["id"]}/restore', token=token)
+        self.assertEqual(status, 200, restored)
+        status, prod = self.request('GET', f'/api/produtos/{pid}', token=token)
+        self.assertEqual(prod['estoque_fisico'], 10)
+
+    def test_saida_excluida_e_restaurada_reconsome_fefo(self):
+        token = self.login()
+        pid = self._criar_produto(token)
+        self.request('POST', '/api/entradas', {
+            'tipo': 'compra_direta', 'data_entrega': '2026-07-01',
+            'itens': [{'produto_id': pid, 'quantidade_unidades': 10, 'valor_unitario': 2}]
+        }, token)
+        status, sai = self.request('POST', '/api/saidas', {
+            'data': '2026-07-12', 'itens': [{'produto_id': pid, 'quantidade': 4}]
+        }, token)
+        self.assertEqual(status, 201, sai)
+
+        self.request('DELETE', f'/api/saidas/{sai["id"]}', token=token)
+        status, prod = self.request('GET', f'/api/produtos/{pid}', token=token)
+        self.assertEqual(prod['estoque_fisico'], 10)  # revertido
+
+        status, restored = self.request('PUT', f'/api/saidas/{sai["id"]}/restore', token=token)
+        self.assertEqual(status, 200, restored)
+        status, prod = self.request('GET', f'/api/produtos/{pid}', token=token)
+        self.assertEqual(prod['estoque_fisico'], 6)  # 10 - 4 de novo
+
+    def test_wipe_mantem_usuarios_e_settings_limpa_o_resto(self):
+        token = self.login()
+        self._criar_produto(token)
+        self.request('PUT', '/api/settings/org', {'orgao': 'Prefeitura de Teste Wipe'}, token)
+
+        status, _ = self.request('DELETE', '/api/wipe', token=token)
+        self.assertEqual(status, 200)
+
+        status, produtos = self.request('GET', '/api/produtos', token=token)
+        self.assertEqual(produtos['items'], [])
+        status, usuarios = self.request('GET', '/api/usuarios', token=token)
+        self.assertEqual(len(usuarios), 1)
+        status, settings = self.request('GET', '/api/settings', token=token)
+        self.assertEqual(settings['orgao'], 'Prefeitura de Teste Wipe')
+
+
+class TestAuditoria(SGEATestCase):
+
+    def test_gravar_e_filtrar_auditoria(self):
+        token = self.login()
+        status, _ = self.request('POST', '/api/audit', {'type': 'PRODUTO_CRIADO', 'detail': 'Produto XYZ criado'}, token)
+        self.assertEqual(status, 200)
+        status, data = self.request('GET', '/api/audit?tipo=PRODUTO_CRIADO', token=token)
+        self.assertEqual(status, 200)
+        self.assertGreaterEqual(data['total'], 1)
+        self.assertEqual(data['items'][0]['type'], 'PRODUTO_CRIADO')
+        self.assertEqual(data['items'][0]['user_nome'], 'Administrador')  # vem da sessão, não do body
+
+    def test_audit_ignora_user_do_body(self):
+        token = self.login()
+        self.request('POST', '/api/audit', {'type': 'TESTE', 'detail': 'x', 'user_nome': 'Forjado'}, token)
+        status, data = self.request('GET', '/api/audit?tipo=TESTE', token=token)
+        self.assertEqual(data['items'][0]['user_nome'], 'Administrador')
+
+
+if __name__ == '__main__':
+    unittest.main()

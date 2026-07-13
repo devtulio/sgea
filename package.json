@@ -1,0 +1,16 @@
+{
+  "name": "sgea-lint",
+  "private": true,
+  "version": "1.0.0",
+  "type": "module",
+  "description": "Ferramentas de desenvolvimento do SGEA (lint e testes — não afeta o runtime do sistema, que continua zero-dependência)",
+  "scripts": {
+    "lint": "node scripts/lint.mjs",
+    "test:e2e": "playwright test"
+  },
+  "devDependencies": {
+    "@playwright/test": "^1.61.1",
+    "eslint": "^9.15.0",
+    "globals": "^14.0.0"
+  }
+}

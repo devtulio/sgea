@@ -1,0 +1,2 @@
+# SGEA roda inteiramente com a biblioteca padrão do Python — nenhuma
+# dependência externa é necessária para o servidor funcionar.

@@ -1,0 +1,26 @@
+# Arquivos de desenvolvimento (Claude Code)
+.claude/
+
+# Runtime — banco de dados
+sgea.db
+sgea.db-wal
+sgea.db-shm
+
+# Runtime — logs e cache
+sgea_errors.log
+__pycache__/
+
+# Runtime — pastas de dados
+backups/
+browser-profile/
+
+# Arquivos institucionais (não versionar)
+brasao.png
+
+# Arquivos temporários
+*.log
+
+# Ferramentas de desenvolvimento (lint, testes) — não fazem parte do runtime
+node_modules/
+test-results/
+playwright-report/
