@@ -5,6 +5,11 @@
 
 ---
 
+## [0.7.0] — 2026-07-13
+
+### Adicionado
+- **Painel de configuração da animação de fundo na tela de login** — botão de engrenagem abre um painel com controles de número de partículas, distância de conexão e velocidade, com persistência em localStorage e botão "Restaurar padrões" (mesmo padrão do SGCD/SGCA/SGDP; mantida a versão mais simples do SGEA, sem interação com o mouse)
+
 ## [0.6.0] — 2026-07-13
 
 ### Alterado — Padronização do esqueleto de navegação (padrão SGCD)

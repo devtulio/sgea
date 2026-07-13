@@ -641,6 +641,45 @@
 <!-- ── Login ── -->
 <div id="overlay-pin">
   <canvas id="pin-canvas" aria-hidden="true"></canvas>
+
+  <!-- Configurações do efeito de fundo -->
+  <div style="position:absolute;bottom:18px;right:18px;z-index:2">
+    <button onclick="_lcToggleConfig()" title="Configurar efeito de fundo"
+      style="width:32px;height:32px;border-radius:50%;background:rgba(255,255,255,.08);border:1px solid rgba(255,255,255,.18);color:rgba(255,255,255,.55);cursor:pointer;display:flex;align-items:center;justify-content:center;transition:background .15s;font-size:0;padding:0"
+      onmouseover="this.style.background='rgba(255,255,255,.16)'" onmouseout="this.style.background='rgba(255,255,255,.08)'">
+      <svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><circle cx="12" cy="12" r="3"/><path d="M19.4 15a1.65 1.65 0 0 0 .33 1.82l.06.06a2 2 0 0 1-2.83 2.83l-.06-.06a1.65 1.65 0 0 0-1.82-.33 1.65 1.65 0 0 0-1 1.51V21a2 2 0 0 1-4 0v-.09A1.65 1.65 0 0 0 9 19.4a1.65 1.65 0 0 0-1.82.33l-.06.06a2 2 0 0 1-2.83-2.83l.06-.06A1.65 1.65 0 0 0 4.68 15a1.65 1.65 0 0 0-1.51-1H3a2 2 0 0 1 0-4h.09A1.65 1.65 0 0 0 4.6 9a1.65 1.65 0 0 0-.33-1.82l-.06-.06a2 2 0 0 1 2.83-2.83l.06.06A1.65 1.65 0 0 0 9 4.68a1.65 1.65 0 0 0 1-1.51V3a2 2 0 0 1 4 0v.09a1.65 1.65 0 0 0 1 1.51 1.65 1.65 0 0 0 1.82-.33l.06-.06a2 2 0 0 1 2.83 2.83l-.06.06A1.65 1.65 0 0 0 19.4 9a1.65 1.65 0 0 0 1.51 1H21a2 2 0 0 1 0 4h-.09a1.65 1.65 0 0 0-1.51 1z"/></svg>
+    </button>
+    <div id="lc-config-panel" style="display:none;position:absolute;bottom:40px;right:0;width:220px;background:rgba(10,22,48,.92);border:1px solid rgba(255,255,255,.15);border-radius:10px;padding:14px 16px;backdrop-filter:blur(8px)">
+      <div style="font-size:10px;font-weight:600;color:rgba(255,255,255,.5);letter-spacing:.08em;margin-bottom:12px;text-transform:uppercase">Efeito de fundo</div>
+      <div style="margin-bottom:10px">
+        <div style="display:flex;justify-content:space-between;align-items:center;margin-bottom:4px">
+          <span style="font-size:11px;color:rgba(255,255,255,.65)">Quantidade de nós</span>
+          <span id="lc-out-nodes" style="font-size:11px;font-weight:600;color:rgba(255,255,255,.9)">50</span>
+        </div>
+        <input type="range" id="lc-sl-nodes" min="20" max="120" value="50" oninput="_lcParam('count',+this.value,'lc-out-nodes')"
+          style="width:100%;height:3px;accent-color:rgba(180,190,210,.8);cursor:pointer">
+      </div>
+      <div style="margin-bottom:10px">
+        <div style="display:flex;justify-content:space-between;align-items:center;margin-bottom:4px">
+          <span style="font-size:11px;color:rgba(255,255,255,.65)">Distância de conexão</span>
+          <span id="lc-out-dist" style="font-size:11px;font-weight:600;color:rgba(255,255,255,.9)">110</span>
+        </div>
+        <input type="range" id="lc-sl-dist" min="60" max="200" value="110" oninput="_lcParam('dist',+this.value,'lc-out-dist')"
+          style="width:100%;height:3px;accent-color:rgba(180,190,210,.8);cursor:pointer">
+      </div>
+      <div style="margin-bottom:12px">
+        <div style="display:flex;justify-content:space-between;align-items:center;margin-bottom:4px">
+          <span style="font-size:11px;color:rgba(255,255,255,.65)">Velocidade</span>
+          <span id="lc-out-speed" style="font-size:11px;font-weight:600;color:rgba(255,255,255,.9)">4</span>
+        </div>
+        <input type="range" id="lc-sl-speed" min="1" max="10" value="4" oninput="_lcParam('speed',+this.value,'lc-out-speed')"
+          style="width:100%;height:3px;accent-color:rgba(180,190,210,.8);cursor:pointer">
+      </div>
+      <button onclick="_lcResetConfig()" style="width:100%;padding:5px 0;background:rgba(255,255,255,.07);border:1px solid rgba(255,255,255,.15);border-radius:6px;color:rgba(255,255,255,.5);font-size:10px;cursor:pointer;letter-spacing:.04em"
+        onmouseover="this.style.background='rgba(255,255,255,.13)'" onmouseout="this.style.background='rgba(255,255,255,.07)'">Restaurar padrões</button>
+    </div>
+  </div>
+
   <div id="pin-card">
     <div class="pin-header">
       <div class="pin-icon" aria-hidden="true">
@@ -887,7 +926,7 @@
 // ══════════════════════════════════════════════════════════════
 // API / SESSÃO
 // ══════════════════════════════════════════════════════════════
-const SGEA_VERSION = '0.6.0';
+const SGEA_VERSION = '0.7.0';
 document.title = `SGEA v${SGEA_VERSION}`;
 
 let _apiToken = localStorage.getItem('sgea-token') || null;
@@ -1055,25 +1094,79 @@ async function _onLoginSuccess() {
 // ══════════════════════════════════════════════════════════════
 // FUNDO ANIMADO DA TELA DE LOGIN — rede de partículas que se conectam
 // quando próximas, à deriva dentro do canvas. Mais simples que o efeito
-// dos sistemas irmãos: sem interação com o mouse nem painel de ajuste,
-// só o visual — não pedido, não construído.
+// dos sistemas irmãos: sem interação com o mouse — só o visual — não
+// pedido, não construído. Painel de ajuste (nós/distância/velocidade)
+// portado dos irmãos.
 // ══════════════════════════════════════════════════════════════
 let _lcRaf = null, _lcNodes = [];
-const _LC = { count: 50, dist: 110, speed: 0.3 };
+const _LC_DEFAULTS = { count: 50, dist: 110, speed: 4 };
+const _LC = Object.assign({}, _LC_DEFAULTS);
+
+function _lcLoadConfig() {
+  try {
+    const s = JSON.parse(localStorage.getItem('sgea_lc_config') || '{}');
+    if (s.count) _LC.count = s.count;
+    if (s.dist)  _LC.dist  = s.dist;
+    if (s.speed) _LC.speed = s.speed;
+  } catch {}
+  const sl = id => document.getElementById(id);
+  if (sl('lc-sl-nodes')) { sl('lc-sl-nodes').value = _LC.count; sl('lc-out-nodes').textContent = _LC.count; }
+  if (sl('lc-sl-dist'))  { sl('lc-sl-dist').value  = _LC.dist;  sl('lc-out-dist').textContent  = _LC.dist;  }
+  if (sl('lc-sl-speed')) { sl('lc-sl-speed').value = _LC.speed; sl('lc-out-speed').textContent = _LC.speed; }
+}
+function _lcSaveConfig() {
+  localStorage.setItem('sgea_lc_config', JSON.stringify({ count: _LC.count, dist: _LC.dist, speed: _LC.speed }));
+}
+function _lcToggleConfig() {
+  const p = document.getElementById('lc-config-panel');
+  if (p) p.style.display = p.style.display === 'none' ? 'block' : 'none';
+}
+function _lcParam(key, val, outId) {
+  document.getElementById(outId).textContent = val;
+  if (key === 'count') {
+    _LC.count = val;
+    while (_lcNodes.length < val) {
+      const c = document.getElementById('pin-canvas');
+      _lcNodes.push({ x: Math.random()*(c?.width||800), y: Math.random()*(c?.height||600),
+        vx: (Math.random()-.5)*_lcSpeedVal(), vy: (Math.random()-.5)*_lcSpeedVal(), r: Math.random()*1.6+1 });
+    }
+    while (_lcNodes.length > val) _lcNodes.pop();
+  } else if (key === 'dist') {
+    _LC.dist = val;
+  } else if (key === 'speed') {
+    _LC.speed = val;
+    const s = _lcSpeedVal();
+    for (const n of _lcNodes) {
+      const a = Math.atan2(n.vy, n.vx);
+      const m = Math.random() * s + s * .3;
+      n.vx = Math.cos(a) * m; n.vy = Math.sin(a) * m;
+    }
+  }
+  _lcSaveConfig();
+}
+function _lcResetConfig() {
+  Object.assign(_LC, _LC_DEFAULTS);
+  _lcSaveConfig();
+  _lcLoadConfig();
+  _lcNodes = [];
+}
+function _lcSpeedVal() { return _LC.speed * 0.08; }
 
 function _loginCanvasStart() {
   const canvas = document.getElementById('pin-canvas');
   const overlay = document.getElementById('overlay-pin');
   if (!canvas || !overlay) return;
   const ctx = canvas.getContext('2d');
+  _lcLoadConfig();
   canvas.width = overlay.offsetWidth;
   canvas.height = overlay.offsetHeight;
 
   if (!_lcNodes.length) {
     for (let i = 0; i < _LC.count; i++) {
+      const s = _lcSpeedVal();
       _lcNodes.push({
         x: Math.random() * canvas.width, y: Math.random() * canvas.height,
-        vx: (Math.random() - .5) * _LC.speed * 2, vy: (Math.random() - .5) * _LC.speed * 2,
+        vx: (Math.random() - .5) * s * 2, vy: (Math.random() - .5) * s * 2,
         r: Math.random() * 1.6 + 1,
       });
     }
