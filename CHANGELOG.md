@@ -5,6 +5,12 @@
 
 ---
 
+## [0.11.0] — 2026-07-13
+
+### Adicionado
+- **Relatório de Backup e Integridade** — novo botão na aba Dados de Configurações gera um documento imprimível com status do backup automático, tamanhos em disco, contagens gerais do sistema (produtos, entradas, saídas, lotes, usuários, cadastros de apoio) e os eventos recentes de backup/restauração/reset, no mesmo padrão dos sistemas irmãos
+- **Auditoria de restauração e reset de fábrica** — restaurar um backup (JSON ou .db) e o reset de fábrica agora registram um evento na trilha de auditoria, o que antes não acontecia
+
 ## [0.10.0] — 2026-07-13
 
 ### Adicionado

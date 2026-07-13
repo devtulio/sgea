@@ -1,4 +1,4 @@
-# SGEA v0.10.0 — Servidor local: SQLite, autenticação, REST API, controle de estoque por lote (FEFO), backup automático
+# SGEA v0.11.0 — Servidor local: SQLite, autenticação, REST API, controle de estoque por lote (FEFO), backup automático
 import http.server
 import socketserver
 import os
@@ -679,6 +679,10 @@ class SGEAHandler(http.server.SimpleHTTPRequestHandler):
                 rows = conn.execute('SELECT id,username,nome,admin,ativo,cpf,email,cargo,matricula,criado_em FROM usuarios').fetchall()
             self._json(200, [dict(r) for r in rows])
 
+        elif p == '/api/relatorio/integridade':
+            if not s['admin']: self._json(403, {'error': 'Acesso restrito'}); return
+            self._relatorio_integridade()
+
         elif p == '/api/settings':
             with get_db() as conn:
                 rows = conn.execute(
@@ -736,7 +740,7 @@ class SGEAHandler(http.server.SimpleHTTPRequestHandler):
     def _route_post(self, p, body, s):
         if p == '/api/backups/db/restore':
             if not s['admin']: self._json(403, {'error': 'Acesso restrito'}); return
-            self._restore_db_backup(body)
+            self._restore_db_backup(body, s)
             return
 
         data = self._parse_json(body)
@@ -756,7 +760,7 @@ class SGEAHandler(http.server.SimpleHTTPRequestHandler):
             self._send_email(data)
         elif p == '/api/backup/restore':
             if not s['admin']: self._json(403, {'error': 'Acesso restrito'}); return
-            self._restore_backup(data)
+            self._restore_backup(data, s)
         elif p == '/api/backups/db/now':
             if not s['admin']: self._json(403, {'error': 'Acesso restrito'}); return
             name = _do_db_backup()
@@ -854,6 +858,9 @@ class SGEAHandler(http.server.SimpleHTTPRequestHandler):
                     if tbl != 'sys_settings':
                         conn.execute(f'DELETE FROM {tbl}')
                 conn.execute('DELETE FROM audit_global')
+                _insert_audit_raw(conn, {'type': 'FACTORY_RESET', 'ts': _now(),
+                                          'user_id': s['user_id'], 'user_nome': s['nome'],
+                                          'label': 'Todos os dados apagados', 'detail': 'Reset de fábrica'})
             self._json(200, {'ok': True})
         else:
             for seg, table in CRUD_ROUTES.items():
@@ -1483,7 +1490,7 @@ class SGEAHandler(http.server.SimpleHTTPRequestHandler):
         finally:
             _watchdog_paused = False
 
-    def _restore_backup(self, data):
+    def _restore_backup(self, data, s):
         if not data.get('_sgea'):
             self._json(400, {'error': 'Arquivo não é um backup SGEA válido'}); return
         _do_db_backup()  # segurança antes de substituir tudo
@@ -1496,12 +1503,15 @@ class SGEAHandler(http.server.SimpleHTTPRequestHandler):
                         cols = list(row.keys())
                         conn.execute(f'INSERT INTO {t} ({",".join(cols)}) VALUES ({",".join("?" * len(cols))})',
                                      [row[c] for c in cols])
+                _insert_audit_raw(conn, {'type': 'RESTAURAR_BACKUP', 'ts': _now(),
+                                          'user_id': s['user_id'], 'user_nome': s['nome'],
+                                          'label': 'Backup do sistema restaurado', 'detail': 'Restauração via arquivo JSON'})
         except Exception as e:
             _log.error('Erro ao restaurar backup JSON: %s', e)
             self._json(500, {'error': f'Falha ao restaurar: {e}'}); return
         self._json(200, {'ok': True})
 
-    def _restore_db_backup(self, raw_bytes):
+    def _restore_db_backup(self, raw_bytes, s):
         if len(raw_bytes) < 16 or raw_bytes[:16] != b'SQLite format 3\x00':
             self._json(400, {'error': 'Arquivo não é um banco SQLite válido'}); return
         import tempfile
@@ -1516,6 +1526,11 @@ class SGEAHandler(http.server.SimpleHTTPRequestHandler):
             _do_db_backup()
             with sqlite3.connect(tmp.name, factory=_ConnAutoClose) as src, get_db() as dst:
                 src.backup(dst)
+                # Registrado na conexão já restaurada — o backup() acima substitui todo o
+                # banco, então logar antes seria sobrescrito pelo conteúdo do arquivo restaurado.
+                _insert_audit_raw(dst, {'type': 'RESTAURAR_DB', 'ts': _now(),
+                                         'user_id': s['user_id'], 'user_nome': s['nome'],
+                                         'label': 'Banco de dados restaurado', 'detail': 'Restauração via arquivo .db'})
             self._json(200, {'ok': True})
         except Exception as e:
             _log.error('Erro ao restaurar banco: %s', e)
@@ -1523,6 +1538,44 @@ class SGEAHandler(http.server.SimpleHTTPRequestHandler):
         finally:
             try: os.remove(tmp.name)
             except Exception: pass
+
+    def _relatorio_integridade(self):
+        cfg = _get_backup_cfg()
+        bdir = cfg['path']
+        backups_db = sorted(
+            (f for f in os.listdir(bdir) if f.startswith('DB_SGEA_BACKUP_') and f.endswith('.db')),
+            reverse=True
+        ) if os.path.isdir(bdir) else []
+        backups_json = sorted(
+            (f for f in os.listdir(bdir) if f.startswith('SIS_SGEA_BACKUP_') and f.endswith('.json')),
+            reverse=True
+        ) if os.path.isdir(bdir) else []
+
+        with get_db() as conn:
+            cadastros_apoio = sum(conn.execute(f'SELECT COUNT(*) FROM {t} WHERE ativo=1').fetchone()[0]
+                                   for t in ('centros_custo', 'fornecedores', 'funcionarios', 'frota'))
+            contagens = {
+                'produtos_ativos': conn.execute('SELECT COUNT(*) FROM produtos WHERE ativo=1').fetchone()[0],
+                'entradas_ativas': conn.execute('SELECT COUNT(*) FROM entradas WHERE deleted_at IS NULL').fetchone()[0],
+                'saidas_ativas': conn.execute('SELECT COUNT(*) FROM saidas WHERE deleted_at IS NULL').fetchone()[0],
+                'lotes': conn.execute('SELECT COUNT(*) FROM lotes').fetchone()[0],
+                'usuarios_ativos': conn.execute('SELECT COUNT(*) FROM usuarios WHERE ativo=1').fetchone()[0],
+                'cadastros_apoio': cadastros_apoio,
+            }
+            eventos = [dict(r) for r in conn.execute(
+                '''SELECT * FROM audit_global WHERE type IN
+                   ('RESTAURAR_BACKUP','RESTAURAR_DB','FACTORY_RESET')
+                   ORDER BY ts DESC LIMIT 15''').fetchall()]
+            last_row = conn.execute("SELECT value FROM sys_settings WHERE key='auto_backup_last'").fetchone()
+
+        self._json(200, {
+            'auto_backup_enabled': cfg['enabled'], 'auto_backup_keep': cfg['keep'], 'backup_path': bdir,
+            'last_backup': last_row['value'] if last_row else None,
+            'db_size_bytes': os.path.getsize(DB_PATH) if os.path.isfile(DB_PATH) else 0,
+            'backups_db_count': len(backups_db), 'backups_json_count': len(backups_json),
+            'backups_db_size_bytes': sum(os.path.getsize(os.path.join(bdir, f)) for f in backups_db),
+            'contagens': contagens, 'eventos_recentes': eventos,
+        })
 
     # ── Helpers HTTP ─────────────────────────────────────────────────────────
 
@@ -1672,6 +1725,14 @@ def _rotate_backups(cfg=None):
                 except Exception as e:
                     _log.error('Falha ao remover backup %s: %s', old, e)
                     break
+
+def _insert_audit_raw(conn, a):
+    conn.execute(
+        '''INSERT INTO audit_global (id,ts,user_id,user_nome,type,label,detail,process_id)
+           VALUES (?,?,?,?,?,?,?,?)''',
+        (a.get('id') or str(uuid.uuid4()), a.get('ts'), a.get('user_id'), a.get('user_nome'),
+         a.get('type'), a.get('label'), a.get('detail'), a.get('process_id'))
+    )
 
 def _get_backup_cfg():
     try:
