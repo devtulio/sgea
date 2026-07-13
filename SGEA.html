@@ -520,10 +520,10 @@
       <fieldset class="cfg-fieldset">
         <legend>Cor de Destaque</legend>
         <div style="display:flex;gap:18px;flex-wrap:wrap;font-size:.85rem">
-          <label style="display:flex;align-items:center;gap:7px;font-weight:400;text-transform:none"><input type="radio" name="cfg-cor" value="institucional"> <span class="cor-swatch" style="background:#1a6b4a"></span> Institucional</label>
-          <label style="display:flex;align-items:center;gap:7px;font-weight:400;text-transform:none"><input type="radio" name="cfg-cor" value="azul"> <span class="cor-swatch" style="background:#0066CC"></span> Azul</label>
-          <label style="display:flex;align-items:center;gap:7px;font-weight:400;text-transform:none"><input type="radio" name="cfg-cor" value="verde"> <span class="cor-swatch" style="background:#1a7a3c"></span> Verde</label>
-          <label style="display:flex;align-items:center;gap:7px;font-weight:400;text-transform:none"><input type="radio" name="cfg-cor" value="roxo"> <span class="cor-swatch" style="background:#5E2750"></span> Roxo</label>
+          <label style="display:flex;align-items:center;gap:7px;font-weight:400;text-transform:none"><input type="radio" name="cfg-cor" value="institucional" style="accent-color:#1a6b4a"> <span class="cor-swatch" style="background:#1a6b4a"></span> Institucional</label>
+          <label style="display:flex;align-items:center;gap:7px;font-weight:400;text-transform:none"><input type="radio" name="cfg-cor" value="azul" style="accent-color:#0066CC"> <span class="cor-swatch" style="background:#0066CC"></span> Azul</label>
+          <label style="display:flex;align-items:center;gap:7px;font-weight:400;text-transform:none"><input type="radio" name="cfg-cor" value="verde" style="accent-color:#1a7a3c"> <span class="cor-swatch" style="background:#1a7a3c"></span> Verde</label>
+          <label style="display:flex;align-items:center;gap:7px;font-weight:400;text-transform:none"><input type="radio" name="cfg-cor" value="roxo" style="accent-color:#5E2750"> <span class="cor-swatch" style="background:#5E2750"></span> Roxo</label>
         </div>
         <p class="cfg-help">Aplicado ao clicar em Salvar.</p>
       </fieldset>
@@ -926,7 +926,7 @@
 // ══════════════════════════════════════════════════════════════
 // API / SESSÃO
 // ══════════════════════════════════════════════════════════════
-const SGEA_VERSION = '0.7.0';
+const SGEA_VERSION = '0.8.0';
 document.title = `SGEA v${SGEA_VERSION}`;
 
 let _apiToken = localStorage.getItem('sgea-token') || null;
@@ -1227,7 +1227,68 @@ function toast(msg, type = '') {
   el.textContent = msg;
   document.getElementById('toast').appendChild(el);
   setTimeout(() => el.remove(), 3500);
+  if (type === 'success') playSuccess();
+  else if (type === 'error') playError();
 }
+
+// ══════════════════════════════════════════════════════════════
+// SOUNDS — Web Audio API
+// ══════════════════════════════════════════════════════════════
+const _ac = () => new (window.AudioContext || window.webkitAudioContext)();
+
+function playClick() {
+  try {
+    const ac = _ac();
+    const o = ac.createOscillator();
+    const g = ac.createGain();
+    o.connect(g); g.connect(ac.destination);
+    o.type = 'sine'; o.frequency.setValueAtTime(880, ac.currentTime);
+    o.frequency.exponentialRampToValueAtTime(660, ac.currentTime + .06);
+    g.gain.setValueAtTime(.18, ac.currentTime);
+    g.gain.exponentialRampToValueAtTime(.001, ac.currentTime + .08);
+    o.start(); o.stop(ac.currentTime + .08);
+  } catch(e) {}
+}
+
+function playSuccess() {
+  try {
+    const ac = _ac();
+    [[523,0],[659,.1],[784,.2],[1047,.32]].forEach(([f,t]) => {
+      const o = ac.createOscillator(), g = ac.createGain();
+      o.connect(g); g.connect(ac.destination);
+      o.type = 'sine'; o.frequency.value = f;
+      g.gain.setValueAtTime(.0001, ac.currentTime + t);
+      g.gain.exponentialRampToValueAtTime(.22, ac.currentTime + t + .02);
+      g.gain.exponentialRampToValueAtTime(.0001, ac.currentTime + t + .18);
+      o.start(ac.currentTime + t); o.stop(ac.currentTime + t + .2);
+    });
+  } catch(e) {}
+}
+
+function playError() {
+  try {
+    const ac = _ac();
+    [[440,0],[330,.1],[220,.22]].forEach(([f,t]) => {
+      const o = ac.createOscillator(), g = ac.createGain();
+      o.connect(g); g.connect(ac.destination);
+      o.type = 'sawtooth'; o.frequency.value = f;
+      g.gain.setValueAtTime(.0001, ac.currentTime + t);
+      g.gain.exponentialRampToValueAtTime(.12, ac.currentTime + t + .02);
+      g.gain.exponentialRampToValueAtTime(.0001, ac.currentTime + t + .15);
+      o.start(ac.currentTime + t); o.stop(ac.currentTime + t + .18);
+    });
+  } catch(e) {}
+}
+
+// ── Wire sounds to all buttons globally ──────────────────────
+document.addEventListener('click', e => {
+  const btn = e.target.closest('button, .process-card, .step-row');
+  if (!btn) return;
+  if (btn.classList.contains('btn-success')) { playSuccess(); return; }
+  if (btn.classList.contains('btn-danger'))  { playError();   return; }
+  if (btn.classList.contains('process-card')) { playClick();  return; }
+  playClick();
+}, true);
 
 function customConfirm(msg, { title = 'Confirmar', okLabel = 'Confirmar', okClass = 'btn-danger', cancelLabel = 'Cancelar' } = {}) {
   return new Promise(res => {

@@ -5,6 +5,14 @@
 
 ---
 
+## [0.8.0] — 2026-07-13
+
+### Adicionado
+- **Som ao clicar em botões** — mesmo efeito sonoro (Web Audio API, sem arquivos externos) dos sistemas irmãos: um clique curto em qualquer botão, um acorde ascendente em ações de sucesso e um som descendente em erros
+
+### Alterado
+- **Opções de "Cor de Destaque" nas Configurações agora seguem exatamente o padrão visual do SGCD** — cada opção de rádio (Institucional, Azul, Verde, Roxo) usa a cor correspondente na própria marcação de seleção, igual aos sistemas irmãos
+
 ## [0.7.0] — 2026-07-13
 
 ### Adicionado
