@@ -7,11 +7,11 @@
 <link rel="icon" type="image/x-icon" href="sgea.ico">
 <style>
   :root {
-    --brand:        #1a6b4a;
-    --brand-light:  #e8f5ef;
-    --brand-dark:   #0f4a33;
-    --accent:       #1a6b4a;
-    --accent-light: #2a9268;
+    --brand:        #1a3a6b;
+    --brand-light:  #e8eef7;
+    --brand-dark:   #102855;
+    --accent:       #1a3a6b;
+    --accent-light: #2a5298;
     --success:      #15803d;
     --success-light:#dcfce7;
     --warning:      #d97706;
@@ -520,7 +520,7 @@
       <fieldset class="cfg-fieldset">
         <legend>Cor de Destaque</legend>
         <div style="display:flex;gap:18px;flex-wrap:wrap;font-size:.85rem">
-          <label style="display:flex;align-items:center;gap:7px;font-weight:400;text-transform:none"><input type="radio" name="cfg-cor" value="institucional" style="accent-color:#1a6b4a"> <span class="cor-swatch" style="background:#1a6b4a"></span> Institucional</label>
+          <label style="display:flex;align-items:center;gap:7px;font-weight:400;text-transform:none"><input type="radio" name="cfg-cor" value="institucional" style="accent-color:#1a3a6b"> <span class="cor-swatch" style="background:#1a3a6b"></span> Institucional</label>
           <label style="display:flex;align-items:center;gap:7px;font-weight:400;text-transform:none"><input type="radio" name="cfg-cor" value="azul" style="accent-color:#0066CC"> <span class="cor-swatch" style="background:#0066CC"></span> Azul</label>
           <label style="display:flex;align-items:center;gap:7px;font-weight:400;text-transform:none"><input type="radio" name="cfg-cor" value="verde" style="accent-color:#1a7a3c"> <span class="cor-swatch" style="background:#1a7a3c"></span> Verde</label>
           <label style="display:flex;align-items:center;gap:7px;font-weight:400;text-transform:none"><input type="radio" name="cfg-cor" value="roxo" style="accent-color:#5E2750"> <span class="cor-swatch" style="background:#5E2750"></span> Roxo</label>
@@ -926,7 +926,7 @@
 // ══════════════════════════════════════════════════════════════
 // API / SESSÃO
 // ══════════════════════════════════════════════════════════════
-const SGEA_VERSION = '0.8.0';
+const SGEA_VERSION = '0.9.0';
 document.title = `SGEA v${SGEA_VERSION}`;
 
 let _apiToken = localStorage.getItem('sgea-token') || null;

@@ -5,6 +5,11 @@
 
 ---
 
+## [0.9.0] — 2026-07-13
+
+### Alterado
+- **Cor institucional (padrão) trocada de verde para azul-marinho** (`#1a3a6b`) — passa a usar exatamente a mesma cor institucional do SGCD/SGCA/SGDP em toda a interface (barra lateral, botões, login, manual). As opções alternativas "Azul", "Verde" e "Roxo" já eram idênticas às dos sistemas irmãos e não mudaram
+
 ## [0.8.0] — 2026-07-13
 
 ### Adicionado
