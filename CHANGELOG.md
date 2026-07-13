@@ -5,6 +5,11 @@
 
 ---
 
+## [0.10.0] — 2026-07-13
+
+### Adicionado
+- **Campos CPF, E-mail, Cargo e Matrícula no cadastro de usuários** — modal de "Novo Usuário"/"Editar Usuário" reescrito no padrão dos sistemas irmãos (largura 560px, ordem dos campos, opção "Ativo" escondida ao criar usuário novo), com máscara de CPF e as novas colunas exibidas na listagem de usuários
+
 ## [0.9.0] — 2026-07-13
 
 ### Alterado

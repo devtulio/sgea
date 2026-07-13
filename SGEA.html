@@ -902,16 +902,21 @@
 
 <!-- ── Modal Usuário ── -->
 <div class="overlay hidden" id="usuario-modal-overlay" role="dialog" aria-modal="true" aria-labelledby="usuario-modal-titulo">
-  <div class="modal">
+  <div class="modal" style="max-width:560px">
     <div class="modal-header">
       <h2 id="usuario-modal-titulo">Novo Usuário</h2>
       <button class="btn btn-ghost btn-icon" onclick="closeUsuarioModal()" aria-label="Fechar">✕</button>
     </div>
     <div class="modal-body">
-      <div class="info-field"><label for="uf-nome">Nome *</label><input type="text" id="uf-nome"></div>
-      <div class="info-field"><label for="uf-username">Usuário (login) *</label><input type="text" id="uf-username"></div>
-      <div class="info-field"><label for="uf-password">Senha <span id="uf-password-hint"></span></label><input type="password" id="uf-password"></div>
+      <div class="info-field"><label for="uf-username">Usuário (login) *</label><input type="text" id="uf-username" autocomplete="off"></div>
+      <div class="info-field"><label for="uf-password">Senha <span id="uf-password-hint"></span></label><input type="password" id="uf-password" autocomplete="new-password"></div>
+      <div class="info-field"><label for="uf-nome">Nome completo *</label><input type="text" id="uf-nome"></div>
+      <div class="info-field"><label for="uf-cpf">CPF</label><input type="text" id="uf-cpf" placeholder="000.000.000-00" maxlength="14" oninput="maskCpf(this)"></div>
+      <div class="info-field"><label for="uf-email">E-mail</label><input type="email" id="uf-email"></div>
+      <div class="info-field"><label for="uf-cargo">Cargo</label><input type="text" id="uf-cargo"></div>
+      <div class="info-field"><label for="uf-matricula">Matrícula</label><input type="text" id="uf-matricula"></div>
       <div class="info-field checkbox"><input type="checkbox" id="uf-admin"><label for="uf-admin" style="margin:0;text-transform:none;font-weight:500">Administrador</label></div>
+      <div class="info-field checkbox" id="uf-ativo-row" style="display:none"><input type="checkbox" id="uf-ativo"><label for="uf-ativo" style="margin:0;text-transform:none;font-weight:500">Conta ativa</label></div>
     </div>
     <div class="modal-footer">
       <button class="btn btn-outline" onclick="closeUsuarioModal()">Cancelar</button>
@@ -926,7 +931,7 @@
 // ══════════════════════════════════════════════════════════════
 // API / SESSÃO
 // ══════════════════════════════════════════════════════════════
-const SGEA_VERSION = '0.9.0';
+const SGEA_VERSION = '0.10.0';
 document.title = `SGEA v${SGEA_VERSION}`;
 
 let _apiToken = localStorage.getItem('sgea-token') || null;
@@ -1410,6 +1415,14 @@ function fmtDateTime(iso) {
 }
 function esc(s) {
   return String(s ?? '').replace(/[&<>"']/g, c => ({ '&': '&amp;', '<': '&lt;', '>': '&gt;', '"': '&quot;', "'": '&#39;' }[c]));
+}
+
+function maskCpf(input) {
+  let v = input.value.replace(/\D/g, '').slice(0, 11);
+  if (v.length > 9) v = v.replace(/^(\d{3})(\d{3})(\d{3})(\d{0,2})/, '$1.$2.$3-$4');
+  else if (v.length > 6) v = v.replace(/^(\d{3})(\d{3})(\d{0,3})/, '$1.$2.$3');
+  else if (v.length > 3) v = v.replace(/^(\d{3})(\d{0,3})/, '$1.$2');
+  input.value = v;
 }
 
 function _hideAllViews() { document.querySelectorAll('.view').forEach(v => v.classList.remove('active')); }
@@ -1997,9 +2010,10 @@ async function renderUsuarios() {
   _usuariosCache = items;
   const el = document.getElementById('usuarios-list');
   el.innerHTML = `<div class="list-table-wrap"><table class="list-table">
-    <thead><tr><th>Nome</th><th>Usuário</th><th>Admin</th><th>Status</th><th class="col-actions">Ações</th></tr></thead>
+    <thead><tr><th>Nome</th><th>Usuário</th><th>Cargo/Matrícula</th><th>Admin</th><th>Status</th><th class="col-actions">Ações</th></tr></thead>
     <tbody>${items.map(u => `<tr>
       <td>${esc(u.nome)}</td><td>${esc(u.username)}</td>
+      <td>${esc([u.cargo, u.matricula].filter(Boolean).join(' · ') || '—')}</td>
       <td>${u.admin ? '<span class="badge badge-ok">Sim</span>' : '<span class="badge badge-neutral">Não</span>'}</td>
       <td>${u.ativo ? '<span class="badge badge-ok">Ativo</span>' : '<span class="badge badge-neutral">Inativo</span>'}</td>
       <td class="col-actions">
@@ -2017,7 +2031,13 @@ function openUsuarioModal(id) {
   document.getElementById('uf-username').disabled = !!item;
   document.getElementById('uf-password').value = '';
   document.getElementById('uf-password-hint').textContent = item ? '(deixe em branco para manter)' : '';
+  document.getElementById('uf-cpf').value = item?.cpf || '';
+  document.getElementById('uf-email').value = item?.email || '';
+  document.getElementById('uf-cargo').value = item?.cargo || '';
+  document.getElementById('uf-matricula').value = item?.matricula || '';
   document.getElementById('uf-admin').checked = item ? !!item.admin : false;
+  document.getElementById('uf-ativo').checked = item ? !!item.ativo : true;
+  document.getElementById('uf-ativo-row').style.display = item ? '' : 'none';
   document.getElementById('usuario-modal-overlay').dataset.id = id || '';
   document.getElementById('usuario-modal-overlay').classList.remove('hidden');
 }
@@ -2027,12 +2047,16 @@ async function saveUsuario() {
   const nome = document.getElementById('uf-nome').value.trim();
   const username = document.getElementById('uf-username').value.trim();
   const password = document.getElementById('uf-password').value;
+  const cpf = document.getElementById('uf-cpf').value.trim();
+  const email = document.getElementById('uf-email').value.trim();
+  const cargo = document.getElementById('uf-cargo').value.trim();
+  const matricula = document.getElementById('uf-matricula').value.trim();
   const admin = document.getElementById('uf-admin').checked;
   if (!nome || (!id && !username)) { toast('Nome e usuário são obrigatórios.', 'error'); return; }
   if (!id && !password) { toast('Senha é obrigatória para novo usuário.', 'error'); return; }
-  const data = { nome, admin };
+  const data = { nome, admin, cpf, email, cargo, matricula };
   if (!id) { data.username = username; data.password = password; }
-  else if (password) { data.password = password; }
+  else { data.ativo = document.getElementById('uf-ativo').checked; if (password) data.password = password; }
   const r = id ? await API.put(`/api/usuarios/${id}`, data) : await API.post('/api/usuarios', data);
   const d = await API.json(r);
   if (!r || !r.ok) { toast(d?.error || 'Erro ao salvar usuário.', 'error'); return; }

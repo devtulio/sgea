@@ -1,4 +1,4 @@
-# SGEA v0.9.0 — Servidor local: SQLite, autenticação, REST API, controle de estoque por lote (FEFO), backup automático
+# SGEA v0.10.0 — Servidor local: SQLite, autenticação, REST API, controle de estoque por lote (FEFO), backup automático
 import http.server
 import socketserver
 import os
@@ -245,6 +245,11 @@ def init_db():
             CREATE INDEX IF NOT EXISTS idx_saidas_deleted ON saidas(deleted_at);
             CREATE INDEX IF NOT EXISTS idx_produtos_ativo ON produtos(ativo);
         ''')
+        cols_usu = [r[1] for r in conn.execute('PRAGMA table_info(usuarios)').fetchall()]
+        if 'cpf' not in cols_usu: conn.execute("ALTER TABLE usuarios ADD COLUMN cpf TEXT DEFAULT ''")
+        if 'email' not in cols_usu: conn.execute("ALTER TABLE usuarios ADD COLUMN email TEXT DEFAULT ''")
+        if 'cargo' not in cols_usu: conn.execute("ALTER TABLE usuarios ADD COLUMN cargo TEXT DEFAULT ''")
+        if 'matricula' not in cols_usu: conn.execute("ALTER TABLE usuarios ADD COLUMN matricula TEXT DEFAULT ''")
         conn.execute('''
             CREATE VIEW IF NOT EXISTS v_estoque AS
             SELECT p.id AS produto_id,
@@ -671,7 +676,7 @@ class SGEAHandler(http.server.SimpleHTTPRequestHandler):
             if not s['admin']:
                 self._json(403, {'error': 'Acesso restrito'}); return
             with get_db() as conn:
-                rows = conn.execute('SELECT id,username,nome,admin,ativo,criado_em FROM usuarios').fetchall()
+                rows = conn.execute('SELECT id,username,nome,admin,ativo,cpf,email,cargo,matricula,criado_em FROM usuarios').fetchall()
             self._json(200, [dict(r) for r in rows])
 
         elif p == '/api/settings':
@@ -917,8 +922,10 @@ class SGEAHandler(http.server.SimpleHTTPRequestHandler):
             self._json(400, {'error': 'Senha mínima: 6 caracteres'}); return
         try:
             with get_db() as conn:
-                conn.execute('INSERT INTO usuarios (username,nome,senha_hash,admin) VALUES (?,?,?,?)',
-                             (username, nome, _hash_password(password), int(bool(data.get('admin')))))
+                conn.execute('INSERT INTO usuarios (username,nome,senha_hash,admin,cpf,email,cargo,matricula) VALUES (?,?,?,?,?,?,?,?)',
+                             (username, nome, _hash_password(password), int(bool(data.get('admin'))),
+                              (data.get('cpf') or '').strip(), (data.get('email') or '').strip(),
+                              (data.get('cargo') or '').strip(), (data.get('matricula') or '').strip()))
                 uid = conn.execute('SELECT last_insert_rowid()').fetchone()[0]
             self._json(201, {'id': uid, 'username': username, 'nome': nome})
         except sqlite3.IntegrityError:
@@ -932,6 +939,10 @@ class SGEAHandler(http.server.SimpleHTTPRequestHandler):
             if 'nome' in data: fields.append('nome=?'); params.append(data['nome'])
             if 'admin' in data: fields.append('admin=?'); params.append(int(bool(data['admin'])))
             if 'ativo' in data: fields.append('ativo=?'); params.append(int(bool(data['ativo'])))
+            if 'cpf' in data: fields.append('cpf=?'); params.append((data['cpf'] or '').strip())
+            if 'email' in data: fields.append('email=?'); params.append((data['email'] or '').strip())
+            if 'cargo' in data: fields.append('cargo=?'); params.append((data['cargo'] or '').strip())
+            if 'matricula' in data: fields.append('matricula=?'); params.append((data['matricula'] or '').strip())
             if data.get('password'):
                 if len(data['password']) < 6:
                     self._json(400, {'error': 'Senha mínima: 6 caracteres'}); return
