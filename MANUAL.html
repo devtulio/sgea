@@ -3,7 +3,7 @@
 <head>
 <meta charset="UTF-8">
 <meta name="viewport" content="width=device-width, initial-scale=1.0">
-<title>Manual Operacional — SGEA v0.11.4</title>
+<title>Manual Operacional — SGEA v0.11.5</title>
 <style>
   * { box-sizing: border-box; margin: 0; padding: 0; }
   body { font-family: 'Times New Roman', Times, serif; font-size: 12pt; color: #000; background: #f5f5f5; }
@@ -63,7 +63,7 @@
     <div class="cover-title">Manual Operacional</div>
     <div class="cover-subtitle">SGEA — Sistema de Gestão de Estoque do Almoxarifado</div>
     <div class="cover-system">Entradas, Saídas, Lotes/Validade e cadastros de apoio</div>
-    <div class="cover-version">Versão v0.11.4</div>
+    <div class="cover-version">Versão v0.11.5</div>
     <br>
     <div style="font-size:11pt; color:#555; line-height:1.8;">
       Aplicação web multiusuário para o Almoxarifado<br>
@@ -170,6 +170,7 @@
   <h2 id="sec12">12. Histórico de Versões</h2>
   <table>
     <tr><th>Versão</th><th>Data</th><th>Resumo</th></tr>
+    <tr><td>0.11.5</td><td>14/07/2026</td><td>Funções de sessão (create/delete/renew/active) reimplementadas localmente, mecanicamente idênticas ao esqueleto compartilhado — agora delegam pro sgx_base.</td></tr>
     <tr><td>0.11.4</td><td>14/07/2026</td><td>Cabeçalho de título + ações de cada tela (.dash-top) sem nenhum estilo — a classe não estava definida nem no esqueleto compartilhado nem localmente; corrigido na fonte compartilhada.</td></tr>
     <tr><td>0.11.3</td><td>14/07/2026</td><td>Removido handler local de Tab-trap dentro de modais, duplicado do listener genérico do esqueleto compartilhado.</td></tr>
     <tr><td>0.11.2</td><td>14/07/2026</td><td>A caixa de confirmação (customConfirm) travava a operação para sempre ao ser fechada com Esc ou clique fora dela — corrigido na fonte compartilhada da família e propagado aos 4 sistemas.</td></tr>
