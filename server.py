@@ -1,4 +1,4 @@
-# SGEA v0.11.0 — Servidor local: SQLite, autenticação, REST API, controle de estoque por lote (FEFO), backup automático
+# SGEA v0.11.1 — Servidor local: SQLite, autenticação, REST API, controle de estoque por lote (FEFO), backup automático
 import http.server
 import socketserver
 import os
@@ -20,6 +20,8 @@ import re
 from email.mime.text import MIMEText
 from email.mime.multipart import MIMEMultipart
 from urllib.parse import urlparse, parse_qs
+
+import sgx_base
 
 # Windows: console pode usar cp1252/cp850 em vez de UTF-8, quebrando prints
 # com caracteres especiais (╔═╗, emojis). Força UTF-8 para evitar UnicodeEncodeError.
@@ -61,22 +63,13 @@ TRASH_RETENTION_DIAS = 30   # dias até um registro na lixeira ser apagado de ve
 
 # ── Banco de dados ────────────────────────────────────────────────────────────
 
-class _ConnAutoClose(sqlite3.Connection):
-    """sqlite3.Connection.__exit__ só faz commit/rollback da transação — não fecha
-    a conexão. Sem isso, todo `with get_db() as conn:` vaza uma conexão aberta por
-    chamada. Fecha a conexão junto, sem precisar alterar nenhum call site."""
-    def __exit__(self, exc_type, exc, tb):
-        try:
-            return super().__exit__(exc_type, exc, tb)
-        finally:
-            self.close()
+# Alias de compatibilidade: _ConnAutoClose é referenciada diretamente em vários
+# pontos além de get_db() (backup manual, restore, integrity check) — manter o
+# nome em vez de caçar cada call site.
+_ConnAutoClose = sgx_base.ConnAutoClose
 
 def get_db():
-    conn = sqlite3.connect(DB_PATH, factory=_ConnAutoClose)
-    conn.row_factory = sqlite3.Row
-    conn.execute('PRAGMA journal_mode=WAL')
-    conn.execute('PRAGMA foreign_keys=ON')
-    return conn
+    return sgx_base.connect_db(DB_PATH)
 
 def init_db():
     with get_db() as conn:
@@ -281,39 +274,16 @@ def init_db():
 
 # ── Segurança ─────────────────────────────────────────────────────────────────
 
-def _hash_password(password, salt=None):
-    if salt is None:
-        salt = secrets.token_hex(16)
-    dk = hashlib.pbkdf2_hmac('sha256', password.encode('utf-8'), salt.encode('utf-8'), 100_000)
-    return f'{salt}:{dk.hex()}'
-
-def _verify_password(password, stored):
-    try:
-        salt, _ = stored.split(':', 1)
-        return secrets.compare_digest(_hash_password(password, salt), stored)
-    except Exception:
-        return False
+_hash_password   = sgx_base.hash_password
+_verify_password = sgx_base.verify_password
 
 # ── Rate limit de login ─────────────────────────────────────────────────────
-# ponytail: dict em memória, sem lock — pior caso é uma contagem levemente
-# imprecisa sob concorrência, não uma falha; zera a cada reinício do servidor.
 LOGIN_MAX_ATTEMPTS   = 5
 LOGIN_LOCKOUT_WINDOW = 300   # 5 min — janela deslizante de tentativas falhas
-_login_failures = {}   # username (lower) -> [timestamps de tentativas falhas]
-
-def _login_rate_limited(username):
-    key = (username or '').strip().lower()
-    now = time.time()
-    attempts = [t for t in _login_failures.get(key, []) if now - t < LOGIN_LOCKOUT_WINDOW]
-    _login_failures[key] = attempts
-    return len(attempts) >= LOGIN_MAX_ATTEMPTS
-
-def _record_login_failure(username):
-    key = (username or '').strip().lower()
-    _login_failures.setdefault(key, []).append(time.time())
-
-def _clear_login_failures(username):
-    _login_failures.pop((username or '').strip().lower(), None)
+_rate_limiter = sgx_base.LoginRateLimiter(LOGIN_MAX_ATTEMPTS, LOGIN_LOCKOUT_WINDOW)
+_login_rate_limited   = _rate_limiter.is_locked
+_record_login_failure = _rate_limiter.record_failure
+_clear_login_failures  = _rate_limiter.clear
 
 def create_session(user_id):
     token = secrets.token_urlsafe(32)
@@ -1605,32 +1575,7 @@ class SGEAHandler(http.server.SimpleHTTPRequestHandler):
 
 # ── E-mail ───────────────────────────────────────────────────────────────────
 
-def _send_email_raw(smtp, frm, to, subj, html, plain=''):
-    msg = MIMEMultipart('alternative')
-    msg['Subject'] = subj
-    msg['From']    = f"{frm['name']} <{frm['email']}>"
-    msg['To']      = to if isinstance(to, str) else ', '.join(to)
-    if plain: msg.attach(MIMEText(plain, 'plain', 'utf-8'))
-    msg.attach(MIMEText(html, 'html', 'utf-8'))
-
-    port = int(smtp.get('port', 587))
-    host = smtp['host']
-    user = smtp['auth']['user']
-    pw   = smtp['auth']['pass']
-
-    ctx = ssl.create_default_context()
-    if smtp.get('ignoreSSL'):
-        ctx.check_hostname = False
-        ctx.verify_mode    = ssl.CERT_NONE
-
-    if smtp.get('secure'):
-        with smtplib.SMTP_SSL(host, port, context=ctx) as s:
-            s.login(user, pw); s.send_message(msg)
-    else:
-        with smtplib.SMTP(host, port) as s:
-            s.ehlo()
-            if smtp.get('requireTLS', True): s.starttls(context=ctx)
-            s.login(user, pw); s.send_message(msg)
+_send_email_raw = sgx_base.send_email_raw
 
 def _send_daily_alerts():
     """Resumo diário por e-mail de lotes vencidos/vencendo. Só envia se SMTP
@@ -1784,8 +1729,7 @@ def _watchdog():
         time.sleep(5)
         if _watchdog_paused:
             continue
-        with get_db() as conn:
-            conn.execute('DELETE FROM sessions WHERE expires<?', (time.time(),))
+        sgx_base.purge_expired_sessions(get_db)
         try:
             _check_shutdown()
         except Exception as e:

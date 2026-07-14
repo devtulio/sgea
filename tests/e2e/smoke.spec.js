@@ -11,10 +11,10 @@ test('login, entrada em caixa, saída fracionada e alerta de validade', async ({
   await page.click('#login-form button[type=submit]');
 
   // Banco novo → admin padrão nasce com troca de senha obrigatória
-  await expect(page.locator('#troca-senha-overlay')).toBeVisible();
+  await expect(page.locator('#overlay-force-pwd')).toBeVisible();
   await page.fill('#ts-nova', 'novaSenhaE2E123');
   await page.fill('#ts-confirma', 'novaSenhaE2E123');
-  await page.click('#troca-senha-overlay button:has-text("Salvar e continuar")');
+  await page.click('#overlay-force-pwd button:has-text("Salvar e continuar")');
   await expect(page.locator('#overlay-pin')).toBeHidden();
 
   // Cadastro de produto (12 unidades por caixa)

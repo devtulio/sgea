@@ -5,186 +5,40 @@
 <meta name="viewport" content="width=device-width, initial-scale=1.0">
 <title>SGEA</title>
 <link rel="icon" type="image/x-icon" href="sgea.ico">
+<link rel="stylesheet" href="base.css">
 <style>
+  /* Cor institucional real do SGEA (base.css só traz um neutro de bootstrap).
+     NOTA: este valor já estava #1a3a6b (azul-marinho) antes desta migração —
+     não era #1a6b4a (verde) como o resto da documentação registra. Preservado
+     como estava; sinalizado ao usuário, não corrigido aqui (fora do escopo
+     desta migração, que só reorganiza CSS/JS existentes sem mudar aparência). */
   :root {
     --brand:        #1a3a6b;
     --brand-light:  #e8eef7;
     --brand-dark:   #102855;
     --accent:       #1a3a6b;
     --accent-light: #2a5298;
-    --success:      #15803d;
-    --success-light:#dcfce7;
-    --warning:      #d97706;
-    --warning-light:#fef3c7;
-    --danger:       #dc2626;
-    --danger-light: #fee2e2;
-    --gray-50:  #f9fafb; --gray-100: #f3f4f6; --gray-200: #e5e7eb; --gray-300: #d1d5db;
-    --gray-400: #6b7280; /* igual ao --gray-500: #9ca3af sobre branco só tem 2.54:1 de contraste (falha WCAG AA) */
-    --gray-500: #6b7280; --gray-600: #4b5563; --gray-700: #374151; --gray-800: #1f2937; --gray-900: #111827;
-    --bg-card: #fff;
-    --radius: 8px;
-    --shadow: 0 1px 3px rgba(0,0,0,.10), 0 1px 2px rgba(0,0,0,.06);
-    --shadow-md: 0 4px 6px rgba(0,0,0,.07), 0 2px 4px rgba(0,0,0,.06);
-    --shadow-lg: 0 10px 25px rgba(0,0,0,.12);
   }
-  /* Cor de destaque alternativa (Configurações → Aparência) — institucional (verde) é o :root acima */
-  html.tema-azul    { --brand: #0066CC; --brand-light: #e0eeff; --brand-dark: #0052a3; --accent: #0052a3; --accent-light: #0066CC; }
-  html.tema-verde   { --brand: #1a7a3c; --brand-light: #dcfce7; --brand-dark: #145e2d; --accent: #145e2d; --accent-light: #1a7a3c; }
-  html.tema-roxo    { --brand: #5E2750; --brand-light: #f5edf3; --brand-dark: #44193a; --accent: #44193a; --accent-light: #5E2750; }
-  * { box-sizing: border-box; margin: 0; padding: 0; }
-  html { font-size: 16px; }
-  body {
-    font-family: system-ui, -apple-system, BlinkMacSystemFont, 'Segoe UI', sans-serif;
-    background: var(--gray-50); color: var(--gray-900); min-height: 100vh;
-  }
+
+  /* SGEA-specific: brasão menor e escondido até ter imagem (SGCD/SGCA mostram
+     sempre, 80px) — preservado como estava. */
+  .sidebar-brasao { width: 56px; height: 56px; object-fit: contain; display: none; margin: 0 auto 8px; filter: drop-shadow(0 2px 4px rgba(0,0,0,.4)); }
+
+  /* Dark mode: SGEA já tinha esse conjunto de overrides antes do esqueleto
+     (valores um pouco diferentes do base.css) — mantidos para não mudar a
+     aparência atual do modo escuro. */
   body.dark { background: #17181c; color: #e5e5e5; }
   body.dark .bg-card, body.dark .modal, body.dark .list-table, body.dark .stat { background: #232323; }
-
-  .skip-link {
-    position: absolute; top: -100%; left: 16px; z-index: 999;
-    background: var(--brand); color: #fff; padding: 8px 16px;
-    border-radius: 0 0 6px 6px; font-size: .85rem; font-weight: 600;
-    text-decoration: none; transition: top .15s;
-  }
-  .skip-link:focus { top: 0; }
-  [role="button"]:focus-visible, a:focus-visible, button:focus-visible, input:focus-visible, select:focus-visible { outline: 2px solid var(--brand); outline-offset: 2px; }
-
-  /* ── Sidebar ─────────────────────────────────────── */
-  #sidebar {
-    position: fixed; left: 0; top: 0; bottom: 0; width: 220px;
-    background: var(--accent); color: #fff;
-    display: flex; flex-direction: column; overflow-y: auto; z-index: 90;
-  }
-  .sidebar-logo { padding: 16px 18px 14px; border-bottom: 1px solid rgba(255,255,255,.12); text-align: center; }
-  .sidebar-brasao { width: 56px; height: 56px; object-fit: contain; display: none; margin: 0 auto 8px; filter: drop-shadow(0 2px 4px rgba(0,0,0,.4)); }
-  .sidebar-logo .s-title { font-size: 20px; font-weight: 800; letter-spacing: -.5px; }
-  .sidebar-logo .s-sub   { font-size: 10px; opacity: .75; text-transform: uppercase; letter-spacing: .5px; margin-top: 2px; }
-  .sidebar-search { padding: 10px 12px; border-bottom: 1px solid rgba(255,255,255,.1); }
-  .sidebar-search button { width: 100%; display: flex; align-items: center; gap: 8px; background: rgba(255,255,255,.1); border: 1px solid rgba(255,255,255,.15); color: rgba(255,255,255,.75); border-radius: 6px; padding: 7px 10px; font-size: .78rem; cursor: pointer; transition: background .15s; font-family: inherit; }
-  .sidebar-search button:hover { background: rgba(255,255,255,.18); color: #fff; }
-  .sidebar-search .search-shortcut { margin-left: auto; font-size: .65rem; opacity: .6; background: rgba(255,255,255,.15); padding: 1px 5px; border-radius: 3px; }
-  .sidebar-date { padding: 8px 18px 10px; font-size: .7rem; color: rgba(255,255,255,.5); border-bottom: 1px solid rgba(255,255,255,.08); line-height: 1.4; }
-  .sidebar-nav { flex: 1; padding: 8px 0; }
-  .nav-section { font-size: 10px; font-weight: 700; text-transform: uppercase; letter-spacing: .8px; opacity: .5; padding: 14px 18px 6px; }
-  .nav-item {
-    display: flex; align-items: center; gap: 10px; padding: 9px 18px;
-    font-size: 13px; font-weight: 500; color: rgba(255,255,255,.8);
-    cursor: pointer; transition: all .15s; border: none; background: none;
-    width: 100%; text-align: left; border-left: 3px solid transparent;
-  }
-  .nav-item:hover { background: rgba(255,255,255,.08); color: #fff; }
-  .nav-item.active { background: rgba(255,255,255,.14); color: #fff; border-left-color: #fff; font-weight: 600; }
-  .nav-item .nav-ico { width: 18px; text-align: center; flex-shrink: 0; opacity: .9; display: flex; align-items: center; justify-content: center; }
-  .admin-only { display: none; }
-
-  /* ── Abas de Configurações ──────────────────────── */
-  .cfg-tabs { display: flex; gap: 2px; border-bottom: 2px solid var(--gray-200); margin-bottom: 24px; flex-wrap: wrap; }
-  body.dark .cfg-tabs { border-color: #383838; }
-  .cfg-tab { padding: 8px 18px; font-size: .78rem; font-weight: 600; letter-spacing: .4px; text-transform: uppercase; color: var(--gray-500); cursor: pointer; border: none; background: none; border-bottom: 2px solid transparent; margin-bottom: -2px; border-radius: 4px 4px 0 0; transition: color .15s, border-color .15s; }
-  .cfg-tab:hover { color: var(--gray-700); }
   body.dark .cfg-tab { color: #999; }
   body.dark .cfg-tab:hover { color: #fff; }
-  .cfg-tab.active { color: var(--brand); border-bottom-color: var(--brand); }
-  .cfg-panel { display: none; }
-  .cfg-panel.active { display: block; min-height: calc(100vh - 56px - 48px - 130px); }
-  .cfg-fieldset { border: 1px solid var(--gray-200); border-radius: var(--radius); padding: 14px; margin-bottom: 16px; max-width: 560px; }
-  body.dark .cfg-fieldset { border-color: #383838; }
-  .cfg-fieldset legend { font-size: .72rem; font-weight: 700; color: var(--accent-light); padding: 0 6px; text-transform: uppercase; letter-spacing: .4px; }
-  .cfg-fieldset .cfg-help { font-size: .68rem; color: var(--gray-500); margin-top: 4px; line-height: 1.4; }
-  .cfg-fieldset .info-field:last-child { margin-bottom: 0; }
-  .cor-swatch { display: inline-block; width: 14px; height: 14px; border-radius: 50%; border: 1px solid rgba(0,0,0,.15); }
-  #btn-save-settings.has-changes { animation: cfg-pulse 1.4s ease-in-out infinite; }
-  @keyframes cfg-pulse { 0%, 100% { box-shadow: 0 0 0 0 color-mix(in srgb, var(--brand) 45%, transparent); } 50% { box-shadow: 0 0 0 6px color-mix(in srgb, var(--brand) 0%, transparent); } }
-  .nav-badge { margin-left: auto; background: var(--danger); border-radius: 10px; padding: 1px 7px; font-size: 11px; font-weight: 700; }
-  .sidebar-user { padding: 14px 18px; border-top: 1px solid rgba(255,255,255,.12); display: flex; align-items: center; gap: 10px; flex-shrink: 0; }
-  .user-avatar { width: 32px; height: 32px; border-radius: 50%; background: rgba(255,255,255,.2); display: flex; align-items: center; justify-content: center; font-weight: 700; font-size: 13px; flex-shrink: 0; }
-  .user-info { flex: 1; min-width: 0; }
-  .user-nome  { font-size: 12px; font-weight: 600; white-space: nowrap; overflow: hidden; text-overflow: ellipsis; }
-  .user-cargo { font-size: 10px; opacity: .65; }
-  .btn-sair { background: none; border: none; color: rgba(255,255,255,.6); padding: 4px; border-radius: 4px; cursor: pointer; }
-  .btn-sair:hover { color: #fff; }
 
-  #app { padding: 24px 32px 24px calc(220px + 24px); }
-  @media (max-width: 760px) { #sidebar { display: none; } #app { padding-left: 16px; } }
-  .view { display: none; }
-  .view.active { display: block; }
-  .dash-top { display: flex; align-items: center; justify-content: space-between; margin-bottom: 20px; flex-wrap: wrap; gap: 10px; }
-  .dash-top h2 { font-size: 1.05rem; font-weight: 700; letter-spacing: .8px; text-transform: uppercase; }
-  .skeleton-card { background: #fff; border-radius: var(--radius); padding: 16px 18px; box-shadow: var(--shadow); border: 1px solid var(--gray-200); margin-bottom: 10px; height: 90px; }
-  .skeleton { background: linear-gradient(90deg, var(--gray-100) 25%, var(--gray-200) 50%, var(--gray-100) 75%); background-size: 200% 100%; animation: shimmer 1.4s infinite; border-radius: var(--radius); }
-  @keyframes shimmer { 0% { background-position: 200% 0; } 100% { background-position: -200% 0; } }
-  body.dark .skeleton, body.dark .skeleton-card { background: #232323; }
-  .view-actions { display: flex; gap: 8px; align-items: center; flex-wrap: wrap; }
-  .search-box { display: flex; align-items: center; gap: 6px; background: #fff; border: 1px solid var(--gray-200); border-radius: 6px; padding: 6px 10px; }
-  body.dark .search-box { background: #232323; border-color: #383838; }
-  .search-box input { border: none; outline: none; font-size: .85rem; background: transparent; color: inherit; width: 200px; }
-
-  /* ── Buttons ─────────────────────────────────────── */
-  .btn { display: inline-flex; align-items: center; gap: 6px; padding: 8px 16px; border-radius: var(--radius); font-size: .85rem; font-weight: 600; border: none; cursor: pointer; transition: all .15s; font-family: inherit; }
-  .btn-primary { background: var(--brand); color: #fff; }
-  .btn-primary:hover { background: var(--brand-dark); }
-  .btn-danger  { background: var(--danger); color: #fff; }
-  .btn-danger:hover { background: #991b1b; }
-  .btn-outline { background: #fff; color: var(--gray-700); border: 1px solid var(--gray-200); }
-  .btn-outline:hover { border-color: var(--brand); color: var(--brand); }
-  body.dark .btn-outline { background: #232323; color: #ddd; border-color: #383838; }
-  .btn-ghost { background: transparent; color: var(--gray-500); padding: 6px 10px; }
-  .btn-ghost:hover { background: var(--gray-100); color: var(--gray-900); }
-  body.dark .btn-ghost:hover { background: #333; color: #fff; }
-  .btn-sm { padding: 5px 12px; font-size: .78rem; }
-  .btn-icon { padding: 6px; }
-  .btn[disabled] { opacity: .45; cursor: not-allowed; }
-
-  /* ── Tabela de listagem ──────────────────────────── */
-  .list-table-wrap { background: #fff; border-radius: var(--radius); box-shadow: var(--shadow); overflow-x: auto; }
-  body.dark .list-table-wrap { background: #2a2a2a; }
-  table.list-table { width: 100%; border-collapse: collapse; font-size: .82rem; }
-  table.list-table th { text-align: left; padding: 10px 14px; background: var(--gray-50); color: var(--gray-600); font-weight: 700; text-transform: uppercase; font-size: .72rem; letter-spacing: .4px; border-bottom: 1px solid var(--gray-200); white-space: nowrap; }
-  body.dark table.list-table th { background: #1c1c1c; color: #aaa; border-color: #383838; }
-  table.list-table td { padding: 9px 14px; border-bottom: 1px solid var(--gray-100); vertical-align: middle; }
-  body.dark table.list-table td { border-color: #2e2e2e; }
-  table.list-table tbody tr:last-child td { border-bottom: none; }
-  table.list-table tbody tr:hover { background: var(--gray-50); }
-  body.dark table.list-table tbody tr:hover { background: #2a2a2a; }
-  table.list-table tbody tr.clickable { cursor: pointer; }
-  .col-actions { white-space: nowrap; text-align: right; }
-  .empty { text-align: center; padding: 48px 24px; color: var(--gray-500); }
-
-  /* ── Badges ──────────────────────────────────────── */
-  .badge { display: inline-block; padding: 2px 9px; border-radius: 99px; font-size: .7rem; font-weight: 700; text-transform: uppercase; letter-spacing: .3px; }
-  .badge-ok      { background: var(--success-light); color: var(--success); }
-  .badge-warn    { background: var(--warning-light); color: var(--warning); }
-  .badge-danger  { background: var(--danger-light); color: var(--danger); }
-  .badge-neutral { background: var(--gray-100); color: var(--gray-600); }
-
-  /* ── Modal / Overlay ─────────────────────────────── */
-  .overlay { position: fixed; inset: 0; background: rgba(0,0,0,.45); display: flex; align-items: center; justify-content: center; z-index: 200; padding: 16px; }
-  .overlay.hidden { display: none; }
-  .modal { background: #fff; border-radius: 12px; box-shadow: var(--shadow-lg); width: 100%; max-width: 620px; max-height: 90vh; overflow-y: auto; }
-  .modal.modal-wide { max-width: 860px; }
-  body.dark .modal { background: #232323; color: #e5e5e5; }
-  .modal-header { padding: 16px 24px; display: flex; justify-content: space-between; align-items: center; border-bottom: 3px solid var(--brand); position: sticky; top: 0; background: var(--accent); z-index: 1; border-radius: 12px 12px 0 0; }
-  .modal-header h2, .modal-header h3 { font-size: .9rem; font-weight: 600; color: #fff; letter-spacing: .4px; }
-  .modal-header .btn-ghost { color: rgba(255,255,255,.8); }
-  .modal-header .btn-ghost:hover { background: rgba(255,255,255,.15); color: #fff; }
-  .modal-body { padding: 20px 24px; }
-  .modal-footer { padding: 14px 24px; border-top: 1px solid var(--gray-200); display: flex; justify-content: flex-end; gap: 10px; position: sticky; bottom: 0; background: #fff; border-radius: 0 0 12px 12px; }
-  body.dark .modal-footer { background: #232323; border-color: #383838; }
-
-  /* ── Formulários ─────────────────────────────────── */
-  .info-field { margin-bottom: 12px; }
-  .info-field label { display: block; font-size: .72rem; font-weight: 700; text-transform: uppercase; letter-spacing: .4px; color: var(--gray-500); margin-bottom: 3px; }
-  .info-field input, .info-field select, .info-field textarea {
-    width: 100%; border: 1px solid var(--gray-200); border-radius: 6px; padding: 7px 10px;
-    font-size: .85rem; font-family: inherit; color: inherit; background: #fff; outline: none;
-  }
-  body.dark .info-field input, body.dark .info-field select, body.dark .info-field textarea { background: #1c1c1c; border-color: #383838; }
-  .info-field input:focus, .info-field select:focus, .info-field textarea:focus { border-color: var(--brand); box-shadow: 0 0 0 3px color-mix(in srgb, var(--brand) 25%, transparent); }
-  .info-field.checkbox { display: flex; align-items: center; gap: 8px; }
-  .info-field.checkbox input { width: auto; }
-  .form-grid { display: grid; grid-template-columns: 1fr 1fr; gap: 0 14px; }
-  .form-grid .span-2 { grid-column: 1 / -1; }
-  @media (max-width: 560px) { .form-grid { grid-template-columns: 1fr; } }
+  #app.layout-expanded { padding-right: 24px; }
+  #app:not(.layout-expanded) #view-produtos,
+  #app:not(.layout-expanded) #view-entradas,
+  #app:not(.layout-expanded) #view-saidas,
+  #app:not(.layout-expanded) #view-alertas,
+  #app:not(.layout-expanded) #view-crud,
+  #app:not(.layout-expanded) #view-config { max-width: 1100px; margin: 0 auto; }
 
   /* ── Itens repetíveis (entrada/saída) ────────────── */
   .item-rows { display: flex; flex-direction: column; gap: 8px; margin: 8px 0 14px; }
@@ -194,101 +48,12 @@
   .conversao-hint { font-size: .72rem; color: var(--gray-500); grid-column: 1 / -1; margin-top: -4px; }
   @media (max-width: 760px) { .item-row { grid-template-columns: 1fr 1fr; } }
 
-  /* ── Notificações ──────────────────────────────────── */
-  #notif-panel { position: fixed; bottom: 16px; left: 16px; width: 340px; max-height: 460px; overflow-y: auto; background: #fff; border: 1px solid var(--gray-200); border-radius: 10px; box-shadow: 0 8px 28px rgba(0,0,0,.28); z-index: 400; display: none; flex-direction: column; }
-  #notif-panel.open { display: flex; }
-  body.dark #notif-panel { background: #232323; border-color: #383838; }
-  .notif-header { padding: 12px 16px 8px; font-size: .72rem; font-weight: 700; text-transform: uppercase; letter-spacing: .5px; color: var(--gray-500); border-bottom: 1px solid var(--gray-100); display: flex; justify-content: space-between; align-items: center; }
-  body.dark .notif-header { border-color: #383838; }
-  .notif-item { padding: 10px 16px; border-bottom: 1px solid var(--gray-100); cursor: pointer; transition: background .1s; display: flex; gap: 10px; align-items: flex-start; }
-  body.dark .notif-item { border-color: #383838; }
-  .notif-item:hover { background: var(--gray-50); }
-  body.dark .notif-item:hover { background: #2a2a2a; }
-  .notif-icon { width: 30px; height: 30px; border-radius: 50%; display: flex; align-items: center; justify-content: center; flex-shrink: 0; font-size: 14px; }
-  .notif-title { font-size: .8rem; font-weight: 600; color: var(--gray-800); white-space: nowrap; overflow: hidden; text-overflow: ellipsis; }
-  body.dark .notif-title { color: #e5e5e5; }
-  .notif-sub { font-size: .72rem; color: var(--gray-500); margin-top: 2px; }
-  .notif-empty { padding: 24px 16px; text-align: center; font-size: .82rem; color: var(--gray-500); }
-
-  /* ── Busca global (Ctrl+K) ────────────────────────── */
-  .gsearch-box { background: #fff; border-radius: 10px; width: min(640px,90vw); max-height: 72vh; overflow: hidden; display: flex; flex-direction: column; box-shadow: 0 8px 32px rgba(0,0,0,.22); }
-  body.dark .gsearch-box { background: #232323; }
-  .gsearch-input-wrap { display: flex; align-items: center; gap: 10px; padding: 14px 16px; border-bottom: 1px solid var(--gray-100); }
-  body.dark .gsearch-input-wrap { border-color: #383838; }
-  .gsearch-input-wrap:focus-within { box-shadow: inset 0 -2px 0 var(--brand); }
-  .gsearch-input-wrap input { flex: 1; border: none; outline: none; font-size: .95rem; background: transparent; color: var(--gray-900); font-family: inherit; }
-  body.dark .gsearch-input-wrap input { color: #e5e5e5; }
-  .gsearch-results { overflow-y: auto; max-height: calc(72vh - 56px); }
-  .gsearch-group { padding: 8px 16px 4px; font-size: .68rem; font-weight: 700; text-transform: uppercase; letter-spacing: .4px; color: var(--gray-500); }
-  .gsearch-item { padding: 10px 16px; cursor: pointer; border-bottom: 1px solid var(--gray-100); }
-  body.dark .gsearch-item { border-color: #383838; }
-  .gsearch-item:hover { background: var(--gray-50); }
-  body.dark .gsearch-item:hover { background: #2a2a2a; }
-  .gsearch-item-title { font-size: .85rem; font-weight: 600; color: var(--gray-900); }
-  body.dark .gsearch-item-title { color: #e5e5e5; }
-  .gsearch-item-sub { font-size: .74rem; color: var(--gray-500); margin-top: 1px; }
-  .gsearch-empty { padding: 24px 16px; text-align: center; font-size: .82rem; color: var(--gray-500); }
-
-  /* ── Toast ───────────────────────────────────────── */
-  #toast { position: fixed; bottom: 24px; right: 24px; z-index: 300; display: flex; flex-direction: column; gap: 8px; pointer-events: none; }
-  .toast-msg { background: var(--accent); color: #fff; padding: 10px 16px; border-radius: var(--radius); font-size: .8rem; box-shadow: var(--shadow-md); animation: slideIn .2s ease; max-width: 320px; border-left: 4px solid var(--brand); }
-  .toast-msg.success { border-color: var(--success); }
-  .toast-msg.error   { border-color: var(--danger); }
-  @keyframes slideIn { from { transform: translateX(20px); opacity: 0; } to { transform: translateX(0); opacity: 1; } }
-
-  /* ── Login ───────────────────────────────────────── */
-  #overlay-pin { position: fixed; inset: 0; background: #1a1f2e; display: flex; align-items: center; justify-content: center; z-index: 500; }
-  #overlay-pin.hidden { display: none; }
-  #pin-canvas { position: absolute; inset: 0; width: 100%; height: 100%; pointer-events: none; }
-  #pin-card { position: relative; z-index: 1; background: #fff; border-radius: 16px; width: 380px; max-width: 92vw; overflow: hidden; box-shadow: var(--shadow-lg); }
-  body.dark #pin-card { background: #232323; color: #e5e5e5; }
-  .pin-header { background: var(--accent); padding: 28px 32px 24px; text-align: center; }
-  .pin-icon { width: 52px; height: 52px; background: rgba(255,255,255,.12); border: 2px solid rgba(255,255,255,.3); border-radius: 50%; display: flex; align-items: center; justify-content: center; margin: 0 auto 14px; }
-  .pin-title { font-size: 17px; font-weight: 700; color: #fff; margin-bottom: 2px; }
-  .pin-subtitle { font-size: 11px; color: rgba(255,255,255,.6); text-transform: uppercase; letter-spacing: .08em; font-weight: 500; }
-  .pin-badge { display: inline-flex; align-items: center; gap: 5px; margin-top: 12px; background: rgba(255,255,255,.12); border: 1px solid rgba(255,255,255,.25); color: rgba(255,255,255,.8); font-size: 10px; font-weight: 600; padding: 3px 10px; border-radius: 20px; }
-  .pin-body { padding: 26px 32px 28px; }
-  .pin-org-card { display: flex; align-items: center; gap: 9px; background: var(--brand-light); border: 1px solid color-mix(in srgb, var(--brand) 20%, transparent); border-radius: 8px; padding: 10px 12px; margin-bottom: 22px; }
-  body.dark .pin-org-card { background: #1c1c1c; border-color: #383838; }
-  .pin-org-avatar { width: 30px; height: 30px; border-radius: 6px; background: var(--accent); display: flex; align-items: center; justify-content: center; font-size: 12px; font-weight: 700; color: #fff; flex-shrink: 0; }
-  .pin-org-nome { font-size: 12px; font-weight: 600; color: var(--brand-dark); white-space: nowrap; overflow: hidden; text-overflow: ellipsis; }
-  body.dark .pin-org-nome { color: #ddd; }
-  .pin-org-sub { font-size: 10px; color: var(--gray-500); margin-top: 1px; }
-  #pin-erro { display: none; align-items: center; gap: 7px; background: var(--danger-light); border: 1px solid #fca5a5; border-radius: 6px; padding: 8px 12px; font-size: 12px; color: #991b1b; margin-bottom: 14px; }
-  #pin-caps-warn { display: none; align-items: center; gap: 6px; font-size: 12px; color: #92400e; background: var(--warning-light); border: 1px solid #fcd34d; border-radius: 6px; padding: 6px 10px; margin: -10px 0 14px; }
-  .pin-field-wrap { position: relative; margin-bottom: 14px; }
-  #pin-toggle-olho { position: absolute; right: 10px; top: 50%; transform: translateY(-50%); background: none; border: none; cursor: pointer; color: var(--gray-400); padding: 4px; display: flex; }
-  .pin-footer-access { display: flex; align-items: center; gap: 9px; background: var(--gray-50); border: 1px solid var(--gray-200); border-radius: 8px; padding: 10px 12px; margin-top: 4px; }
-  body.dark .pin-footer-access { background: #1c1c1c; border-color: #383838; }
-  .pin-footer-access-title { font-size: 11px; font-weight: 600; color: var(--gray-700); }
-  body.dark .pin-footer-access-title { color: #ccc; }
-  .pin-footer-access-sub { font-size: 10px; color: var(--gray-500); margin-top: 1px; }
-  .pin-footer { background: var(--gray-50); border-top: 1px solid var(--gray-200); padding: 10px 32px; display: flex; align-items: center; justify-content: space-between; font-size: 10px; color: var(--gray-500); }
-  body.dark .pin-footer { background: #1c1c1c; border-color: #383838; }
-  .pin-footer .pin-version { background: var(--gray-200); padding: 2px 7px; border-radius: 10px; }
-  body.dark .pin-footer .pin-version { background: #383838; }
-  @keyframes pin-shake { 0%,100% { transform: translateX(0); } 20% { transform: translateX(-6px); } 40% { transform: translateX(6px); } 60% { transform: translateX(-4px); } 80% { transform: translateX(4px); } }
-  .pin-shake { animation: pin-shake .35s ease; }
-
-  /* ── Tamanho de fonte e largura de conteúdo (Aparência) ── */
-  html.font-pequena { font-size: 14px; }
-  html.font-grande  { font-size: 18px; }
-  #app.layout-expanded { padding-right: 24px; }
-  #app:not(.layout-expanded) #view-produtos,
-  #app:not(.layout-expanded) #view-entradas,
-  #app:not(.layout-expanded) #view-saidas,
-  #app:not(.layout-expanded) #view-alertas,
-  #app:not(.layout-expanded) #view-crud,
-  #app:not(.layout-expanded) #view-config { max-width: 1100px; margin: 0 auto; }
-
   /* ── Painel de lotes (produto) ───────────────────── */
   .lotes-panel { padding: 12px 16px; background: var(--gray-50); border-top: 1px solid var(--gray-200); }
   body.dark .lotes-panel { background: #1c1c1c; border-color: #383838; }
   .lotes-panel table { width: 100%; font-size: .78rem; border-collapse: collapse; }
   .lotes-panel th, .lotes-panel td { text-align: left; padding: 5px 8px; }
   .lotes-panel th { color: var(--gray-500); font-weight: 700; text-transform: uppercase; font-size: .65rem; }
-
-  footer { text-align: center; padding: 18px 16px 14px calc(220px + 16px); font-size: .72rem; color: var(--gray-400); }
 </style>
 </head>
 <body>
@@ -510,7 +275,7 @@
         <div class="info-field">
           <label for="cfg-fonte">Tamanho da Fonte</label>
           <select id="cfg-fonte">
-            <option value="normal">Normal</option>
+            <option value="normal">Normal — padrão do sistema</option>
             <option value="pequena">Pequena — mais itens visíveis</option>
             <option value="grande">Grande — melhor legibilidade</option>
           </select>
@@ -558,7 +323,7 @@
     </div>
 
     <div class="cfg-panel" id="cfg-panel-comunicacao">
-      <fieldset class="cfg-fieldset" style="max-width:560px">
+      <fieldset class="cfg-fieldset">
         <legend>Servidor SMTP</legend>
         <div class="form-grid">
           <div class="info-field"><label for="cfg-smtp-host">Servidor SMTP</label><input type="text" id="cfg-smtp-host" placeholder="smtp.exemplo.com"></div>
@@ -580,7 +345,7 @@
     </div>
 
     <div class="cfg-panel" id="cfg-panel-dados">
-      <fieldset class="cfg-fieldset" style="max-width:640px">
+      <fieldset class="cfg-fieldset">
         <legend>Pasta de Backup</legend>
         <div class="info-field">
           <div style="display:flex;gap:8px">
@@ -589,7 +354,7 @@
           </div>
         </div>
       </fieldset>
-      <fieldset class="cfg-fieldset" style="max-width:640px">
+      <fieldset class="cfg-fieldset">
         <legend>Backup Automático</legend>
         <div class="info-field checkbox"><input type="checkbox" id="cfg-backup-auto" checked><label for="cfg-backup-auto" style="margin:0;text-transform:none;font-weight:500">Backup automático ao encerrar a última sessão</label></div>
         <div class="info-field"><label for="cfg-backup-keep">Backups mantidos</label><input type="number" id="cfg-backup-keep" min="1" value="7"></div>
@@ -606,7 +371,7 @@
       <div id="config-info" style="margin-bottom:16px;font-size:.85rem;color:var(--gray-600)"></div>
       <div id="backups-list"></div>
 
-      <div style="max-width:640px;margin-top:28px;padding:16px;border:1px solid var(--danger);border-radius:var(--radius);background:var(--danger-light)">
+      <div style="margin-top:28px;padding:16px;border:1px solid var(--danger);border-radius:var(--radius);background:var(--danger-light)">
         <label style="display:block;font-size:.72rem;font-weight:700;text-transform:uppercase;letter-spacing:.4px;color:var(--danger);margin-bottom:8px">Zona de Perigo</label>
         <p style="font-size:.82rem;color:var(--gray-700);margin-bottom:10px">Apaga produtos, lotes, entradas, saídas e todos os cadastros (centros de custo, fornecedores, funcionários, frota, pedidos). Usuários e configurações são mantidos. Um backup é baixado automaticamente antes.</p>
         <button class="btn btn-danger" onclick="factoryReset()">Reset de Fábrica</button>
@@ -615,12 +380,13 @@
     </div>
 
     <div class="cfg-panel" id="cfg-panel-seguranca">
-      <div class="form-grid" style="max-width:420px">
-        <div class="info-field span-2"><label for="cfg-senha-atual">Senha Atual</label><input type="password" id="cfg-senha-atual"></div>
+      <fieldset class="cfg-fieldset">
+        <legend>Alterar Minha Senha</legend>
+        <div class="info-field"><label for="cfg-senha-atual">Senha Atual</label><input type="password" id="cfg-senha-atual"></div>
         <div class="info-field"><label for="cfg-senha-nova">Nova Senha</label><input type="password" id="cfg-senha-nova"></div>
         <div class="info-field"><label for="cfg-senha-confirma">Confirmar Nova Senha</label><input type="password" id="cfg-senha-confirma"></div>
-      </div>
-      <button class="btn btn-primary" onclick="alterarMinhaSenha()">Alterar Senha</button>
+        <button class="btn btn-primary" onclick="alterarMinhaSenha()">Alterar Senha</button>
+      </fieldset>
     </div>
 
     <div class="cfg-panel" id="cfg-panel-diagnostico">
@@ -743,7 +509,7 @@
 </div>
 
 <!-- ── Troca de senha obrigatória ── -->
-<div class="overlay hidden" id="troca-senha-overlay" role="dialog" aria-modal="true" aria-labelledby="troca-senha-titulo">
+<div class="overlay hidden" id="overlay-force-pwd" role="dialog" aria-modal="true" aria-labelledby="troca-senha-titulo">
   <div class="modal">
     <div class="modal-header"><h2 id="troca-senha-titulo">Defina uma nova senha</h2></div>
     <div class="modal-body">
@@ -928,66 +694,17 @@
 
 <div id="toast" role="status" aria-live="polite"></div>
 
+<script>const SGX_APP_ID = 'sgea';</script>
+<script src="base.js"></script>
 <script>
 // ══════════════════════════════════════════════════════════════
 // API / SESSÃO
 // ══════════════════════════════════════════════════════════════
-const SGEA_VERSION = '0.11.0';
+const SGEA_VERSION = '0.11.1';
 document.title = `SGEA v${SGEA_VERSION}`;
 
 let _apiToken = localStorage.getItem('sgea-token') || null;
 let _apiUser  = null;
-
-const API = {
-  async req(method, path, body, isForm = false) {
-    const headers = {};
-    if (_apiToken) headers['Authorization'] = `Bearer ${_apiToken}`;
-    if (body && !isForm) headers['Content-Type'] = 'application/json';
-    const opts = { method, headers };
-    if (body) opts.body = isForm ? body : JSON.stringify(body);
-    try {
-      const r = await fetch(path, opts);
-      // 401 no próprio login é "senha incorreta", não sessão expirada — deixa o
-      // chamador (doLogin) tratar a resposta em vez de disparar um logout aqui.
-      if (r.status === 401 && path !== '/api/auth/login') { _apiLogout(); return null; }
-      return r;
-    } catch (e) {
-      console.error('[API]', method, path, e.message);
-      toast('Falha de comunicação com o servidor.', 'error');
-      return null;
-    }
-  },
-  get:  (p)    => API.req('GET', p),
-  post: (p, b) => API.req('POST', p, b),
-  put:  (p, b) => API.req('PUT', p, b),
-  del:  (p)    => API.req('DELETE', p),
-  async json(r) { try { return r ? await r.json() : null; } catch { return null; } },
-};
-
-function _apiLogout() {
-  if (_apiToken) fetch('/api/auth/logout', { method: 'POST', headers: { Authorization: `Bearer ${_apiToken}` } }).catch(() => {});
-  _apiToken = null; _apiUser = null;
-  localStorage.removeItem('sgea-token');
-  _showLoginOverlay();
-}
-
-function _pinToggleOlho() {
-  const inp = document.getElementById('pin-input');
-  const ico = document.getElementById('pin-eye-icon');
-  if (inp.type === 'password') {
-    inp.type = 'text';
-    ico.innerHTML = '<path d="M17.94 17.94A10.07 10.07 0 0 1 12 20c-7 0-11-8-11-8a18.45 18.45 0 0 1 5.06-5.94"/><path d="M9.9 4.24A9.12 9.12 0 0 1 12 4c7 0 11 8 11 8a18.5 18.5 0 0 1-2.16 3.19"/><line x1="1" y1="1" x2="23" y2="23"/>';
-  } else {
-    inp.type = 'password';
-    ico.innerHTML = '<path d="M1 12s4-8 11-8 11 8 11 8-4 8-11 8-11-8-11-8z"/><circle cx="12" cy="12" r="3"/>';
-  }
-}
-
-function _pinCheckCaps(e) {
-  const warn = document.getElementById('pin-caps-warn');
-  const caps = typeof e.getModifierState === 'function' && e.getModifierState('CapsLock');
-  warn.style.display = caps ? 'flex' : 'none';
-}
 
 async function doLogin(e) {
   e.preventDefault();
@@ -1017,7 +734,7 @@ async function doLogin(e) {
   document.getElementById('overlay-pin').classList.add('hidden');
   _loginCanvasStop();
   if (_apiUser.mustChangePassword) {
-    document.getElementById('troca-senha-overlay').classList.remove('hidden');
+    document.getElementById('overlay-force-pwd').classList.remove('hidden');
   } else {
     _onLoginSuccess();
   }
@@ -1031,7 +748,7 @@ async function salvarTrocaSenha() {
   if (nova !== confirma) { toast('As senhas não coincidem.', 'error'); return; }
   const r = await API.put(`/api/usuarios/${_apiUser.id}`, { password: nova });
   if (!r || !r.ok) { toast('Não foi possível trocar a senha.', 'error'); return; }
-  document.getElementById('troca-senha-overlay').classList.add('hidden');
+  document.getElementById('overlay-force-pwd').classList.add('hidden');
   document.getElementById('overlay-pin').classList.add('hidden');
   _loginCanvasStop();
   toast('Senha atualizada.', 'success');
@@ -1104,9 +821,11 @@ async function _onLoginSuccess() {
 // pedido, não construído. Painel de ajuste (nós/distância/velocidade)
 // portado dos irmãos.
 // ══════════════════════════════════════════════════════════════
-let _lcRaf = null, _lcNodes = [];
-const _LC_DEFAULTS = { count: 50, dist: 110, speed: 4 };
-const _LC = Object.assign({}, _LC_DEFAULTS);
+// _lcRaf/_lcNodes/_LC_DEFAULTS/_LC já vêm declarados (let/const) pelo base.js —
+// redeclará-los aqui seria SyntaxError (mesmo escopo léxico global da página).
+// SGEA usa um default de nós diferente do padrão do base.js (50, não 60).
+_LC_DEFAULTS.count = 50;
+Object.assign(_LC, _LC_DEFAULTS);
 
 function _lcLoadConfig() {
   try {
@@ -1313,11 +1032,6 @@ function customConfirm(msg, { title = 'Confirmar', okLabel = 'Confirmar', okClas
   });
 }
 
-function _debounce(fn, ms) {
-  let t;
-  return (...args) => { clearTimeout(t); t = setTimeout(() => fn(...args), ms); };
-}
-
 // ── Busca global (Ctrl+K) ──────────────────────────────────────
 const GSEARCH_FONTES = [
   { tipo: 'produto', label: 'Produtos', endpoint: '/api/produtos', titulo: p => p.nome, sub: p => p.codigo_fiorilli ? `Código Fiorilli ${p.codigo_fiorilli}` : '' },
@@ -1426,11 +1140,6 @@ function maskCpf(input) {
   input.value = v;
 }
 
-function _hideAllViews() { document.querySelectorAll('.view').forEach(v => v.classList.remove('active')); }
-function setNavActive(id) {
-  document.querySelectorAll('.nav-item').forEach(b => b.classList.remove('active'));
-  document.getElementById(id)?.classList.add('active');
-}
 function _showView(viewId, navId) {
   _hideAllViews();
   document.getElementById(viewId).classList.add('active');
@@ -2681,18 +2390,6 @@ async function _restaurarLixeira(api, id, tipo) {
   });
 })();
 
-document.addEventListener('keydown', e => {
-  if (e.key === 'Escape') {
-    const aberto = [...document.querySelectorAll('.overlay:not(.hidden)')].find(o => o.id !== 'overlay-pin' && o.id !== 'troca-senha-overlay');
-    if (aberto) aberto.classList.add('hidden');
-  }
-});
-document.addEventListener('keydown', e => {
-  if ((e.key === 'Enter' || e.key === ' ') && e.target.getAttribute('role') === 'button') {
-    e.preventDefault();
-    e.target.click();
-  }
-});
 document.addEventListener('keydown', e => {
   if ((e.ctrlKey || e.metaKey) && e.key.toLowerCase() === 'k') { e.preventDefault(); abrirGlobalSearch(); }
 });

@@ -5,6 +5,13 @@
 
 ---
 
+## [0.11.1] — 2026-07-13
+
+### Corrigido
+- **Fieldsets da aba Configurações limitados a uma largura fixa (420/560/640px)** deixavam uma faixa vazia grande à direita do painel em telas maiores — removida a restrição de largura em todas as abas (Interface, Organização, Comunicação, Dados, Segurança), os grupos agora ocupam toda a largura do painel, como nos sistemas irmãos
+- **Aba Segurança sem o agrupamento em fieldset** que as demais abas têm — campos de troca de senha agora dentro de um fieldset "Alterar Minha Senha", igual ao padrão do SGCA
+- **Opção "Normal" do Tamanho da Fonte sem descrição**, diferente das demais opções ("Pequena — mais itens visíveis", "Grande — melhor legibilidade") — agora "Normal — padrão do sistema"
+
 ## [0.11.0] — 2026-07-13
 
 ### Adicionado
