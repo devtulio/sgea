@@ -5,6 +5,11 @@
 
 ---
 
+## [0.11.3] — 2026-07-14
+
+### Removido
+- **Handler local de Tab-trap dentro do modal aberto, duplicado do listener genérico do esqueleto compartilhado (`base.js`)** — ficava dentro da IIFE de foco automático dos modais (que continua local, pois gerencia o retorno de foco). SGEA não tinha handler local de Enter/Espaço (já dependia do genérico). Mesmo padrão já adotado pelo SGDP ao migrar para o esqueleto
+
 ## [0.11.2] — 2026-07-14
 
 ### Corrigido

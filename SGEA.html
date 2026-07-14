@@ -700,7 +700,7 @@
 // ══════════════════════════════════════════════════════════════
 // API / SESSÃO
 // ══════════════════════════════════════════════════════════════
-const SGEA_VERSION = '0.11.2';
+const SGEA_VERSION = '0.11.3';
 document.title = `SGEA v${SGEA_VERSION}`;
 
 let _apiToken = localStorage.getItem('sgea-token') || null;
@@ -2378,16 +2378,7 @@ async function _restaurarLixeira(api, id, tipo) {
     }).observe(overlay, { attributes: true, attributeFilter: ['class'] });
   });
 
-  document.addEventListener('keydown', e => {
-    if (e.key !== 'Tab') return;
-    const modal = document.querySelector('.overlay:not(.hidden)');
-    if (!modal) return;
-    const focaveis = [...modal.querySelectorAll(FOCUSABLE_SEL)].filter(el => el.offsetParent !== null);
-    if (!focaveis.length) return;
-    const primeiro = focaveis[0], ultimo = focaveis[focaveis.length - 1];
-    if (e.shiftKey && document.activeElement === primeiro) { e.preventDefault(); ultimo.focus(); }
-    else if (!e.shiftKey && document.activeElement === ultimo) { e.preventDefault(); primeiro.focus(); }
-  });
+  // Tab-trap dentro do modal aberto é o listener genérico do base.js.
 })();
 
 document.addEventListener('keydown', e => {
