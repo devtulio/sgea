@@ -97,7 +97,10 @@ function customConfirm(msg, { title = 'Confirmar', icon = '⚠️', okLabel = 'C
 }
 document.addEventListener('DOMContentLoaded', () => {
   const overlay = document.getElementById('confirm-overlay');
-  overlay?.addEventListener('click', e => { if (e.target === overlay) overlay.classList.add('hidden'); });
+  // Clica no botão Cancelar em vez de só esconder o overlay — customConfirm()
+  // só resolve a Promise (e limpa os listeners de OK/Cancelar) quando um dos
+  // dois botões é clicado; esconder por fora disso trava o await pra sempre.
+  overlay?.addEventListener('click', e => { if (e.target === overlay) document.getElementById('confirm-cancel')?.click(); });
 });
 
 // ── Utilitários genéricos ───────────────────────────────────────────────
@@ -292,7 +295,11 @@ document.addEventListener('keydown', e => {
 document.addEventListener('keydown', e => {
   if (e.key === 'Escape') {
     const aberto = [...document.querySelectorAll('.overlay:not(.hidden)')].find(o => o.id !== 'overlay-pin' && o.id !== 'overlay-force-pwd');
-    if (aberto) aberto.classList.add('hidden');
+    if (!aberto) return;
+    // #confirm-overlay precisa passar pelo botão Cancelar (não só esconder) —
+    // ver comentário equivalente no handler de clique-fora, mesmo overlay.
+    if (aberto.id === 'confirm-overlay') { document.getElementById('confirm-cancel')?.click(); return; }
+    aberto.classList.add('hidden');
   }
 });
 
