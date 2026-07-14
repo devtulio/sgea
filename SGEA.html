@@ -700,7 +700,7 @@
 // ══════════════════════════════════════════════════════════════
 // API / SESSÃO
 // ══════════════════════════════════════════════════════════════
-const SGEA_VERSION = '0.11.5';
+const SGEA_VERSION = '0.11.6';
 document.title = `SGEA v${SGEA_VERSION}`;
 
 let _apiToken = localStorage.getItem('sgea-token') || null;
@@ -821,61 +821,14 @@ async function _onLoginSuccess() {
 // pedido, não construído. Painel de ajuste (nós/distância/velocidade)
 // portado dos irmãos.
 // ══════════════════════════════════════════════════════════════
-// _lcRaf/_lcNodes/_LC_DEFAULTS/_LC já vêm declarados (let/const) pelo base.js —
-// redeclará-los aqui seria SyntaxError (mesmo escopo léxico global da página).
-// SGEA usa um default de nós diferente do padrão do base.js (50, não 60).
+// _lcRaf/_lcNodes/_LC_DEFAULTS/_LC/_lcLoadConfig/_lcSaveConfig/_lcToggleConfig/
+// _lcParam/_lcResetConfig/_lcSpeedVal já vêm do base.js (usam _lcConfigKey(),
+// que resolve pra 'sgea_lc_config' via SGX_APP_ID — mesma chave que estava
+// hardcoded aqui). SGEA usa um default de nós diferente do padrão do base.js
+// (50, não 60) e não reage ao mouse — só _loginCanvasStart/_loginCanvasStop
+// continuam locais.
 _LC_DEFAULTS.count = 50;
 Object.assign(_LC, _LC_DEFAULTS);
-
-function _lcLoadConfig() {
-  try {
-    const s = JSON.parse(localStorage.getItem('sgea_lc_config') || '{}');
-    if (s.count) _LC.count = s.count;
-    if (s.dist)  _LC.dist  = s.dist;
-    if (s.speed) _LC.speed = s.speed;
-  } catch {}
-  const sl = id => document.getElementById(id);
-  if (sl('lc-sl-nodes')) { sl('lc-sl-nodes').value = _LC.count; sl('lc-out-nodes').textContent = _LC.count; }
-  if (sl('lc-sl-dist'))  { sl('lc-sl-dist').value  = _LC.dist;  sl('lc-out-dist').textContent  = _LC.dist;  }
-  if (sl('lc-sl-speed')) { sl('lc-sl-speed').value = _LC.speed; sl('lc-out-speed').textContent = _LC.speed; }
-}
-function _lcSaveConfig() {
-  localStorage.setItem('sgea_lc_config', JSON.stringify({ count: _LC.count, dist: _LC.dist, speed: _LC.speed }));
-}
-function _lcToggleConfig() {
-  const p = document.getElementById('lc-config-panel');
-  if (p) p.style.display = p.style.display === 'none' ? 'block' : 'none';
-}
-function _lcParam(key, val, outId) {
-  document.getElementById(outId).textContent = val;
-  if (key === 'count') {
-    _LC.count = val;
-    while (_lcNodes.length < val) {
-      const c = document.getElementById('pin-canvas');
-      _lcNodes.push({ x: Math.random()*(c?.width||800), y: Math.random()*(c?.height||600),
-        vx: (Math.random()-.5)*_lcSpeedVal(), vy: (Math.random()-.5)*_lcSpeedVal(), r: Math.random()*1.6+1 });
-    }
-    while (_lcNodes.length > val) _lcNodes.pop();
-  } else if (key === 'dist') {
-    _LC.dist = val;
-  } else if (key === 'speed') {
-    _LC.speed = val;
-    const s = _lcSpeedVal();
-    for (const n of _lcNodes) {
-      const a = Math.atan2(n.vy, n.vx);
-      const m = Math.random() * s + s * .3;
-      n.vx = Math.cos(a) * m; n.vy = Math.sin(a) * m;
-    }
-  }
-  _lcSaveConfig();
-}
-function _lcResetConfig() {
-  Object.assign(_LC, _LC_DEFAULTS);
-  _lcSaveConfig();
-  _lcLoadConfig();
-  _lcNodes = [];
-}
-function _lcSpeedVal() { return _LC.speed * 0.08; }
 
 function _loginCanvasStart() {
   const canvas = document.getElementById('pin-canvas');

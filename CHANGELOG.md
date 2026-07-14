@@ -5,6 +5,11 @@
 
 ---
 
+## [0.11.6] — 2026-07-14
+
+### Removido
+- **6 das 8 funções do motor de partículas da tela de login (`_lcLoadConfig`/`_lcSaveConfig`/`_lcToggleConfig`/`_lcParam`/`_lcResetConfig`/`_lcSpeedVal`) reimplementadas localmente**, byte-idênticas às do esqueleto compartilhado (só a chave de `localStorage` estava hardcoded em vez de usar `_lcConfigKey()` — mesmo valor na prática). `_loginCanvasStart`/`_loginCanvasStop` continuam locais (sem interação de mouse, contagem de partículas padrão 50 em vez de 60 — escolhas deliberadas do SGEA)
+
 ## [0.11.5] — 2026-07-14
 
 ### Removido
