@@ -5,6 +5,11 @@
 
 ---
 
+## [0.11.4] — 2026-07-14
+
+### Corrigido
+- **Cabeçalho de título + ações de cada tela (`.dash-top`) sem nenhum estilo** — a classe não estava definida no esqueleto compartilhado (`_esqueleto/base.css`, só a classe morta `.view-top` existia lá) nem localmente no SGEA (removida por engano numa correção anterior de outra sessão). Corrigido definindo `.dash-top` em `base.css`, aplicando-se automaticamente aqui — flex, espaçamento e título em maiúsculas voltam a aparecer corretamente
+
 ## [0.11.3] — 2026-07-14
 
 ### Removido
