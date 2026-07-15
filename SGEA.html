@@ -421,9 +421,9 @@
       <div style="margin-bottom:10px">
         <div style="display:flex;justify-content:space-between;align-items:center;margin-bottom:4px">
           <span style="font-size:11px;color:rgba(255,255,255,.65)">Quantidade de nós</span>
-          <span id="lc-out-nodes" style="font-size:11px;font-weight:600;color:rgba(255,255,255,.9)">50</span>
+          <span id="lc-out-nodes" style="font-size:11px;font-weight:600;color:rgba(255,255,255,.9)">60</span>
         </div>
-        <input type="range" id="lc-sl-nodes" min="20" max="120" value="50" oninput="_lcParam('count',+this.value,'lc-out-nodes')"
+        <input type="range" id="lc-sl-nodes" min="20" max="120" value="60" oninput="_lcParam('count',+this.value,'lc-out-nodes')"
           style="width:100%;height:3px;accent-color:rgba(180,190,210,.8);cursor:pointer">
       </div>
       <div style="margin-bottom:10px">
@@ -700,7 +700,7 @@
 // ══════════════════════════════════════════════════════════════
 // API / SESSÃO
 // ══════════════════════════════════════════════════════════════
-const SGEA_VERSION = '0.11.6';
+const SGEA_VERSION = '0.11.7';
 document.title = `SGEA v${SGEA_VERSION}`;
 
 let _apiToken = localStorage.getItem('sgea-token') || null;
@@ -814,73 +814,12 @@ async function _onLoginSuccess() {
   showProdutos();
 }
 
-// ══════════════════════════════════════════════════════════════
-// FUNDO ANIMADO DA TELA DE LOGIN — rede de partículas que se conectam
-// quando próximas, à deriva dentro do canvas. Mais simples que o efeito
-// dos sistemas irmãos: sem interação com o mouse — só o visual — não
-// pedido, não construído. Painel de ajuste (nós/distância/velocidade)
-// portado dos irmãos.
-// ══════════════════════════════════════════════════════════════
-// _lcRaf/_lcNodes/_LC_DEFAULTS/_LC/_lcLoadConfig/_lcSaveConfig/_lcToggleConfig/
-// _lcParam/_lcResetConfig/_lcSpeedVal já vêm do base.js (usam _lcConfigKey(),
-// que resolve pra 'sgea_lc_config' via SGX_APP_ID — mesma chave que estava
-// hardcoded aqui). SGEA usa um default de nós diferente do padrão do base.js
-// (50, não 60) e não reage ao mouse — só _loginCanvasStart/_loginCanvasStop
-// continuam locais.
-_LC_DEFAULTS.count = 50;
-Object.assign(_LC, _LC_DEFAULTS);
-
-function _loginCanvasStart() {
-  const canvas = document.getElementById('pin-canvas');
-  const overlay = document.getElementById('overlay-pin');
-  if (!canvas || !overlay) return;
-  const ctx = canvas.getContext('2d');
-  _lcLoadConfig();
-  canvas.width = overlay.offsetWidth;
-  canvas.height = overlay.offsetHeight;
-
-  if (!_lcNodes.length) {
-    for (let i = 0; i < _LC.count; i++) {
-      const s = _lcSpeedVal();
-      _lcNodes.push({
-        x: Math.random() * canvas.width, y: Math.random() * canvas.height,
-        vx: (Math.random() - .5) * s * 2, vy: (Math.random() - .5) * s * 2,
-        r: Math.random() * 1.6 + 1,
-      });
-    }
-  }
-
-  function frame() {
-    const W = canvas.width, H = canvas.height, D = _LC.dist;
-    ctx.clearRect(0, 0, W, H);
-    for (let i = 0; i < _lcNodes.length; i++) {
-      const a = _lcNodes[i];
-      for (let j = i + 1; j < _lcNodes.length; j++) {
-        const b = _lcNodes[j];
-        const d = Math.hypot(a.x - b.x, a.y - b.y);
-        if (d < D) {
-          ctx.beginPath(); ctx.moveTo(a.x, a.y); ctx.lineTo(b.x, b.y);
-          ctx.strokeStyle = `rgba(180,190,210,${(1 - d / D) * 0.35})`; ctx.lineWidth = .7; ctx.stroke();
-        }
-      }
-    }
-    for (const n of _lcNodes) {
-      ctx.beginPath(); ctx.arc(n.x, n.y, n.r, 0, Math.PI * 2);
-      ctx.fillStyle = 'rgba(180,190,210,.5)'; ctx.fill();
-      n.x += n.vx; n.y += n.vy;
-      if (n.x < 0 || n.x > W) { n.vx *= -1; n.x = Math.max(0, Math.min(W, n.x)); }
-      if (n.y < 0 || n.y > H) { n.vy *= -1; n.y = Math.max(0, Math.min(H, n.y)); }
-    }
-    _lcRaf = requestAnimationFrame(frame);
-  }
-  if (_lcRaf) cancelAnimationFrame(_lcRaf);
-  _lcRaf = requestAnimationFrame(frame);
-}
-
-function _loginCanvasStop() {
-  if (_lcRaf) { cancelAnimationFrame(_lcRaf); _lcRaf = null; }
-  _lcNodes = [];
-}
+// Fundo animado da tela de login (rede de partículas com interação de mouse)
+// agora vem inteiramente do base.js — _lcRaf/_lcNodes/_LC_DEFAULTS/_LC/
+// _lcLoadConfig/_lcSaveConfig/_lcToggleConfig/_lcParam/_lcResetConfig/
+// _lcSpeedVal/_loginCanvasStart/_loginCanvasStop, mesmo comportamento do
+// SGCD/SGCA/SGDP (a versão local mais simples, sem mouse, foi removida a
+// pedido do usuário pra igualar aos irmãos).
 
 aplicarTema(localStorage.getItem('sgea-theme') === 'dark', false);
 aplicarLayoutWidth(localStorage.getItem('sgea-layout-width') || 'compacto', false);

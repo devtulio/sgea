@@ -5,6 +5,11 @@
 
 ---
 
+## [0.11.7] — 2026-07-14
+
+### Alterado
+- **Fundo animado da tela de login ganhou interação de mouse**, igualando ao SGCD/SGCA/SGDP — `_loginCanvasStart`/`_loginCanvasStop` (as 2 últimas funções do motor de partículas ainda locais, mantidas deliberadamente simples na v0.11.6) foram removidas em favor da versão do esqueleto compartilhado, que já tinha esse comportamento. Contagem padrão de partículas também passa a ser 60 (padrão da família), não mais 50.
+
 ## [0.11.6] — 2026-07-14
 
 ### Removido
