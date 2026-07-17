@@ -233,7 +233,10 @@ class TestEntradasSaidas(SGEATestCase):
     def test_entrada_com_pedido(self):
         token = self.login()
         pid = self._criar_produto(token)
-        status, ped = self.request('POST', '/api/pedidos', {'numero': f'{uuid.uuid4().hex[:6]}/2026'}, token)
+        status, ped = self.request('POST', '/api/pedidos', {
+            'numero': f'{uuid.uuid4().hex[:6]}/2026',
+            'itens': [{'produto_id': pid, 'quantidade_pedida': 10}],
+        }, token)
         self.assertEqual(status, 201, ped)
         status, ent = self.request('POST', '/api/entradas', {
             'tipo': 'pedido', 'pedido_id': ped['id'], 'data_entrega': '2026-07-01',
@@ -280,6 +283,160 @@ class TestEntradasSaidas(SGEATestCase):
             'data': '2026-07-12', 'itens': [{'produto_id': pid, 'quantidade': 3}]
         }, token)
         status, data = self.request('DELETE', f'/api/entradas/{ent["id"]}', token=token)
+        self.assertEqual(status, 409, data)
+
+    # ── Pedidos: itens, saldo, status agregado ──────────────────────────────
+    # (métodos aqui, não numa classe TestPedidos própria, pra não sortear depois
+    # de TestLixeiraEWipe — ver comentário na classe abaixo sobre ordem alfabética)
+
+    def _criar_pedido(self, token, pid_produto, quantidade_pedida=10):
+        status, ped = self.request('POST', '/api/pedidos', {
+            'numero': f'{uuid.uuid4().hex[:6]}/2026',
+            'itens': [{'produto_id': pid_produto, 'quantidade_pedida': quantidade_pedida}],
+        }, token)
+        self.assertEqual(status, 201, ped)
+        return ped
+
+    def test_criar_pedido_com_itens_e_itens_imutaveis_na_edicao(self):
+        token = self.login()
+        pid = self._criar_produto(token)
+        ped = self._criar_pedido(token, pid, quantidade_pedida=10)
+        self.assertEqual(len(ped['itens']), 1)
+        self.assertEqual(ped['itens'][0]['quantidade_pedida'], 10)
+        self.assertEqual(ped['itens'][0]['status'], 'aberto')
+
+        status, ped2 = self.request('PUT', f'/api/pedidos/{ped["id"]}', {
+            'itens': [{'produto_id': pid, 'quantidade_pedida': 999}],  # ignorado — só cabeçalho é editável
+            'codigo_licitacao': 'LIC-123',
+        }, token)
+        self.assertEqual(status, 200, ped2)
+        self.assertEqual(ped2['codigo_licitacao'], 'LIC-123')
+        self.assertEqual(ped2['itens'][0]['quantidade_pedida'], 10)  # inalterado
+
+    def test_entrada_dentro_do_saldo_reduz_saldo_do_item(self):
+        token = self.login()
+        pid = self._criar_produto(token)
+        ped = self._criar_pedido(token, pid, quantidade_pedida=10)
+        status, ent = self.request('POST', '/api/entradas', {
+            'tipo': 'pedido', 'pedido_id': ped['id'], 'data_entrega': '2026-07-01',
+            'itens': [{'produto_id': pid, 'quantidade_unidades': 5, 'valor_unitario': 2.0}]
+        }, token)
+        self.assertEqual(status, 201, ent)
+        status, ped2 = self.request('GET', f'/api/pedidos/{ped["id"]}', token=token)
+        item = ped2['itens'][0]
+        self.assertEqual(item['quantidade_recebida'], 5)
+        self.assertEqual(item['saldo'], 5)
+        self.assertEqual(item['status'], 'parcial')
+        self.assertEqual(ped2['status'], 'aberto')
+
+    def test_entrada_excedendo_saldo_retorna_409_sem_gravar_nada(self):
+        token = self.login()
+        pid = self._criar_produto(token)
+        ped = self._criar_pedido(token, pid, quantidade_pedida=10)
+        status, data = self.request('POST', '/api/entradas', {
+            'tipo': 'pedido', 'pedido_id': ped['id'], 'data_entrega': '2026-07-01',
+            'itens': [{'produto_id': pid, 'quantidade_unidades': 12, 'valor_unitario': 2.0}]
+        }, token)
+        self.assertEqual(status, 409, data)
+        status, ped2 = self.request('GET', f'/api/pedidos/{ped["id"]}', token=token)
+        self.assertEqual(ped2['itens'][0]['saldo'], 10)  # nada foi consumido
+        status, prod = self.request('GET', f'/api/produtos/{pid}', token=token)
+        self.assertEqual(prod['estoque_fisico'], 0)  # nenhum lote foi criado
+
+    def test_entrada_com_produto_fora_do_pedido_retorna_erro(self):
+        token = self.login()
+        pid = self._criar_produto(token)
+        outro_pid = self._criar_produto(token)
+        ped = self._criar_pedido(token, pid, quantidade_pedida=10)
+        status, data = self.request('POST', '/api/entradas', {
+            'tipo': 'pedido', 'pedido_id': ped['id'], 'data_entrega': '2026-07-01',
+            'itens': [{'produto_id': outro_pid, 'quantidade_unidades': 1, 'valor_unitario': 2.0}]
+        }, token)
+        self.assertEqual(status, 409, data)
+
+    def test_anular_saldo_item_zerado_retorna_409(self):
+        token = self.login()
+        pid = self._criar_produto(token)
+        ped = self._criar_pedido(token, pid, quantidade_pedida=10)
+        self.request('POST', '/api/entradas', {
+            'tipo': 'pedido', 'pedido_id': ped['id'], 'data_entrega': '2026-07-01',
+            'itens': [{'produto_id': pid, 'quantidade_unidades': 10, 'valor_unitario': 2.0}]
+        }, token)
+        item_id = ped['itens'][0]['id']
+        status, data = self.request('PUT', f'/api/pedidos/{ped["id"]}/itens/{item_id}/anular', {}, token)
+        self.assertEqual(status, 409, data)
+
+    def test_anular_saldo_muda_status_do_item_e_do_pedido(self):
+        token = self.login()
+        pid = self._criar_produto(token)
+        ped = self._criar_pedido(token, pid, quantidade_pedida=10)
+        self.request('POST', '/api/entradas', {
+            'tipo': 'pedido', 'pedido_id': ped['id'], 'data_entrega': '2026-07-01',
+            'itens': [{'produto_id': pid, 'quantidade_unidades': 5, 'valor_unitario': 2.0}]
+        }, token)
+        item_id = ped['itens'][0]['id']
+        status, ped2 = self.request('PUT', f'/api/pedidos/{ped["id"]}/itens/{item_id}/anular', {}, token)
+        self.assertEqual(status, 200, ped2)
+        self.assertEqual(ped2['itens'][0]['status'], 'encerrado_parcial')
+        self.assertEqual(ped2['itens'][0]['saldo'], 0)
+        self.assertEqual(ped2['status'], 'encerrado_parcial')
+
+    def test_status_pedido_atendido_quando_todos_itens_atendidos(self):
+        token = self.login()
+        pid = self._criar_produto(token)
+        ped = self._criar_pedido(token, pid, quantidade_pedida=10)
+        status, ent = self.request('POST', '/api/entradas', {
+            'tipo': 'pedido', 'pedido_id': ped['id'], 'data_entrega': '2026-07-01',
+            'itens': [{'produto_id': pid, 'quantidade_unidades': 10, 'valor_unitario': 2.0}]
+        }, token)
+        self.assertEqual(status, 201, ent)
+        status, ped2 = self.request('GET', f'/api/pedidos/{ped["id"]}', token=token)
+        self.assertEqual(ped2['itens'][0]['status'], 'atendido')
+        self.assertEqual(ped2['status'], 'atendido')
+
+    def test_status_pedido_fica_aberto_enquanto_algum_item_esta_pendente(self):
+        token = self.login()
+        pid_a = self._criar_produto(token)
+        pid_b = self._criar_produto(token)
+        status, ped = self.request('POST', '/api/pedidos', {
+            'numero': f'{uuid.uuid4().hex[:6]}/2026',
+            'itens': [
+                {'produto_id': pid_a, 'quantidade_pedida': 5},
+                {'produto_id': pid_b, 'quantidade_pedida': 5},
+            ],
+        }, token)
+        self.assertEqual(status, 201, ped)
+        # atende só o item A por completo — item B continua aberto
+        status, ent = self.request('POST', '/api/entradas', {
+            'tipo': 'pedido', 'pedido_id': ped['id'], 'data_entrega': '2026-07-01',
+            'itens': [{'produto_id': pid_a, 'quantidade_unidades': 5, 'valor_unitario': 2.0}]
+        }, token)
+        self.assertEqual(status, 201, ent)
+        status, ped2 = self.request('GET', f'/api/pedidos/{ped["id"]}', token=token)
+        self.assertEqual(ped2['status'], 'aberto')  # item B ainda pendente
+
+    def test_cancelar_pedido_zera_saldo_pendente_e_bloqueia_se_ja_atendido(self):
+        token = self.login()
+        pid = self._criar_produto(token)
+        ped = self._criar_pedido(token, pid, quantidade_pedida=10)
+        self.request('POST', '/api/entradas', {
+            'tipo': 'pedido', 'pedido_id': ped['id'], 'data_entrega': '2026-07-01',
+            'itens': [{'produto_id': pid, 'quantidade_unidades': 3, 'valor_unitario': 2.0}]
+        }, token)
+        status, ped2 = self.request('PUT', f'/api/pedidos/{ped["id"]}/cancelar', {}, token)
+        self.assertEqual(status, 200, ped2)
+        self.assertEqual(ped2['status'], 'cancelado')
+        self.assertEqual(ped2['itens'][0]['saldo'], 0)
+        self.assertEqual(ped2['itens'][0]['quantidade_recebida'], 3)  # o que já entrou não é desfeito
+
+        # pedido totalmente atendido não pode ser cancelado
+        pid2 = self._criar_produto(token)
+        ped3 = self._criar_pedido(token, pid2, quantidade_pedida=5)
+        self.request('POST', '/api/entradas', {
+            'tipo': 'pedido', 'pedido_id': ped3['id'], 'data_entrega': '2026-07-01',
+            'itens': [{'produto_id': pid2, 'quantidade_unidades': 5, 'valor_unitario': 2.0}]
+        }, token)
+        status, data = self.request('PUT', f'/api/pedidos/{ped3["id"]}/cancelar', {}, token)
         self.assertEqual(status, 409, data)
 
 

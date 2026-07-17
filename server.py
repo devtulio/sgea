@@ -1,4 +1,4 @@
-# SGEA v0.11.7 — Servidor local: SQLite, autenticação, REST API, controle de estoque por lote (FEFO), backup automático
+# SGEA v0.12.0 — Servidor local: SQLite, autenticação, REST API, controle de estoque por lote (FEFO), backup automático
 import http.server
 import socketserver
 import os
@@ -190,6 +190,14 @@ def init_db():
                 lote_numero TEXT,
                 data_validade TEXT
             );
+            CREATE TABLE IF NOT EXISTS pedido_itens (
+                id INTEGER PRIMARY KEY AUTOINCREMENT,
+                pedido_id TEXT NOT NULL REFERENCES pedidos(id) ON DELETE CASCADE,
+                produto_id TEXT NOT NULL REFERENCES produtos(id),
+                quantidade_pedida INTEGER NOT NULL CHECK(quantidade_pedida > 0),
+                quantidade_anulada INTEGER NOT NULL DEFAULT 0,
+                UNIQUE(pedido_id, produto_id)
+            );
             CREATE TABLE IF NOT EXISTS lotes (
                 id INTEGER PRIMARY KEY AUTOINCREMENT,
                 produto_id TEXT NOT NULL REFERENCES produtos(id),
@@ -349,6 +357,57 @@ class EstoqueInsuficiente(Exception):
         self.produto_id, self.solicitado, self.disponivel = produto_id, solicitado, disponivel
         super().__init__(f'Estoque insuficiente para o produto (solicitado: {solicitado}, disponível: {disponivel})')
 
+class SaldoPedidoExcedido(Exception):
+    def __init__(self, mensagem):
+        super().__init__(mensagem)
+
+def _pedido_item_status(pedida, recebida, anulada):
+    if anulada > 0:
+        return 'encerrado_parcial'
+    if recebida >= pedida:
+        return 'atendido'
+    if recebida > 0:
+        return 'parcial'
+    return 'aberto'
+
+def _pedido_itens_com_saldo(conn, pedido_id):
+    """Itens do pedido com quantidade_recebida/saldo/status calculados a partir das
+    entradas vinculadas — quantidade_recebida nunca é armazenada, só derivada, pra não
+    correr o risco de um contador desalinhar da soma real de entrada_itens."""
+    rows = conn.execute('''
+        SELECT pi.id, pi.produto_id, pi.quantidade_pedida, pi.quantidade_anulada,
+               p.nome AS produto_nome, p.unidade_consumo,
+               COALESCE((
+                   SELECT SUM(ei.quantidade_unidades)
+                   FROM entrada_itens ei JOIN entradas e ON e.id = ei.entrada_id
+                   WHERE e.pedido_id = pi.pedido_id AND ei.produto_id = pi.produto_id AND e.deleted_at IS NULL
+               ), 0) AS quantidade_recebida
+        FROM pedido_itens pi JOIN produtos p ON p.id = pi.produto_id
+        WHERE pi.pedido_id = ?
+        ORDER BY pi.id
+    ''', (pedido_id,)).fetchall()
+    itens = []
+    for r in rows:
+        d = dict(r)
+        d['saldo'] = max(d['quantidade_pedida'] - d['quantidade_recebida'] - d['quantidade_anulada'], 0)
+        d['status'] = _pedido_item_status(d['quantidade_pedida'], d['quantidade_recebida'], d['quantidade_anulada'])
+        itens.append(d)
+    return itens
+
+def _pedido_status_agregado(status_coluna, itens):
+    """Status exibido do pedido: 'cancelado' é o único valor manual (setado só por
+    _cancelar_pedido); qualquer outra coisa é sempre recalculada a partir dos itens,
+    nunca lida da coluna — evita a coluna e os itens saírem de sincronia."""
+    if status_coluna == 'cancelado':
+        return 'cancelado'
+    if not itens:
+        return 'aberto'
+    if any(i['status'] in ('aberto', 'parcial') for i in itens):
+        return 'aberto'
+    if all(i['status'] == 'atendido' for i in itens):
+        return 'atendido'
+    return 'encerrado_parcial'
+
 def _consumir_fefo(conn, produto_id, quantidade_solicitada):
     """Consome `quantidade_solicitada` unidades do produto, priorizando o lote
     com validade mais próxima (FEFO); lotes sem validade (incl. saldo inicial)
@@ -436,14 +495,12 @@ CRUD_TABLES = {
         'id_type': 'int', 'fields': ['numero', 'placa', 'marca', 'modelo', 'combustivel', 'centro_custo_id', 'ativo'],
         'required': ['numero'], 'order': 'numero ASC', 'search_fields': ['numero', 'placa', 'modelo'],
     },
-    'pedidos': {
-        'id_type': 'uuid', 'fields': ['numero', 'codigo_licitacao', 'data_pedido', 'fornecedor_id', 'status'],
-        'required': ['numero'], 'order': 'created_at DESC', 'search_fields': ['numero', 'codigo_licitacao'],
-    },
 }
 CRUD_ROUTES = {  # segmento da URL -> tabela
     'centros-custo': 'centros_custo', 'fornecedores': 'fornecedores',
-    'funcionarios': 'funcionarios', 'frota': 'frota', 'pedidos': 'pedidos',
+    'funcionarios': 'funcionarios', 'frota': 'frota',
+    # pedidos NÃO está aqui — tem itens, o motor genérico não suporta; handlers
+    # dedicados abaixo (_get_pedido_dict/_create_pedido/_update_pedido/etc).
 }
 
 def _crud_list(table, qs):
@@ -623,6 +680,12 @@ class SGEAHandler(http.server.SimpleHTTPRequestHandler):
         elif p == '/api/alertas/validade':
             self._alertas_validade(qs)
 
+        elif p == '/api/pedidos':
+            self._list_pedidos(qs)
+        elif re.fullmatch(r'/api/pedidos/[^/]+', p):
+            item = self._get_pedido_dict(p.split('/')[-1])
+            self._json(200, item) if item else self._json(404, {'error': 'Não encontrado'})
+
         elif p == '/api/entradas':
             self._list_entradas(qs.get('trash', ['0'])[0] == '1')
         elif re.fullmatch(r'/api/entradas/[^/]+', p):
@@ -713,6 +776,8 @@ class SGEAHandler(http.server.SimpleHTTPRequestHandler):
 
         if p == '/api/produtos':
             self._create_produto(data)
+        elif p == '/api/pedidos':
+            self._create_pedido(data)
         elif p == '/api/entradas':
             self._create_entrada(data, s)
         elif p == '/api/saidas':
@@ -752,6 +817,12 @@ class SGEAHandler(http.server.SimpleHTTPRequestHandler):
             self._restore_saida(p.split('/')[-2])
         elif re.fullmatch(r'/api/produtos/[^/]+', p):
             self._update_produto(p.split('/')[-1], data)
+        elif re.fullmatch(r'/api/pedidos/[^/]+/cancelar', p):
+            self._cancelar_pedido(p.split('/')[-2])
+        elif re.fullmatch(r'/api/pedidos/[^/]+/itens/[^/]+/anular', p):
+            self._anular_saldo_pedido_item(p.split('/')[-2])
+        elif re.fullmatch(r'/api/pedidos/[^/]+', p):
+            self._update_pedido(p.split('/')[-1], data)
         elif re.fullmatch(r'/api/entradas/[^/]+', p):
             self._update_entrada(p.split('/')[-1], data)
         elif p in ('/api/settings', '/api/settings/'):
@@ -1074,6 +1145,120 @@ class SGEAHandler(http.server.SimpleHTTPRequestHandler):
         dias = int((qs.get('dias', ['30'])[0]) or 30)
         self._json(200, {'items': _lotes_vencendo(dias), 'dias': dias})
 
+    # ── Pedidos ──────────────────────────────────────────────────────────────
+    # Fora do motor CRUD genérico (CRUD_TABLES/_crud_*) porque tem itens — o
+    # motor só sabe renderizar/gravar campos escalares (ver openCrudModal/
+    # saveCrudModal no SGEA.html).
+
+    def _list_pedidos(self, qs):
+        q = (qs.get('q', [''])[0] or '').strip()
+        where, params = [], []
+        if q:
+            where.append('(numero LIKE ? OR codigo_licitacao LIKE ?)')
+            params += [f'%{q}%', f'%{q}%']
+        w = ('WHERE ' + ' AND '.join(where)) if where else ''
+        with get_db() as conn:
+            rows = conn.execute(f'''
+                SELECT pe.*, f.razao_social AS fornecedor_nome
+                FROM pedidos pe LEFT JOIN fornecedores f ON f.id=pe.fornecedor_id
+                {w} ORDER BY pe.created_at DESC''', params).fetchall()
+            items = []
+            for r in rows:
+                d = dict(r)
+                itens = _pedido_itens_com_saldo(conn, d['id'])
+                d['status'] = _pedido_status_agregado(d['status'], itens)
+                items.append(d)
+        self._json(200, {'items': items})
+
+    def _get_pedido_dict(self, pid):
+        with get_db() as conn:
+            pe = conn.execute('''
+                SELECT pe.*, f.razao_social AS fornecedor_nome
+                FROM pedidos pe LEFT JOIN fornecedores f ON f.id=pe.fornecedor_id
+                WHERE pe.id=?''', (pid,)).fetchone()
+            if not pe:
+                return None
+            itens = _pedido_itens_com_saldo(conn, pid)
+        result = dict(pe)
+        result['itens'] = itens
+        result['status'] = _pedido_status_agregado(result['status'], itens)
+        return result
+
+    def _create_pedido(self, data):
+        try:
+            _require(data, 'numero')
+        except ValueError as e:
+            self._json(400, {'error': str(e)}); return
+        itens = data.get('itens') or []
+        if not itens:
+            self._json(400, {'error': 'Informe ao menos um item'}); return
+
+        pid = str(uuid.uuid4())
+        try:
+            with get_db() as conn:
+                conn.execute('''INSERT INTO pedidos
+                    (id,numero,codigo_licitacao,data_pedido,fornecedor_id,status)
+                    VALUES (?,?,?,?,?,'aberto')''',
+                    (pid, data['numero'], data.get('codigo_licitacao'), data.get('data_pedido'),
+                     data.get('fornecedor_id')))
+                for it in itens:
+                    pid_prod = it.get('produto_id')
+                    qtd = int(it.get('quantidade_pedida') or 0)
+                    if not pid_prod or qtd <= 0:
+                        raise ValueError('Item inválido: produto e quantidade pedida são obrigatórios')
+                    conn.execute('''INSERT INTO pedido_itens (pedido_id,produto_id,quantidade_pedida)
+                        VALUES (?,?,?)''', (pid, pid_prod, qtd))
+        except ValueError as e:
+            self._json(400, {'error': str(e)}); return
+        except sqlite3.IntegrityError:
+            self._json(409, {'error': 'Já existe um pedido com esse número/licitação, ou item duplicado'}); return
+        self._json(201, self._get_pedido_dict(pid))
+
+    def _update_pedido(self, pid, data):
+        # Só cabeçalho — itens são imutáveis após criação (o saldo de outras
+        # entradas já pode depender da quantidade_pedida original) e status
+        # não é mais editável aqui, só via _cancelar_pedido.
+        cols = ['numero', 'codigo_licitacao', 'data_pedido', 'fornecedor_id']
+        fields = {k: data[k] for k in cols if k in data}
+        with get_db() as conn:
+            row = conn.execute('SELECT id FROM pedidos WHERE id=?', (pid,)).fetchone()
+            if not row:
+                self._json(404, {'error': 'Não encontrado'}); return
+            if fields:
+                fields['updated_at'] = _now()
+                conn.execute(f'UPDATE pedidos SET {",".join(f"{k}=?" for k in fields)} WHERE id=?',
+                             list(fields.values()) + [pid])
+        self._json(200, self._get_pedido_dict(pid))
+
+    def _anular_saldo_pedido_item(self, item_id):
+        with get_db() as conn:
+            item = conn.execute('SELECT * FROM pedido_itens WHERE id=?', (item_id,)).fetchone()
+            if not item:
+                self._json(404, {'error': 'Item de pedido não encontrado'}); return
+            itens = _pedido_itens_com_saldo(conn, item['pedido_id'])
+            alvo = next((i for i in itens if i['id'] == int(item_id)), None)
+            if not alvo or alvo['saldo'] <= 0:
+                self._json(409, {'error': 'Este item não tem saldo remanescente para anular'}); return
+            conn.execute('UPDATE pedido_itens SET quantidade_anulada = quantidade_anulada + ? WHERE id=?',
+                         (alvo['saldo'], item_id))
+        self._json(200, self._get_pedido_dict(item['pedido_id']))
+
+    def _cancelar_pedido(self, pid):
+        with get_db() as conn:
+            row = conn.execute('SELECT * FROM pedidos WHERE id=?', (pid,)).fetchone()
+            if not row:
+                self._json(404, {'error': 'Não encontrado'}); return
+            itens = _pedido_itens_com_saldo(conn, pid)
+            status_atual = _pedido_status_agregado(row['status'], itens)
+            if status_atual in ('atendido', 'cancelado'):
+                self._json(409, {'error': f'Pedido já está {status_atual}, não há o que cancelar'}); return
+            for it in itens:
+                if it['saldo'] > 0:
+                    conn.execute('UPDATE pedido_itens SET quantidade_anulada = quantidade_anulada + ? WHERE id=?',
+                                 (it['saldo'], it['id']))
+            conn.execute("UPDATE pedidos SET status='cancelado', updated_at=? WHERE id=?", (_now(), pid))
+        self._json(200, self._get_pedido_dict(pid))
+
     # ── Entradas ─────────────────────────────────────────────────────────────
 
     def _list_entradas(self, trash=False):
@@ -1127,15 +1312,14 @@ class SGEAHandler(http.server.SimpleHTTPRequestHandler):
             self._json(400, {'error': str(e)}); return
 
         eid = str(uuid.uuid4())
+        pedido_id = data.get('pedido_id') if tipo == 'pedido' else None
         try:
             with get_db() as conn:
-                conn.execute('''INSERT INTO entradas
-                    (id,pedido_id,tipo,fornecedor_id,nfe_numero,nfe_chave_acesso,data_entrega,
-                     recebedor_id,centro_custo_id,observacao,created_by)
-                    VALUES (?,?,?,?,?,?,?,?,?,?,?)''',
-                    (eid, data.get('pedido_id'), tipo, data.get('fornecedor_id'), data.get('nfe_numero'),
-                     data.get('nfe_chave_acesso'), data['data_entrega'], data.get('recebedor_id'),
-                     data.get('centro_custo_id'), data.get('observacao'), s['user_id']))
+                # 1ª passada: resolve quantidade_unidades de cada item (conversão
+                # embalagem→unidade incluída) antes de inserir qualquer coisa —
+                # precisamos do total por produto pra validar contra o saldo do
+                # pedido (passo seguinte) sem já ter gravado nada.
+                resolvidos = []
                 for it in itens:
                     pid = it.get('produto_id')
                     if not pid:
@@ -1153,16 +1337,47 @@ class SGEAHandler(http.server.SimpleHTTPRequestHandler):
                     if qtd_un <= 0:
                         raise ValueError('Quantidade deve ser maior que zero')
                     valor_unit = _float(it.get('valor_unitario')) or 0
-                    valor_total = round(valor_unit * qtd_un, 2)
+                    resolvidos.append({
+                        'produto_id': pid, 'qtd_emb': qtd_emb, 'qtd_un': qtd_un, 'valor_unit': valor_unit,
+                        'lote_numero': it.get('lote_numero'), 'data_validade': it.get('data_validade'),
+                    })
+
+                if pedido_id:
+                    agregado = {}
+                    for r in resolvidos:
+                        agregado[r['produto_id']] = agregado.get(r['produto_id'], 0) + r['qtd_un']
+                    pedido_itens = {i['produto_id']: i for i in _pedido_itens_com_saldo(conn, pedido_id)}
+                    for produto_id, qtd_solicitada in agregado.items():
+                        pi = pedido_itens.get(produto_id)
+                        if not pi:
+                            raise SaldoPedidoExcedido(f'Produto {produto_id} não faz parte deste pedido')
+                        if qtd_solicitada > pi['saldo']:
+                            raise SaldoPedidoExcedido(
+                                f'Quantidade solicitada ({qtd_solicitada}) excede o saldo do pedido '
+                                f'para {pi["produto_nome"]} (saldo: {pi["saldo"]})')
+
+                conn.execute('''INSERT INTO entradas
+                    (id,pedido_id,tipo,fornecedor_id,nfe_numero,nfe_chave_acesso,data_entrega,
+                     recebedor_id,centro_custo_id,observacao,created_by)
+                    VALUES (?,?,?,?,?,?,?,?,?,?,?)''',
+                    (eid, data.get('pedido_id'), tipo, data.get('fornecedor_id'), data.get('nfe_numero'),
+                     data.get('nfe_chave_acesso'), data['data_entrega'], data.get('recebedor_id'),
+                     data.get('centro_custo_id'), data.get('observacao'), s['user_id']))
+                for r in resolvidos:
+                    valor_total = round(r['valor_unit'] * r['qtd_un'], 2)
                     cur = conn.execute('''INSERT INTO entrada_itens
                         (entrada_id,produto_id,quantidade_embalagem,quantidade_unidades,valor_unitario,valor_total,lote_numero,data_validade)
                         VALUES (?,?,?,?,?,?,?,?)''',
-                        (eid, pid, qtd_emb, qtd_un, valor_unit, valor_total, it.get('lote_numero'), it.get('data_validade')))
+                        (eid, r['produto_id'], r['qtd_emb'], r['qtd_un'], r['valor_unit'], valor_total,
+                         r['lote_numero'], r['data_validade']))
                     item_id = cur.lastrowid
                     conn.execute('''INSERT INTO lotes
                         (produto_id,lote_numero,data_validade,quantidade_recebida,quantidade_atual,valor_unitario_custo,entrada_item_id)
                         VALUES (?,?,?,?,?,?,?)''',
-                        (pid, it.get('lote_numero'), it.get('data_validade'), qtd_un, qtd_un, valor_unit, item_id))
+                        (r['produto_id'], r['lote_numero'], r['data_validade'], r['qtd_un'], r['qtd_un'],
+                         r['valor_unit'], item_id))
+        except SaldoPedidoExcedido as e:
+            self._json(409, {'error': str(e)}); return
         except ValueError as e:
             self._json(400, {'error': str(e)}); return
         self._json(201, self._get_entrada_dict(eid))

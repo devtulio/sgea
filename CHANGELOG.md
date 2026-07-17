@@ -5,6 +5,12 @@
 
 ---
 
+## [0.12.0] — 2026-07-17
+
+### Adicionado
+- **Pedidos com múltiplos itens** — cada pedido agora agrupa vários produtos, cada um com sua quantidade pedida (nova tabela `pedido_itens`, uma linha por produto, única por pedido+produto). Nova aba de Pedidos com listagem, modal de criação/edição com linhas de itens dinâmicas, cancelamento do pedido inteiro e anulação do saldo de um item específico. Endpoints: `GET/POST /api/pedidos`, `GET/PUT/DELETE /api/pedidos/<id>`, `POST /api/pedidos/<id>/cancelar`, `POST /api/pedidos/<id>/itens/<id>/anular`.
+- **Status derivado das entradas, sem contador armazenado** — a quantidade recebida de cada item é sempre calculada a partir da soma real das entradas vinculadas ao pedido (`entrada_itens`), nunca guardada numa coluna, pra não correr o risco de um contador desalinhar da realidade. Daí saem o saldo em aberto e o status por item (`aberto`/`parcial`/`atendido`/`encerrado_parcial`) e o status agregado do pedido — sendo `cancelado` o único valor definido manualmente, tudo o mais é recalculado dos itens a cada leitura.
+
 ## [0.11.7] — 2026-07-14
 
 ### Alterado

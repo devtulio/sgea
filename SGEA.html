@@ -100,7 +100,7 @@
     <button class="nav-item" id="nav-frota" onclick="showCrud('frota')">
       <span class="nav-ico">🚗</span> Frota
     </button>
-    <button class="nav-item" id="nav-pedidos" onclick="showCrud('pedidos')">
+    <button class="nav-item" id="nav-pedidos" onclick="showPedidos()">
       <span class="nav-ico">📄</span> Pedidos
     </button>
     <div class="nav-section">Administração</div>
@@ -151,6 +151,17 @@
       <div class="skeleton skeleton-card"></div>
       <div class="skeleton skeleton-card"></div>
     </div>
+  </div>
+
+  <!-- ── Pedidos ── -->
+  <div id="view-pedidos" class="view">
+    <div class="dash-top">
+      <h2>Pedidos</h2>
+      <div class="view-actions">
+        <button class="btn btn-primary" onclick="openPedidoModal()">+ Novo Pedido</button>
+      </div>
+    </div>
+    <div id="pedidos-list"></div>
   </div>
 
   <!-- ── Entradas ── -->
@@ -605,6 +616,38 @@
   </div>
 </div>
 
+<!-- ── Modal Pedido ── -->
+<div class="overlay hidden" id="pedido-modal-overlay" role="dialog" aria-modal="true" aria-labelledby="pedido-modal-titulo">
+  <div class="modal modal-wide">
+    <div class="modal-header">
+      <h2 id="pedido-modal-titulo">Novo Pedido</h2>
+      <button class="btn btn-ghost btn-icon" onclick="closePedidoModal()" aria-label="Fechar">✕</button>
+    </div>
+    <div class="modal-body">
+      <div class="form-grid">
+        <div class="info-field"><label for="pf-numero">Número do Pedido *</label><input type="text" id="pf-numero" placeholder="Ex: 1234/2026"></div>
+        <div class="info-field"><label for="pf-licitacao">Código da Licitação</label><input type="text" id="pf-licitacao"></div>
+        <div class="info-field"><label for="pf-data">Data do Pedido</label><input type="date" id="pf-data"></div>
+        <div class="info-field"><label for="pf-fornecedor">Fornecedor</label><select id="pf-fornecedor"></select></div>
+      </div>
+      <div id="pf-status-row" style="display:none;align-items:center;gap:10px;margin-bottom:14px">
+        <span style="font-size:.72rem;font-weight:700;text-transform:uppercase;color:var(--gray-500)">Status</span>
+        <span id="pf-status-badge"></span>
+        <button class="btn btn-outline btn-sm" id="pf-btn-cancelar" onclick="cancelarPedido()" style="margin-left:auto">Cancelar pedido</button>
+      </div>
+
+      <h3 style="font-size:.8rem;margin:6px 0 8px;color:var(--gray-600)">Itens</h3>
+      <div class="item-rows" id="pf-itens-edit"></div>
+      <button class="btn btn-outline btn-sm" id="pf-btn-add-item" onclick="_addPedidoItemRow()">+ Adicionar item</button>
+      <div id="pf-itens-view"></div>
+    </div>
+    <div class="modal-footer">
+      <button class="btn btn-outline" onclick="closePedidoModal()">Cancelar</button>
+      <button class="btn btn-primary" onclick="savePedido()">Salvar Pedido</button>
+    </div>
+  </div>
+</div>
+
 <!-- ── Modal Entrada ── -->
 <div class="overlay hidden" id="entrada-modal-overlay" role="dialog" aria-modal="true" aria-labelledby="entrada-modal-titulo">
   <div class="modal modal-wide">
@@ -700,7 +743,7 @@
 // ══════════════════════════════════════════════════════════════
 // API / SESSÃO
 // ══════════════════════════════════════════════════════════════
-const SGEA_VERSION = '0.11.7';
+const SGEA_VERSION = '0.12.0';
 document.title = `SGEA v${SGEA_VERSION}`;
 
 let _apiToken = localStorage.getItem('sgea-token') || null;
@@ -1000,6 +1043,10 @@ async function _gsearchAbrirItem(tipo, id) {
     showProdutos();
     await renderProdutos();
     await openProdutoModal(id);
+  } else if (tipo === 'pedidos') {
+    showPedidos();
+    await renderPedidos();
+    await openPedidoModal(id);
   } else {
     showCrud(tipo);
     await renderCrud();
@@ -1089,17 +1136,9 @@ const CRUD_MODULES = {
     ],
     columns: [{ h: 'Nº', k: 'numero' }, { h: 'Placa', k: 'placa' }, { h: 'Marca/Modelo', kfn: i => `${i.marca || ''} ${i.modelo || ''}`.trim() }, { h: 'Status', k: 'ativo', badge: true }],
   },
-  'pedidos': {
-    titulo: 'Pedidos', navId: 'nav-pedidos',
-    fields: [
-      { key: 'numero', label: 'Número do Pedido', required: true, placeholder: 'Ex: 1234/2026' },
-      { key: 'codigo_licitacao', label: 'Código da Licitação' },
-      { key: 'data_pedido', label: 'Data do Pedido', type: 'date' },
-      { key: 'fornecedor_id', label: 'Fornecedor', type: 'select', source: 'fornecedores', optLabel: 'razao_social' },
-      { key: 'status', label: 'Status', type: 'select', options: ['aberto', 'atendido', 'cancelado'] },
-    ],
-    columns: [{ h: 'Número', k: 'numero' }, { h: 'Licitação', k: 'codigo_licitacao' }, { h: 'Status', k: 'status', badge: true }],
-  },
+  // pedidos NÃO está aqui — tem itens (produto/quantidade), o motor genérico
+  // só sabe campos escalares. Tela própria: showPedidos/renderPedidos/
+  // openPedidoModal/savePedido, mais abaixo.
 };
 let _crudAtual = null;
 let _crudCache = [];
@@ -1179,7 +1218,7 @@ function closeCrudModal() { document.getElementById('crud-modal-overlay').classL
 
 const _CRUD_AUDIT_PREFIX = {
   'centros-custo': 'CENTRO_CUSTO', 'fornecedores': 'FORNECEDOR', 'funcionarios': 'FUNCIONARIO',
-  'frota': 'FROTA', 'pedidos': 'PEDIDO',
+  'frota': 'FROTA',
 };
 function _crudNome(data) {
   return data.nome || data.razao_social || data.numero || '(sem nome)';
@@ -1353,6 +1392,161 @@ async function deleteProduto(id) {
   await _auditEvento('PRODUTO_EXCLUIDO', `Produto "${item?.nome || id}" excluído`, id);
   toast('Produto excluído.', 'success');
   renderProdutos();
+}
+
+// ══════════════════════════════════════════════════════════════
+// PEDIDOS
+// ══════════════════════════════════════════════════════════════
+function showPedidos() {
+  _showView('view-pedidos', 'nav-pedidos');
+  renderPedidos();
+}
+
+const PEDIDO_STATUS_LABELS = {
+  aberto: ['Aberto', 'badge-neutral'],
+  parcial: ['Parcial', 'badge-warn'],
+  atendido: ['Atendido', 'badge-ok'],
+  encerrado_parcial: ['Encerrado parcial', 'badge-warn'],
+  cancelado: ['Cancelado', 'badge-danger'],
+};
+function _pedidoStatusBadge(status) {
+  const [label, cls] = PEDIDO_STATUS_LABELS[status] || [status, 'badge-neutral'];
+  return `<span class="badge ${cls}">${esc(label)}</span>`;
+}
+
+async function renderPedidos() {
+  const items = await _fetchList('pedidos');
+  const el = document.getElementById('pedidos-list');
+  if (!items.length) { el.innerHTML = '<div class="empty">Nenhum pedido registrado.</div>'; return; }
+  el.innerHTML = `<div class="list-table-wrap"><table class="list-table">
+    <thead><tr><th>Número</th><th>Licitação</th><th>Fornecedor</th><th>Status</th><th class="col-actions">Ações</th></tr></thead>
+    <tbody>${items.map(p => `<tr>
+      <td>${esc(p.numero)}</td>
+      <td>${esc(p.codigo_licitacao || '—')}</td>
+      <td>${esc(p.fornecedor_nome || '—')}</td>
+      <td>${_pedidoStatusBadge(p.status)}</td>
+      <td class="col-actions"><button class="btn btn-ghost btn-sm" onclick="openPedidoModal('${p.id}')">Ver/Editar</button></td>
+    </tr>`).join('')}</tbody>
+  </table></div>`;
+}
+
+let _pedidoProdutos = [];
+async function openPedidoModal(id) {
+  let item = null;
+  if (id) {
+    const r = await API.get(`/api/pedidos/${id}`);
+    item = await API.json(r);
+  }
+  document.getElementById('pedido-modal-titulo').textContent = item ? 'Editar Pedido' : 'Novo Pedido';
+  await _fillSelect('pf-fornecedor', 'fornecedores', 'razao_social');
+  document.getElementById('pf-numero').value = item?.numero || '';
+  document.getElementById('pf-licitacao').value = item?.codigo_licitacao || '';
+  document.getElementById('pf-data').value = item?.data_pedido || '';
+  document.getElementById('pf-fornecedor').value = item?.fornecedor_id || '';
+  document.getElementById('pedido-modal-overlay').dataset.id = id || '';
+
+  const statusRow = document.getElementById('pf-status-row');
+  const editWrap = document.getElementById('pf-itens-edit');
+  const addBtn = document.getElementById('pf-btn-add-item');
+  const viewWrap = document.getElementById('pf-itens-view');
+  if (item) {
+    // Itens já existem — só leitura + status/saldo por item; quantidade_pedida
+    // é imutável no backend (_update_pedido não aceita "itens"), então não faz
+    // sentido oferecer edição aqui.
+    statusRow.style.display = 'flex';
+    document.getElementById('pf-status-badge').innerHTML = _pedidoStatusBadge(item.status);
+    document.getElementById('pf-btn-cancelar').style.display = ['atendido', 'cancelado'].includes(item.status) ? 'none' : '';
+    editWrap.style.display = 'none';
+    addBtn.style.display = 'none';
+    viewWrap.style.display = '';
+    viewWrap.innerHTML = `<div class="list-table-wrap"><table class="list-table">
+      <thead><tr><th>Produto</th><th>Pedida</th><th>Recebida</th><th>Saldo</th><th>Status</th><th class="col-actions">Ações</th></tr></thead>
+      <tbody>${item.itens.map(i => `<tr>
+        <td>${esc(i.produto_nome)}</td>
+        <td>${i.quantidade_pedida} ${esc(i.unidade_consumo || '')}</td>
+        <td>${i.quantidade_recebida}</td>
+        <td>${i.saldo}</td>
+        <td>${_pedidoStatusBadge(i.status)}</td>
+        <td class="col-actions">${i.saldo > 0 ? `<button class="btn btn-ghost btn-sm" onclick="anularSaldoPedidoItem('${i.id}')">Anular saldo</button>` : ''}</td>
+      </tr>`).join('')}</tbody>
+    </table></div>`;
+  } else {
+    statusRow.style.display = 'none';
+    editWrap.style.display = '';
+    addBtn.style.display = '';
+    viewWrap.style.display = 'none';
+    viewWrap.innerHTML = '';
+    editWrap.innerHTML = '';
+    _pedidoProdutos = await _fetchList('produtos?somente_ativos=1');
+    _addPedidoItemRow();
+  }
+  document.getElementById('pedido-modal-overlay').classList.remove('hidden');
+}
+function closePedidoModal() { document.getElementById('pedido-modal-overlay').classList.add('hidden'); }
+
+function _addPedidoItemRow() {
+  const wrap = document.getElementById('pf-itens-edit');
+  const row = document.createElement('div');
+  row.className = 'item-row';
+  const opts = _pedidoProdutos.map(p => `<option value="${p.id}">${esc(p.nome)} (${esc(p.codigo_fiorilli)})</option>`).join('');
+  row.innerHTML = `
+    <div class="info-field span-produto"><label>Produto</label><select class="pi-produto"><option value="">Selecione...</option>${opts}</select></div>
+    <div class="info-field"><label>Quantidade Pedida</label><input type="number" class="pi-qtd" min="1" step="1"></div>
+    <button class="btn btn-ghost btn-icon" onclick="this.closest('.item-row').remove()" aria-label="Remover item">✕</button>`;
+  wrap.appendChild(row);
+}
+
+async function savePedido() {
+  const id = document.getElementById('pedido-modal-overlay').dataset.id;
+  const numero = document.getElementById('pf-numero').value.trim();
+  if (!numero) { toast('Número do pedido é obrigatório.', 'error'); return; }
+  const data = {
+    numero,
+    codigo_licitacao: document.getElementById('pf-licitacao').value.trim() || null,
+    data_pedido: document.getElementById('pf-data').value || null,
+    fornecedor_id: document.getElementById('pf-fornecedor').value || null,
+  };
+  if (!id) {
+    const itens = [...document.querySelectorAll('#pf-itens-edit .item-row')].map(row => ({
+      produto_id: row.querySelector('.pi-produto').value,
+      quantidade_pedida: parseInt(row.querySelector('.pi-qtd').value) || 0,
+    })).filter(i => i.produto_id);
+    if (!itens.length) { toast('Adicione ao menos um item.', 'error'); return; }
+    data.itens = itens;
+  }
+  const r = id ? await API.put(`/api/pedidos/${id}`, data) : await API.post('/api/pedidos', data);
+  const d = await API.json(r);
+  if (!r || !r.ok) { toast(d?.error || 'Erro ao salvar pedido.', 'error'); return; }
+  await _auditEvento(`PEDIDO_${id ? 'EDITADO' : 'CRIADO'}`, `Pedido "${numero}" ${id ? 'editado' : 'criado'}`, d.id);
+  closePedidoModal();
+  toast('Pedido salvo.', 'success');
+  renderPedidos();
+}
+
+async function anularSaldoPedidoItem(itemId) {
+  const ok = await customConfirm('Anular o saldo remanescente deste item? Essa ação não pode ser desfeita.', { okLabel: 'Anular saldo' });
+  if (!ok) return;
+  const pedidoId = document.getElementById('pedido-modal-overlay').dataset.id;
+  const r = await API.put(`/api/pedidos/${pedidoId}/itens/${itemId}/anular`, {});
+  const d = await API.json(r);
+  if (!r || !r.ok) { toast(d?.error || 'Não foi possível anular o saldo.', 'error'); return; }
+  await _auditEvento('PEDIDO_ITEM_ANULADO', `Saldo anulado num item do pedido "${d.numero}"`, pedidoId);
+  toast('Saldo anulado.', 'success');
+  openPedidoModal(pedidoId);
+  renderPedidos();
+}
+
+async function cancelarPedido() {
+  const ok = await customConfirm('Cancelar este pedido? O saldo pendente de todos os itens será anulado.', { okLabel: 'Cancelar pedido' });
+  if (!ok) return;
+  const pedidoId = document.getElementById('pedido-modal-overlay').dataset.id;
+  const r = await API.put(`/api/pedidos/${pedidoId}/cancelar`, {});
+  const d = await API.json(r);
+  if (!r || !r.ok) { toast(d?.error || 'Não foi possível cancelar o pedido.', 'error'); return; }
+  await _auditEvento('PEDIDO_CANCELADO', `Pedido "${d.numero}" cancelado`, pedidoId);
+  toast('Pedido cancelado.', 'success');
+  openPedidoModal(pedidoId);
+  renderPedidos();
 }
 
 // ══════════════════════════════════════════════════════════════
@@ -2138,7 +2332,7 @@ const _AUDIT_TIPOS = [
   'FORNECEDOR_CRIADO', 'FORNECEDOR_EDITADO', 'FORNECEDOR_EXCLUIDO',
   'FUNCIONARIO_CRIADO', 'FUNCIONARIO_EDITADO', 'FUNCIONARIO_EXCLUIDO',
   'FROTA_CRIADO', 'FROTA_EDITADO', 'FROTA_EXCLUIDO',
-  'PEDIDO_CRIADO', 'PEDIDO_EDITADO', 'PEDIDO_EXCLUIDO',
+  'PEDIDO_CRIADO', 'PEDIDO_EDITADO', 'PEDIDO_EXCLUIDO', 'PEDIDO_ITEM_ANULADO', 'PEDIDO_CANCELADO',
   'USUARIO_CRIADO', 'USUARIO_EDITADO', 'USUARIO_EXCLUIDO',
 ];
 

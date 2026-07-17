@@ -3,7 +3,7 @@
 <head>
 <meta charset="UTF-8">
 <meta name="viewport" content="width=device-width, initial-scale=1.0">
-<title>Manual Operacional — SGEA v0.11.7</title>
+<title>Manual Operacional — SGEA v0.12.0</title>
 <style>
   * { box-sizing: border-box; margin: 0; padding: 0; }
   body { font-family: 'Times New Roman', Times, serif; font-size: 12pt; color: #000; background: #f5f5f5; }
@@ -63,7 +63,7 @@
     <div class="cover-title">Manual Operacional</div>
     <div class="cover-subtitle">SGEA — Sistema de Gestão de Estoque do Almoxarifado</div>
     <div class="cover-system">Entradas, Saídas, Lotes/Validade e cadastros de apoio</div>
-    <div class="cover-version">Versão v0.11.7</div>
+    <div class="cover-version">Versão v0.12.0</div>
     <br>
     <div style="font-size:11pt; color:#555; line-height:1.8;">
       Aplicação web multiusuário para o Almoxarifado<br>
@@ -142,8 +142,9 @@
   <p>Esta tela lista todos os lotes com saldo que estão vencidos ou vencendo dentro de uma janela configurável (30, 60 ou 90 dias), mostrando o produto, o lote, a data de validade, o saldo restante e o centro de custo de origem do produto. Use-a periodicamente para priorizar o consumo de itens perto do vencimento.</p>
 
   <h2 id="sec8">8. Cadastros de Apoio</h2>
-  <p>As telas de <strong>Centros de Custo</strong>, <strong>Fornecedores</strong>, <strong>Funcionários</strong>, <strong>Frota</strong> e <strong>Pedidos</strong> seguem o mesmo padrão de lista + formulário. No cadastro de Fornecedores, o campo CNPJ pode ser preenchido manualmente; a consulta automática de dados do CNPJ está disponível via a API pública da ReceitaWS.</p>
+  <p>As telas de <strong>Centros de Custo</strong>, <strong>Fornecedores</strong>, <strong>Funcionários</strong> e <strong>Frota</strong> seguem o mesmo padrão de lista + formulário. No cadastro de Fornecedores, o campo CNPJ pode ser preenchido manualmente; a consulta automática de dados do CNPJ está disponível via a API pública da ReceitaWS.</p>
   <p><strong>Funcionários</strong> são usados como solicitantes de saída (nome, cargo e unidade). <strong>Frota</strong> cadastra os veículos do município (número, placa, marca/modelo) para permitir vincular uma saída de combustível ou peça a um veículo específico.</p>
+  <p><strong>Pedidos</strong> vão além do cadastro simples: cada pedido (número + código de licitação) agrupa <strong>vários produtos</strong>, cada um com a quantidade pedida. Ao registrar uma Entrada vinculada a um pedido, o sistema abate automaticamente a quantidade recebida dos itens correspondentes — a quantidade recebida nunca é digitada nem armazenada à parte, é sempre calculada a partir das entradas reais. Assim cada item mostra seu <strong>saldo em aberto</strong> e um <strong>status</strong> (aberto, parcial, atendido) e o pedido mostra um status agregado. É possível <strong>cancelar</strong> um pedido inteiro ou <strong>anular o saldo</strong> de um item específico (quando o restante não vai mais ser entregue), sem afetar o que já foi recebido.</p>
 
   <h2 id="sec9">9. Configurações</h2>
   <p>A tela <strong>Configurações</strong> reúne, em sete abas, tudo que não é operação de estoque no dia a dia. Um único botão <strong>Salvar</strong>, fixo no topo, grava as alterações das abas Interface/Organização/Comunicação/Dados de uma só vez — ele pulsa quando há alterações não salvas. O botão "← Voltar" retorna para o Estoque.</p>
@@ -170,6 +171,7 @@
   <h2 id="sec12">12. Histórico de Versões</h2>
   <table>
     <tr><th>Versão</th><th>Data</th><th>Resumo</th></tr>
+    <tr><td>0.12.0</td><td>17/07/2026</td><td>Pedidos com múltiplos itens: cada pedido agrupa vários produtos com quantidade pedida; a quantidade recebida é derivada das entradas vinculadas (nunca armazenada), gerando saldo e status por item (aberto/parcial/atendido/encerrado parcial) e do pedido. Cancelamento do pedido e anulação de saldo de item.</td></tr>
     <tr><td>0.11.7</td><td>14/07/2026</td><td>Fundo animado da tela de login ganhou interação de mouse, igualando ao SGCD/SGCA/SGDP — as 2 últimas funções locais do motor de partículas (mantidas simples de propósito na v0.11.6) agora vêm do base.js. Contagem padrão de partículas passa de 50 para 60.</td></tr>
     <tr><td>0.11.6</td><td>14/07/2026</td><td>6 das 8 funções do motor de partículas da tela de login reimplementadas localmente, byte-idênticas às do esqueleto compartilhado — agora vêm só do base.js.</td></tr>
     <tr><td>0.11.5</td><td>14/07/2026</td><td>Funções de sessão (create/delete/renew/active) reimplementadas localmente, mecanicamente idênticas ao esqueleto compartilhado — agora delegam pro sgx_base.</td></tr>
