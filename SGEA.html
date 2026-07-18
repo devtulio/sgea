@@ -157,11 +157,7 @@
         <button class="btn btn-primary" onclick="openProdutoModal()">+ Novo Produto</button>
       </div>
     </div>
-    <div id="produtos-list">
-      <div class="skeleton skeleton-card"></div>
-      <div class="skeleton skeleton-card"></div>
-      <div class="skeleton skeleton-card"></div>
-    </div>
+    <div id="produtos-list"></div>
   </div>
 
   <!-- ── Pedidos ── -->
@@ -759,7 +755,7 @@
 // ══════════════════════════════════════════════════════════════
 // API / SESSÃO
 // ══════════════════════════════════════════════════════════════
-const SGEA_VERSION = '0.13.2';
+const SGEA_VERSION = '0.13.3';
 document.title = `SGEA v${SGEA_VERSION}`;
 
 let _apiToken = localStorage.getItem('sgea-token') || null;

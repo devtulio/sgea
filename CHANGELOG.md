@@ -5,6 +5,11 @@
 
 ---
 
+## [0.13.3] — 2026-07-17
+
+### Removido
+- **Skeleton de carregamento removido** — eram apenas 3 divs placeholder que nem tinham CSS de skeleton (renderizavam vazios); padronização com os sistemas irmãos. A lista de produtos já é populada pelo JS ao carregar.
+
 ## [0.13.2] — 2026-07-17
 
 ### Alterado
