@@ -5,6 +5,11 @@
 
 ---
 
+## [0.13.1] — 2026-07-17
+
+### Corrigido
+- **Tabela da tela de Auditoria agora tem o mesmo visual dos sistemas irmãos** — na v0.13.0 os rótulos/badges/filtros/CSV/relatório foram igualados, mas a tabela em si ainda usava o estilo genérico "cru" (sem cabeçalho em faixa, sem bordas de linha, sem card). Agora tem cabeçalho em faixa (maiúsculo), linhas com separador e o conjunto dentro de um card com sombra e cantos arredondados, no padrão do SGDP/SGCD (com a paleta escura do próprio SGEA no modo noturno). O título passou a ser "Trilha de Auditoria" e a filtragem ao vivo ganhou um pequeno atraso (debounce) para não recarregar a cada tecla.
+
 ## [0.13.0] — 2026-07-17
 
 ### Alterado

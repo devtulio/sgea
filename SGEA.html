@@ -54,6 +54,19 @@
   .lotes-panel table { width: 100%; font-size: .78rem; border-collapse: collapse; }
   .lotes-panel th, .lotes-panel td { text-align: left; padding: 5px 8px; }
   .lotes-panel th { color: var(--gray-500); font-weight: 700; text-transform: uppercase; font-size: .65rem; }
+
+  /* Trilha de Auditoria — tabela no mesmo padrão dos sistemas irmãos (cabeçalho
+     em faixa, linhas com separador, dentro de um card). Dark usa a paleta
+     neutra do próprio SGEA, já que aqui os tokens --gray-* não mudam no dark. */
+  .audit-table-wrap { background: #fff; border-radius: var(--radius); box-shadow: var(--shadow); overflow: hidden; }
+  .audit-table { width: 100%; border-collapse: collapse; }
+  .audit-table th { background: var(--gray-50); border-bottom: 1px solid var(--gray-200); padding: 10px 14px; text-align: left; font-size: .6875rem; font-weight: 700; text-transform: uppercase; letter-spacing: .4px; color: var(--gray-500); white-space: nowrap; }
+  .audit-table td { padding: 11px 14px; border-bottom: 1px solid var(--gray-100); vertical-align: middle; font-size: .75rem; }
+  .audit-table tr:last-child td { border-bottom: none; }
+  body.dark .audit-table-wrap { background: #232323; }
+  body.dark .audit-table th { background: #2a2a2a; border-bottom-color: #383838; color: #9aa4b2; }
+  body.dark .audit-table td { border-bottom-color: #383838; }
+  body.dark .audit-table tr:hover td { background: #2a2a2a; }
 </style>
 </head>
 <body>
@@ -228,7 +241,7 @@
   <!-- ── Auditoria ── -->
   <div id="view-auditoria" class="view">
     <div class="dash-top">
-      <h2>Auditoria</h2>
+      <h2>Trilha de Auditoria</h2>
       <div class="view-actions">
         <button class="btn btn-outline btn-sm" onclick="exportarAuditoriaCSV()">⬇️ Exportar CSV</button>
         <button class="btn btn-outline btn-sm" onclick="gerarRelatorioAuditoria()">📄 Relatório</button>
@@ -748,7 +761,7 @@
 // ══════════════════════════════════════════════════════════════
 // API / SESSÃO
 // ══════════════════════════════════════════════════════════════
-const SGEA_VERSION = '0.13.0';
+const SGEA_VERSION = '0.13.1';
 document.title = `SGEA v${SGEA_VERSION}`;
 
 let _apiToken = localStorage.getItem('sgea-token') || null;
@@ -2387,6 +2400,7 @@ function showAuditoria() {
   _auditCarregar(false);
 }
 
+let _auditTimer = null;
 function _auditFiltrar() {
   _auditFiltros = {
     q: document.getElementById('aud-q').value.trim(),
@@ -2395,7 +2409,8 @@ function _auditFiltrar() {
     ate: document.getElementById('aud-ate').value,
   };
   _auditPage = 0;
-  _auditCarregar(false);
+  clearTimeout(_auditTimer);
+  _auditTimer = setTimeout(() => _auditCarregar(false), 300);
 }
 function _auditLimparFiltros() {
   document.getElementById('aud-q').value = '';
@@ -2423,7 +2438,7 @@ async function _auditCarregar(append) {
   </tr>`;
   }).join('');
   const el = document.getElementById('auditoria-list');
-  const table = `<div class="list-table-wrap"><table class="list-table">
+  const table = `<div class="audit-table-wrap"><table class="audit-table">
     <thead><tr><th>Data/Hora</th><th>Usuário</th><th>Ação</th><th>Detalhes</th></tr></thead>
     <tbody id="audit-tbody">${rows}</tbody>
   </table></div>`;
