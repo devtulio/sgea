@@ -65,6 +65,9 @@
   body.dark .audit-table th { background: #323232; border-bottom-color: #383838; color: #9aa4b2; }
   body.dark .audit-table td { border-bottom-color: #383838; }
   body.dark .audit-table tr:hover td { background: #323232; }
+
+  /* Bolinha de cor no seletor "Cor de destaque" (padrão dos sistemas irmãos) */
+  .cor-swatch { display: inline-block; width: 14px; height: 14px; border-radius: 50%; flex-shrink: 0; }
 </style>
 </head>
 <body>
@@ -755,7 +758,7 @@
 // ══════════════════════════════════════════════════════════════
 // API / SESSÃO
 // ══════════════════════════════════════════════════════════════
-const SGEA_VERSION = '0.13.4';
+const SGEA_VERSION = '0.13.5';
 document.title = `SGEA v${SGEA_VERSION}`;
 
 let _apiToken = localStorage.getItem('sgea-token') || null;

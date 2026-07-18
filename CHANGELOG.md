@@ -5,6 +5,11 @@
 
 ---
 
+## [0.13.5] — 2026-07-18
+
+### Corrigido
+- **Bolinha de cor em "Cor de destaque" não aparecia** — a classe `.cor-swatch` não tinha dimensões definidas (span de 0×0). Adicionada a regra CSS (`14×14`, círculo, `flex-shrink:0`), igualando o padrão de bolinha dos sistemas irmãos.
+
 ## [0.13.4] — 2026-07-17
 
 ### Corrigido
