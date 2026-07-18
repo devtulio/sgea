@@ -5,6 +5,12 @@
 
 ---
 
+## [0.13.7] — 2026-07-18
+
+### Corrigido (acessibilidade — WCAG 2.1 AA)
+- **Elementos interativos agora acessíveis por teclado** (WCAG 2.1.1): itens da busca global (Ctrl+K), item de notificação e a linha de produto que expande os lotes ganharam `role="button"` + `tabindex="0"` (o estilo compartilhado já dispara a ação em Enter/Espaço). Antes só respondiam ao mouse. Fecha a paridade com SGCD/SGCA/SGDP.
+- **`alt` na prévia do brasão** (WCAG 1.1.1) — a imagem de pré-visualização do brasão nas Configurações passou a ter texto alternativo.
+
 ## [0.13.6] — 2026-07-18
 
 ### Corrigido

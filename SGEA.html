@@ -336,7 +336,7 @@
         <legend>Brasão do Município</legend>
         <p class="cfg-help" style="margin:0 0 10px">Exibido na barra lateral. Formatos de imagem, até 3 MB.</p>
         <div style="display:flex;align-items:center;gap:14px;flex-wrap:wrap">
-          <img id="cfg-brasao-preview" style="height:56px;width:auto;display:none;border:1px solid var(--gray-200);border-radius:4px;padding:2px">
+          <img id="cfg-brasao-preview" alt="Prévia do brasão selecionado" style="height:56px;width:auto;display:none;border:1px solid var(--gray-200);border-radius:4px;padding:2px">
           <div style="display:flex;gap:8px">
             <label class="btn btn-outline btn-sm" style="cursor:pointer">
               Selecionar imagem
@@ -758,7 +758,7 @@
 // ══════════════════════════════════════════════════════════════
 // API / SESSÃO
 // ══════════════════════════════════════════════════════════════
-const SGEA_VERSION = '0.13.6';
+const SGEA_VERSION = '0.13.7';
 document.title = `SGEA v${SGEA_VERSION}`;
 
 let _apiToken = localStorage.getItem('sgea-token') || null;
@@ -1016,7 +1016,7 @@ async function _globalSearch() {
   if (!grupos.length) { el.innerHTML = '<div class="gsearch-empty">Nenhum resultado encontrado.</div>'; return; }
   el.innerHTML = grupos.map(({ fonte, items }) => `
     <div class="gsearch-group">${esc(fonte.label)}</div>
-    ${items.map(i => `<div class="gsearch-item" onclick="_gsearchAbrirItem('${fonte.tipo}','${i.id}')">
+    ${items.map(i => `<div class="gsearch-item" onclick="_gsearchAbrirItem('${fonte.tipo}','${i.id}')" role="button" tabindex="0">
       <div class="gsearch-item-title">${esc(fonte.titulo(i))}</div>
       <div class="gsearch-item-sub">${esc(fonte.sub(i))}</div>
     </div>`).join('')}
@@ -1038,7 +1038,7 @@ async function toggleNotificacoes() {
   const items = await atualizarNotifCount();
   const list = document.getElementById('notif-list');
   list.innerHTML = items.length ? items.slice(0, 20).map(i => `
-    <div class="notif-item" onclick="toggleNotificacoes(); showAlertas();">
+    <div class="notif-item" onclick="toggleNotificacoes(); showAlertas();" role="button" tabindex="0">
       <div class="notif-icon" style="background:${i.vencido ? 'var(--danger-light)' : 'var(--warning-light)'}">${i.vencido ? '⛔' : '⏰'}</div>
       <div style="flex:1;min-width:0">
         <div class="notif-title">${esc(i.produto_nome)}${i.lote_numero ? ' — Lote ' + esc(i.lote_numero) : ''}</div>
@@ -1302,7 +1302,7 @@ async function renderProdutos() {
         if (p.proxima_validade < hoje) validadeBadge = `<span class="badge badge-danger">Vencido ${fmtDate(p.proxima_validade)}</span>`;
         else validadeBadge = `<span class="badge badge-neutral">${fmtDate(p.proxima_validade)}</span>`;
       }
-      return `<tr class="clickable" onclick="_toggleLotes('${p.id}', this)">
+      return `<tr class="clickable" onclick="_toggleLotes('${p.id}', this)" role="button" tabindex="0">
         <td>${esc(p.nome)}</td>
         <td>${esc(p.codigo_fiorilli)}</td>
         <td>${esc(p.centro_custo_nome || '—')}</td>
