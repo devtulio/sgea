@@ -3,7 +3,7 @@
 <head>
 <meta charset="UTF-8">
 <meta name="viewport" content="width=device-width, initial-scale=1.0">
-<title>Manual Operacional — SGEA v0.12.0</title>
+<title>Manual Operacional — SGEA v0.13.0</title>
 <style>
   * { box-sizing: border-box; margin: 0; padding: 0; }
   body { font-family: 'Times New Roman', Times, serif; font-size: 12pt; color: #000; background: #f5f5f5; }
@@ -63,7 +63,7 @@
     <div class="cover-title">Manual Operacional</div>
     <div class="cover-subtitle">SGEA — Sistema de Gestão de Estoque do Almoxarifado</div>
     <div class="cover-system">Entradas, Saídas, Lotes/Validade e cadastros de apoio</div>
-    <div class="cover-version">Versão v0.12.0</div>
+    <div class="cover-version">Versão v0.13.0</div>
     <br>
     <div style="font-size:11pt; color:#555; line-height:1.8;">
       Aplicação web multiusuário para o Almoxarifado<br>
@@ -161,7 +161,7 @@
   <div class="nota">Quando o SMTP está configurado, o sistema envia automaticamente, uma vez por dia, um e-mail para o destinatário interno resumindo os lotes vencidos ou vencendo nos próximos 7 dias.</div>
 
   <h2 id="sec10">10. Auditoria e Lixeira</h2>
-  <p>A tela <strong>Auditoria</strong> <em>(somente administradores)</em> registra todo evento de criação, edição ou exclusão nos módulos de Produtos, Entradas, Saídas, cadastros de apoio e Usuários — quem fez, quando e o quê, com filtros por texto, tipo de evento e período. O autor de cada evento é sempre o usuário autenticado no momento, nunca um dado enviado pela tela.</p>
+  <p>A tela <strong>Auditoria</strong> <em>(somente administradores)</em> registra todo evento de criação, edição ou exclusão nos módulos de Produtos, Entradas, Saídas, cadastros de apoio, Pedidos e Usuários — quem fez, quando e o quê. Cada ação aparece com um rótulo legível e uma cor conforme a família (verde para criação, azul para edição, vermelho para exclusão, âmbar para anulação/restauração), com filtros ao vivo por texto, tipo de evento e período. O autor de cada evento é sempre o usuário autenticado no momento, nunca um dado enviado pela tela. Os botões <strong>Exportar CSV</strong> e <strong>Relatório</strong> geram, respectivamente, uma planilha com os eventos filtrados e um documento imprimível (com cabeçalho do órgão) para arquivo ou prestação de contas.</p>
   <p>A tela <strong>Lixeira</strong> lista as Entradas e Saídas excluídas, com o botão <strong>Restaurar</strong> disponível por até 30 dias (depois disso, o registro é apagado de vez automaticamente). Restaurar uma entrada devolve o saldo aos lotes que ela gerou; restaurar uma saída consome o estoque novamente pela regra FEFO — podendo, se o estoque tiver mudado nesse meio-tempo, sair de lotes diferentes dos originais, mas com o mesmo efeito final na quantidade.</p>
   <div class="aviso">Excluir uma entrada zera o saldo dos lotes que ela gerou (não é permitido se algum lote já foi parcialmente consumido por uma saída) — o efeito no estoque é imediato, não só uma remoção da lista.</div>
 
@@ -171,6 +171,7 @@
   <h2 id="sec12">12. Histórico de Versões</h2>
   <table>
     <tr><th>Versão</th><th>Data</th><th>Resumo</th></tr>
+    <tr><td>0.13.0</td><td>17/07/2026</td><td>Tela de Auditoria em paridade com os sistemas irmãos: rótulos legíveis + badges coloridos por família de ação, filtros ao vivo, layout centralizado, e botões Exportar CSV e Relatório imprimível (com cabeçalho do órgão).</td></tr>
     <tr><td>0.12.0</td><td>17/07/2026</td><td>Pedidos com múltiplos itens: cada pedido agrupa vários produtos com quantidade pedida; a quantidade recebida é derivada das entradas vinculadas (nunca armazenada), gerando saldo e status por item (aberto/parcial/atendido/encerrado parcial) e do pedido. Cancelamento do pedido e anulação de saldo de item.</td></tr>
     <tr><td>0.11.7</td><td>14/07/2026</td><td>Fundo animado da tela de login ganhou interação de mouse, igualando ao SGCD/SGCA/SGDP — as 2 últimas funções locais do motor de partículas (mantidas simples de propósito na v0.11.6) agora vêm do base.js. Contagem padrão de partículas passa de 50 para 60.</td></tr>
     <tr><td>0.11.6</td><td>14/07/2026</td><td>6 das 8 funções do motor de partículas da tela de login reimplementadas localmente, byte-idênticas às do esqueleto compartilhado — agora vêm só do base.js.</td></tr>

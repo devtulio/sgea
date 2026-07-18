@@ -230,16 +230,21 @@
     <div class="dash-top">
       <h2>Auditoria</h2>
       <div class="view-actions">
-        <div class="search-box"><span>🔎</span><input type="text" id="aud-q" placeholder="Buscar por usuário ou detalhe..." aria-label="Buscar"></div>
-        <select id="aud-tipo" class="btn btn-outline btn-sm" aria-label="Tipo de evento"><option value="">Todos os tipos</option></select>
-        <input type="date" id="aud-de" class="btn btn-outline btn-sm" aria-label="De" title="De">
-        <input type="date" id="aud-ate" class="btn btn-outline btn-sm" aria-label="Até" title="Até">
-        <button class="btn btn-outline btn-sm" onclick="_auditFiltrar()">Filtrar</button>
-        <button class="btn btn-ghost btn-sm" onclick="_auditLimparFiltros()">Limpar</button>
+        <button class="btn btn-outline btn-sm" onclick="exportarAuditoriaCSV()">⬇️ Exportar CSV</button>
+        <button class="btn btn-outline btn-sm" onclick="gerarRelatorioAuditoria()">📄 Relatório</button>
       </div>
     </div>
-    <div id="auditoria-list"></div>
-    <div style="text-align:center;margin-top:14px"><button class="btn btn-outline btn-sm hidden" id="audit-mais" onclick="_auditCarregar(true)">Carregar mais</button></div>
+    <div id="audit-inner" style="max-width:960px;margin:0 auto">
+      <div class="view-actions" style="margin-bottom:12px">
+        <div class="search-box"><span>🔎</span><input type="text" id="aud-q" placeholder="Buscar por usuário ou detalhe..." aria-label="Buscar" oninput="_auditFiltrar()"></div>
+        <select id="aud-tipo" class="btn btn-outline btn-sm" aria-label="Tipo de evento" onchange="_auditFiltrar()"><option value="">Todos os tipos</option></select>
+        <input type="date" id="aud-de" class="btn btn-outline btn-sm" aria-label="De" title="De" onchange="_auditFiltrar()">
+        <input type="date" id="aud-ate" class="btn btn-outline btn-sm" aria-label="Até" title="Até" onchange="_auditFiltrar()">
+        <button class="btn btn-ghost btn-sm" onclick="_auditLimparFiltros()">Limpar</button>
+      </div>
+      <div id="auditoria-list"></div>
+      <div style="text-align:center;margin-top:14px"><button class="btn btn-outline btn-sm hidden" id="audit-mais" onclick="_auditCarregar(true)">Carregar mais</button></div>
+    </div>
   </div>
 
   <!-- ── Configurações ── -->
@@ -743,7 +748,7 @@
 // ══════════════════════════════════════════════════════════════
 // API / SESSÃO
 // ══════════════════════════════════════════════════════════════
-const SGEA_VERSION = '0.12.0';
+const SGEA_VERSION = '0.13.0';
 document.title = `SGEA v${SGEA_VERSION}`;
 
 let _apiToken = localStorage.getItem('sgea-token') || null;
@@ -2336,6 +2341,34 @@ const _AUDIT_TIPOS = [
   'USUARIO_CRIADO', 'USUARIO_EDITADO', 'USUARIO_EXCLUIDO',
 ];
 
+// Auditoria — label legível + cor do badge por tipo (paridade com SGCD/SGCA).
+// Inclui também os eventos de backup/reset (RESTAURAR_*/FACTORY_RESET), que são
+// registrados pelo backend mas não fazem parte do filtro _AUDIT_TIPOS.
+const _AUDIT_EVENT_LABELS = {
+  PRODUTO_CRIADO: 'Produto criado', PRODUTO_EDITADO: 'Produto editado', PRODUTO_EXCLUIDO: 'Produto excluído',
+  ENTRADA_REGISTRADA: 'Entrada registrada', ENTRADA_EXCLUIDA: 'Entrada excluída', ENTRADA_RESTAURADA: 'Entrada restaurada',
+  SAIDA_REGISTRADA: 'Saída registrada', SAIDA_EXCLUIDA: 'Saída excluída', SAIDA_RESTAURADA: 'Saída restaurada',
+  CENTRO_CUSTO_CRIADO: 'Centro de custo criado', CENTRO_CUSTO_EDITADO: 'Centro de custo editado', CENTRO_CUSTO_EXCLUIDO: 'Centro de custo excluído',
+  FORNECEDOR_CRIADO: 'Fornecedor criado', FORNECEDOR_EDITADO: 'Fornecedor editado', FORNECEDOR_EXCLUIDO: 'Fornecedor excluído',
+  FUNCIONARIO_CRIADO: 'Funcionário criado', FUNCIONARIO_EDITADO: 'Funcionário editado', FUNCIONARIO_EXCLUIDO: 'Funcionário excluído',
+  FROTA_CRIADO: 'Veículo criado', FROTA_EDITADO: 'Veículo editado', FROTA_EXCLUIDO: 'Veículo excluído',
+  PEDIDO_CRIADO: 'Pedido criado', PEDIDO_EDITADO: 'Pedido editado', PEDIDO_EXCLUIDO: 'Pedido excluído',
+  PEDIDO_ITEM_ANULADO: 'Saldo de item anulado', PEDIDO_CANCELADO: 'Pedido cancelado',
+  USUARIO_CRIADO: 'Usuário criado', USUARIO_EDITADO: 'Usuário editado', USUARIO_EXCLUIDO: 'Usuário excluído',
+  RESTAURAR_BACKUP: 'Backup restaurado (JSON)', RESTAURAR_DB: 'Banco restaurado (.db)', FACTORY_RESET: 'Reset de fábrica',
+};
+
+// Cor do badge (fundo sólido, texto branco) por família de ação.
+const _AUDIT_EVENT_META = (() => {
+  const m = {};
+  const set = (tipos, cor) => tipos.forEach(t => { m[t] = cor; });
+  set(['PRODUTO_CRIADO', 'ENTRADA_REGISTRADA', 'SAIDA_REGISTRADA', 'CENTRO_CUSTO_CRIADO', 'FORNECEDOR_CRIADO', 'FUNCIONARIO_CRIADO', 'FROTA_CRIADO', 'PEDIDO_CRIADO', 'USUARIO_CRIADO', 'ENTRADA_RESTAURADA', 'SAIDA_RESTAURADA'], '#0F6E56'); // verde — criação/restauração
+  set(['PRODUTO_EDITADO', 'CENTRO_CUSTO_EDITADO', 'FORNECEDOR_EDITADO', 'FUNCIONARIO_EDITADO', 'FROTA_EDITADO', 'PEDIDO_EDITADO', 'USUARIO_EDITADO'], '#185FA5'); // azul — edição
+  set(['PRODUTO_EXCLUIDO', 'ENTRADA_EXCLUIDA', 'SAIDA_EXCLUIDA', 'CENTRO_CUSTO_EXCLUIDO', 'FORNECEDOR_EXCLUIDO', 'FUNCIONARIO_EXCLUIDO', 'FROTA_EXCLUIDO', 'PEDIDO_EXCLUIDO', 'USUARIO_EXCLUIDO', 'FACTORY_RESET'], '#A32D2D'); // vermelho — exclusão/reset
+  set(['PEDIDO_ITEM_ANULADO', 'PEDIDO_CANCELADO', 'RESTAURAR_BACKUP', 'RESTAURAR_DB'], '#854F0B'); // âmbar — anulação/restauração sensível
+  return m;
+})();
+
 async function _auditEvento(type, detail, processId) {
   try { await API.post('/api/audit', { type, detail, processId: processId || null }); }
   catch (e) { console.warn('Falha ao gravar auditoria:', e); }
@@ -2348,7 +2381,7 @@ function showAuditoria() {
   _showView('view-auditoria', 'nav-auditoria');
   const sel = document.getElementById('aud-tipo');
   if (sel.options.length <= 1) {
-    sel.innerHTML = '<option value="">Todos os tipos</option>' + _AUDIT_TIPOS.map(t => `<option value="${t}">${t}</option>`).join('');
+    sel.innerHTML = '<option value="">Todos os tipos</option>' + _AUDIT_TIPOS.map(t => `<option value="${t}">${_AUDIT_EVENT_LABELS[t] || t}</option>`).join('');
   }
   _auditPage = 0;
   _auditCarregar(false);
@@ -2379,12 +2412,16 @@ async function _auditCarregar(append) {
   const r = await API.get(`/api/audit?${params}`);
   const d = await API.json(r);
   const items = d?.items || [];
-  const rows = items.map(a => `<tr>
-    <td>${fmtDateTime(a.ts)}</td>
+  const rows = items.map(a => {
+    const label = _AUDIT_EVENT_LABELS[a.type] || a.type || '—';
+    const cor = _AUDIT_EVENT_META[a.type] || '#6b7280';
+    return `<tr>
+    <td style="white-space:nowrap">${fmtDateTime(a.ts)}</td>
     <td>${esc(a.user_nome || '—')}</td>
-    <td><span class="badge badge-neutral">${esc(a.type || '—')}</span></td>
+    <td><span style="display:inline-block;padding:2px 8px;border-radius:4px;font-size:11px;font-weight:700;color:#fff;background:${cor}">${esc(label)}</span></td>
     <td title="${esc(a.detail || '')}">${esc((a.detail || '').slice(0, 120))}</td>
-  </tr>`).join('');
+  </tr>`;
+  }).join('');
   const el = document.getElementById('auditoria-list');
   const table = `<div class="list-table-wrap"><table class="list-table">
     <thead><tr><th>Data/Hora</th><th>Usuário</th><th>Ação</th><th>Detalhes</th></tr></thead>
@@ -2397,6 +2434,101 @@ async function _auditCarregar(append) {
   }
   const totalCarregado = (append ? el.querySelectorAll('#audit-tbody tr').length : items.length);
   document.getElementById('audit-mais').classList.toggle('hidden', totalCarregado >= (d?.total || 0));
+}
+
+// Busca TODOS os registros que batem com os filtros atuais (pagina o /api/audit,
+// que já filtra por q/tipo/de/ate no servidor) — usado por CSV e Relatório.
+async function _auditFetchAll() {
+  const base = { per: 200, ...Object.fromEntries(Object.entries(_auditFiltros).filter(([, v]) => v)) };
+  let page = 1, todos = [], total = Infinity;
+  while (todos.length < total && page <= 500) {
+    const params = new URLSearchParams({ ...base, page });
+    const d = await API.json(await API.get(`/api/audit?${params}`));
+    const items = d?.items || [];
+    todos = todos.concat(items);
+    total = d?.total ?? todos.length;
+    if (!items.length) break;
+    page++;
+  }
+  return todos;
+}
+
+async function exportarAuditoriaCSV() {
+  const lista = await _auditFetchAll();
+  const cel = v => `"${String(v ?? '').replace(/"/g, '""')}"`;
+  const header = ['Data/Hora', 'Usuário', 'Ação', 'Detalhes'];
+  const linhas = lista.map(a => [
+    fmtDateTime(a.ts), a.user_nome || '', _AUDIT_EVENT_LABELS[a.type] || a.type || '', a.detail || '',
+  ].map(cel).join(','));
+  const csv = '﻿' + [header.map(cel).join(','), ...linhas].join('\r\n');
+  const blob = new Blob([csv], { type: 'text/csv;charset=utf-8;' });
+  const url = URL.createObjectURL(blob);
+  const a = document.createElement('a');
+  a.href = url; a.download = `SGEA_auditoria_${new Date().toISOString().slice(0, 10)}.csv`;
+  document.body.appendChild(a); a.click();
+  document.body.removeChild(a); URL.revokeObjectURL(url);
+  toast(`${lista.length} registro(s) exportado(s).`, 'success');
+}
+
+async function gerarRelatorioAuditoria() {
+  const [rSet, rBrasao] = await Promise.all([API.get('/api/settings'), API.get('/api/settings/brasao')]);
+  const settings = (await API.json(rSet)) || {};
+  const brasao = (await API.json(rBrasao))?.brasao_dataurl || '';
+  const orgao = settings.orgao || 'Órgão Público';
+  const municipio = settings.municipio || '';
+  const lista = await _auditFetchAll();
+
+  const filtrosAtivos = [
+    _auditFiltros.tipo && `Evento: ${_AUDIT_EVENT_LABELS[_auditFiltros.tipo] || _auditFiltros.tipo}`,
+    _auditFiltros.de && `De: ${new Date(_auditFiltros.de + 'T00:00:00').toLocaleDateString('pt-BR')}`,
+    _auditFiltros.ate && `Até: ${new Date(_auditFiltros.ate + 'T00:00:00').toLocaleDateString('pt-BR')}`,
+    _auditFiltros.q && `Busca: ${_auditFiltros.q}`,
+  ].filter(Boolean).join(' · ');
+
+  const linhas = lista.map(a => `<tr>
+    <td>${fmtDateTime(a.ts)}</td>
+    <td>${esc(a.user_nome || '—')}</td>
+    <td>${esc(_AUDIT_EVENT_LABELS[a.type] || a.type || '—')}</td>
+    <td>${esc(a.detail || '—')}</td>
+  </tr>`).join('');
+
+  const dtGer = new Date().toLocaleDateString('pt-BR') + ' às ' + new Date().toLocaleTimeString('pt-BR', { hour: '2-digit', minute: '2-digit' });
+
+  const html = `<!DOCTYPE html><html lang="pt-BR"><head><meta charset="UTF-8">
+<title>Relatório de Auditoria — SGEA</title>
+<style>
+  body { font-family: 'Times New Roman', Times, serif; font-size: 11pt; color: #000; background: #fff; padding: 2cm 2.5cm; }
+  .header { text-align: center; margin-bottom: 20pt; border-bottom: 2px solid #000; padding-bottom: 12pt; }
+  .header img { height: 70pt; width: auto; margin-bottom: 6pt; }
+  .header h1 { font-size: 13pt; font-weight: 700; text-transform: uppercase; }
+  .doc-title { text-align: center; margin: 14pt 0 6pt; }
+  .doc-title h3 { font-size: 13pt; font-weight: 700; text-transform: uppercase; }
+  .meta { font-size: 9pt; color: #555; text-align: center; margin-bottom: 10pt; }
+  table { width: 100%; border-collapse: collapse; margin-top: 8pt; font-size: 9pt; }
+  th { background: #1a3a6b; color: #fff; padding: 5pt 7pt; text-align: center; vertical-align: middle; font-weight: 700; }
+  td { padding: 4pt 7pt; vertical-align: middle; font-size: 8.5pt; border-bottom: 1px solid #e0e0e0; }
+  tr:nth-child(even) td { background: #f7f7f7; }
+  .btn-print { position: fixed; top: 20px; right: 20px; background: #1a3a6b; color: #fff; border: none; border-radius: 6px; padding: 10px 18px; cursor: pointer; font-size: 11pt; }
+  @media print { .btn-print { display: none; } }
+</style></head><body>
+<button class="btn-print" onclick="window.print()">🖨 Imprimir / Salvar PDF</button>
+<div class="header">
+  ${brasao ? `<img src="${brasao}" alt="Brasão">` : ''}
+  <h1>${esc(orgao)}</h1>
+  <h2>${esc(municipio)}</h2>
+</div>
+<div class="doc-title"><h3>Relatório de Trilha de Auditoria</h3></div>
+<div class="meta">${filtrosAtivos ? `Filtros: ${esc(filtrosAtivos)} · ` : ''}Gerado em ${dtGer} · ${lista.length} registro${lista.length !== 1 ? 's' : ''}</div>
+${lista.length ? `<table>
+  <thead><tr><th style="width:110pt">Data/Hora</th><th style="width:120pt">Usuário</th><th style="width:130pt">Ação</th><th>Detalhes</th></tr></thead>
+  <tbody>${linhas}</tbody>
+</table>` : '<p style="font-size:10pt;color:#666;text-align:center">Nenhum evento encontrado para os filtros aplicados.</p>'}
+</body></html>`;
+
+  const win = window.open('', '_blank', 'width=900,height=720');
+  if (!win) { toast('Popup bloqueado pelo navegador. Permita popups para este site.', 'error'); return; }
+  win.document.write(html);
+  win.document.close();
 }
 
 // ══════════════════════════════════════════════════════════════

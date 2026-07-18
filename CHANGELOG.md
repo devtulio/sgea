@@ -5,6 +5,14 @@
 
 ---
 
+## [0.13.0] — 2026-07-17
+
+### Alterado
+- **Tela de Auditoria em paridade com os sistemas irmãos** — as ações agora aparecem com **rótulos legíveis** (ex.: "Entrada registrada" em vez de `ENTRADA_REGISTRADA`) e **badges coloridos por família de ação** (verde = criação/restauração, azul = edição, vermelho = exclusão/reset, âmbar = anulação/restauração de backup), a filtragem por busca/tipo/data passou a ser **ao vivo** (sem botão "Filtrar"), e a lista ficou num **layout centralizado**, tudo igual ao SGCD/SGCA.
+
+### Adicionado
+- **Exportar CSV** e **Relatório imprimível** na tela de Auditoria — o CSV baixa todos os eventos que batem com os filtros atuais (com cabeçalho e rótulos legíveis); o Relatório abre um documento com cabeçalho do órgão/brasão e a trilha completa, pronto para imprimir ou salvar em PDF (reusa a infraestrutura de documento imprimível já existente no SGEA).
+
 ## [0.12.0] — 2026-07-17
 
 ### Adicionado
