@@ -1,4 +1,4 @@
-# SGEA v0.13.5 — Servidor local: SQLite, autenticação, REST API, controle de estoque por lote (FEFO), backup automático
+# SGEA v0.13.6 — Servidor local: SQLite, autenticação, REST API, controle de estoque por lote (FEFO), backup automático
 import http.server
 import socketserver
 import os
@@ -341,9 +341,21 @@ def _now():
 def _float(v):
     if v is None or v == '':
         return None
+    if isinstance(v, (int, float)):
+        return float(v)
+    s = str(v).replace('R$', '').strip()
+    if not s:
+        return None
+    # Formato BR: ponto = milhar, vírgula = decimal. Com os dois presentes,
+    # remove os pontos e troca a vírgula por ponto (1.234,56 -> 1234.56).
+    # Só vírgula -> decimal (1234,56 -> 1234.56). Só ponto -> já é decimal.
+    if ',' in s and '.' in s:
+        s = s.replace('.', '').replace(',', '.')
+    elif ',' in s:
+        s = s.replace(',', '.')
     try:
-        return float(str(v).replace(',', '.').replace('R$', '').strip())
-    except Exception:
+        return float(s)
+    except (ValueError, TypeError):
         return None
 
 def _require(data, *fields):

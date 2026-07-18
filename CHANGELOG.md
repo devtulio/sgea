@@ -5,6 +5,11 @@
 
 ---
 
+## [0.13.6] — 2026-07-18
+
+### Corrigido
+- **Parsing de valores (`_float`) mais robusto** — aceita moeda no formato brasileiro com separador de milhar (`1.234,56` deixou de virar nulo) e número puro; entradas inválidas continuam retornando nulo sem quebrar. Mesma correção aplicada em SGCD e SGCA.
+
 ## [0.13.5] — 2026-07-18
 
 ### Corrigido
