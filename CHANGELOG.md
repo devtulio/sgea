@@ -5,6 +5,11 @@
 
 ---
 
+## [0.13.4] — 2026-07-17
+
+### Corrigido
+- **Painel de notificações (sino) agora abre à direita da barra lateral**, em vez de sobrepor o rodapé da sidebar. O SGEA era o único que não reposicionava o painel dinamicamente (usava a posição padrão `left:16px` do estilo compartilhado); agora usa `left = largura da sidebar + 12px`, no mesmo padrão de SGCD/SGCA/SGDP.
+
 ## [0.13.3] — 2026-07-17
 
 ### Removido

@@ -755,7 +755,7 @@
 // ══════════════════════════════════════════════════════════════
 // API / SESSÃO
 // ══════════════════════════════════════════════════════════════
-const SGEA_VERSION = '0.13.3';
+const SGEA_VERSION = '0.13.4';
 document.title = `SGEA v${SGEA_VERSION}`;
 
 let _apiToken = localStorage.getItem('sgea-token') || null;
@@ -1042,6 +1042,10 @@ async function toggleNotificacoes() {
         <div class="notif-sub">${i.vencido ? 'Vencido em ' + fmtDate(i.data_validade) : 'Vence em ' + fmtDate(i.data_validade)}</div>
       </div>
     </div>`).join('') : '<div class="notif-empty">Nenhum lote vencido ou próximo do vencimento.</div>';
+  // Posiciona à direita da sidebar, qualquer que seja a largura atual (padrão dos irmãos)
+  const sidebar = document.getElementById('sidebar');
+  const sidebarW = sidebar ? sidebar.getBoundingClientRect().width : 220;
+  panel.style.left = (sidebarW + 12) + 'px';
   panel.classList.add('open');
 }
 document.addEventListener('click', e => {
