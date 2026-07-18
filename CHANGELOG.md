@@ -5,6 +5,11 @@
 
 ---
 
+## [0.13.2] — 2026-07-17
+
+### Alterado
+- **Modo escuro alinhado ao padrão neutro canônico da família.** O tema escuro do SGEA usava tons próprios ligeiramente diferentes (fundo `#17181c`, cards `#232323`); agora usa exatamente a paleta neutra do estilo compartilhado (`base.css`): fundo `#1a1a1a`, cards `#2a2a2a`, texto `#f0ece8`, faixa de tabela `#323232`. Fica idêntico ao dark de SGCD/SGCA/SGDP. Nenhuma mudança no modo claro.
+
 ## [0.13.1] — 2026-07-17
 
 ### Corrigido

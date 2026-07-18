@@ -24,11 +24,9 @@
      sempre, 80px) — preservado como estava. */
   .sidebar-brasao { width: 56px; height: 56px; object-fit: contain; display: none; margin: 0 auto 8px; filter: drop-shadow(0 2px 4px rgba(0,0,0,.4)); }
 
-  /* Dark mode: SGEA já tinha esse conjunto de overrides antes do esqueleto
-     (valores um pouco diferentes do base.css) — mantidos para não mudar a
-     aparência atual do modo escuro. */
-  body.dark { background: #17181c; color: #e5e5e5; }
-  body.dark .bg-card, body.dark .modal, body.dark .list-table, body.dark .stat { background: #232323; }
+  /* Dark mode alinhado ao padrão neutro canônico do base.css (#1a1a1a fundo,
+     #2a2a2a cards). Fundo/texto do body e tokens --gray-* vêm do base.css. */
+  body.dark .modal, body.dark .list-table { background: #2a2a2a; }
   body.dark .cfg-tab { color: #999; }
   body.dark .cfg-tab:hover { color: #fff; }
 
@@ -63,10 +61,10 @@
   .audit-table th { background: var(--gray-50); border-bottom: 1px solid var(--gray-200); padding: 10px 14px; text-align: left; font-size: .6875rem; font-weight: 700; text-transform: uppercase; letter-spacing: .4px; color: var(--gray-500); white-space: nowrap; }
   .audit-table td { padding: 11px 14px; border-bottom: 1px solid var(--gray-100); vertical-align: middle; font-size: .75rem; }
   .audit-table tr:last-child td { border-bottom: none; }
-  body.dark .audit-table-wrap { background: #232323; }
-  body.dark .audit-table th { background: #2a2a2a; border-bottom-color: #383838; color: #9aa4b2; }
+  body.dark .audit-table-wrap { background: #2a2a2a; }
+  body.dark .audit-table th { background: #323232; border-bottom-color: #383838; color: #9aa4b2; }
   body.dark .audit-table td { border-bottom-color: #383838; }
-  body.dark .audit-table tr:hover td { background: #2a2a2a; }
+  body.dark .audit-table tr:hover td { background: #323232; }
 </style>
 </head>
 <body>
@@ -761,7 +759,7 @@
 // ══════════════════════════════════════════════════════════════
 // API / SESSÃO
 // ══════════════════════════════════════════════════════════════
-const SGEA_VERSION = '0.13.1';
+const SGEA_VERSION = '0.13.2';
 document.title = `SGEA v${SGEA_VERSION}`;
 
 let _apiToken = localStorage.getItem('sgea-token') || null;
