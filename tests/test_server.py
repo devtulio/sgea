@@ -523,5 +523,61 @@ class TestAuditoria(SGEATestCase):
         self.assertEqual(data['items'][0]['user_nome'], 'Administrador')
 
 
+class ReconciliacaoUnitTest(unittest.TestCase):
+    """Funções puras da reconciliação com o Fiorilli (sem servidor/DB)."""
+
+    CSV = (
+        'CADPRO;DISC1;UNID1;QUAN1;QUAN2;QUAN3;VATO3\r\n'
+        '002;GRUPO;;;;;\r\n'                                    # grupo: ignorado
+        '002.001;SUBGRUPO;;;;;\r\n'                             # subgrupo: ignorado
+        '002.001.036;Leite integral;UN;700;20;680;1360,00\r\n' # confere direto (UN=UN)
+        '001.004.012;Papel A4;CX;1;0;0,68;170,00\r\n'          # 0,68 CX ×25 = 17 UN
+        '003.002.008;Detergente 5L;UN;40;0;40;200,00\r\n'      # diverge (40 vs 34)
+        '014.011.004;Cabo vassoura;UN;55;0;55,0000009;-21,24\r\n'  # confere + valor negativo
+        '007.003.021;Luva nitrilica;UN;120;0;120;600,00\r\n'   # só Fiorilli
+        '012.008.045;Fita zebrada;RL;8;0;8;80,00\r\n'          # unidade incompativel (RL vs UN)
+    )
+    PRODUTOS = [
+        {'codigo_fiorilli': '002.001.036', 'nome': 'Leite', 'unidade_consumo': 'UN', 'unidade_licitada': 'UN', 'qtd_por_embalagem': 1, 'estoque_fisico': 680, 'estoque_financeiro': 1360.0},
+        {'codigo_fiorilli': '001.004.012', 'nome': 'Papel A4', 'unidade_consumo': 'UN', 'unidade_licitada': 'CX', 'qtd_por_embalagem': 25, 'estoque_fisico': 17, 'estoque_financeiro': 170.0},
+        {'codigo_fiorilli': '003.002.008', 'nome': 'Detergente', 'unidade_consumo': 'UN', 'unidade_licitada': 'UN', 'qtd_por_embalagem': 1, 'estoque_fisico': 34, 'estoque_financeiro': 170.0},
+        {'codigo_fiorilli': '014.011.004', 'nome': 'Cabo', 'unidade_consumo': 'UN', 'unidade_licitada': 'UN', 'qtd_por_embalagem': 1, 'estoque_fisico': 55, 'estoque_financeiro': 0.0},
+        {'codigo_fiorilli': '012.008.045', 'nome': 'Fita', 'unidade_consumo': 'UN', 'unidade_licitada': 'UND', 'qtd_por_embalagem': 200, 'estoque_fisico': 200, 'estoque_financeiro': 80.0},
+        {'codigo_fiorilli': '009.005.100', 'nome': 'Cafe avulso', 'unidade_consumo': 'UN', 'unidade_licitada': 'UN', 'qtd_por_embalagem': 1, 'estoque_fisico': 12, 'estoque_financeiro': 60.0},  # só SGEA
+        {'codigo_fiorilli': '099.099.099', 'nome': 'Zerado inativo', 'unidade_consumo': 'UN', 'unidade_licitada': 'UN', 'qtd_por_embalagem': 1, 'estoque_fisico': 0, 'estoque_financeiro': 0.0},  # zero implícito
+    ]
+
+    def test_parser_filtra_e_arredonda(self):
+        itens = server._parse_fiorilli_posicao(self.CSV)
+        self.assertNotIn('002', itens)          # grupo descartado
+        self.assertNotIn('002.001', itens)      # subgrupo descartado
+        self.assertEqual(itens['001.004.012']['estoque'], 0.68)
+        self.assertEqual(itens['014.011.004']['estoque'], 55.0)   # 55,0000009 -> 55.0
+        self.assertTrue(itens['014.011.004']['valor_negativo'])
+
+    def test_parser_cabecalho_invalido(self):
+        with self.assertRaises(ValueError):
+            server._parse_fiorilli_posicao('A;B;C\r\n1;2;3\r\n')
+
+    def test_classificacao_baldes(self):
+        fiorilli = server._parse_fiorilli_posicao(self.CSV)
+        res = server._classificar_reconciliacao(fiorilli, self.PRODUTOS, '2026-07-15')
+        balde = {i['codigo']: i for i in res['itens']}
+        self.assertEqual(balde['002.001.036']['balde'], 'confere')
+        self.assertEqual(balde['001.004.012']['balde'], 'confere')       # conversão ×25
+        self.assertEqual(balde['001.004.012']['fiorilli_qtd'], 17.0)     # mostrado em UN
+        self.assertEqual(balde['003.002.008']['balde'], 'diverge')
+        self.assertEqual(balde['003.002.008']['delta'], -6.0)
+        self.assertEqual(balde['014.011.004']['balde'], 'confere')
+        self.assertIn('valor_divergente', balde['014.011.004']['flags'])
+        self.assertIn('fiorilli_valor_negativo', balde['014.011.004']['flags'])
+        self.assertEqual(balde['007.003.021']['balde'], 'so_fiorilli')
+        self.assertEqual(balde['009.005.100']['balde'], 'so_sgea')
+        self.assertEqual(balde['012.008.045']['balde'], 'unidade')       # RL não casa
+        self.assertEqual(balde['099.099.099']['balde'], 'confere')       # zero implícito
+        self.assertEqual(res['resumo']['confere'], 4)
+        self.assertEqual(res['resumo']['total'], 8)
+
+
 if __name__ == '__main__':
     unittest.main()

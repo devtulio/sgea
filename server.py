@@ -1,4 +1,4 @@
-# SGEA v0.13.7 — Servidor local: SQLite, autenticação, REST API, controle de estoque por lote (FEFO), backup automático
+# SGEA v0.14.0 — Servidor local: SQLite, autenticação, REST API, controle de estoque por lote (FEFO), backup automático
 import http.server
 import socketserver
 import os
@@ -16,6 +16,8 @@ import urllib.error
 import logging
 import uuid
 import re
+import csv
+import io
 from email.mime.text import MIMEText
 from email.mime.multipart import MIMEMultipart
 from urllib.parse import urlparse, parse_qs
@@ -357,6 +359,107 @@ def _float(v):
         return float(s)
     except (ValueError, TypeError):
         return None
+
+# ── Reconciliação com o Fiorilli (razão oficial; import read-only) ───────────
+# O Fiorilli não converte unidade: exporta um número achatado na UNID1 dele. Todo
+# o fator de conversão vive no SGEA (produtos.qtd_por_embalagem). Ver o desenho em
+# memory/project_reconciliacao_fiorilli.md.
+UNID_SINONIMOS = {
+    'UN': 'UN', 'UND': 'UN', 'UNID': 'UN', 'UNIDADE': 'UN', 'UNIDADES': 'UN',
+    'CX': 'CX', 'CAIXA': 'CX', 'CAIXAS': 'CX',
+    'PC': 'PC', 'PCT': 'PC', 'PACOTE': 'PC', 'PACOTES': 'PC',
+    'FR': 'FR', 'FRASCO': 'FR', 'FRASCOS': 'FR',
+    'KG': 'KG', 'QUILO': 'KG', 'QUILOS': 'KG', 'KILO': 'KG',
+    'L': 'L', 'LT': 'L', 'LITRO': 'L', 'LITROS': 'L',  # LATA != litro, fica fora
+    'M': 'M', 'METRO': 'M', 'METROS': 'M',
+    'RL': 'RL', 'ROLO': 'RL', 'ROLOS': 'RL',
+    'PAR': 'PAR', 'PARES': 'PAR',
+    'RESMA': 'RESMA', 'RESMAS': 'RESMA',
+}
+_CADPRO_RE = re.compile(r'^\d{3}\.\d{3}\.\d{3}$')
+_RECON_EPS = 0.5  # tolerância no grão da unidade física (estoque é inteiro); absorve o ×fator do arredondamento do Fiorilli
+
+def _norm_unid(u):
+    u = (u or '').strip().upper()
+    return UNID_SINONIMOS.get(u, u)
+
+def _parse_fiorilli_posicao(csv_text):
+    """Parseia o export 'CSV (Dados)' do Fiorilli. Retorna {codigo: {...}}.
+    Levanta ValueError se o cabeçalho não bater (arquivo errado)."""
+    reader = csv.DictReader(io.StringIO(csv_text), delimiter=';')
+    faltando = {'CADPRO', 'DISC1', 'UNID1', 'QUAN3', 'VATO3'} - set(reader.fieldnames or [])
+    if faltando:
+        raise ValueError('Não parece o "CSV (Dados)" do Fiorilli. Faltam colunas: ' + ', '.join(sorted(faltando)))
+    itens = {}
+    for row in reader:
+        cod = (row.get('CADPRO') or '').strip()
+        if not _CADPRO_RE.match(cod):
+            continue  # grupo (NNN), subgrupo (NNN.NNN) ou linha vazia
+        est = _float(row.get('QUAN3')) or 0.0
+        val = _float(row.get('VATO3')) or 0.0
+        itens[cod] = {
+            'descricao': (row.get('DISC1') or '').strip(),
+            'unidade': (row.get('UNID1') or '').strip().upper(),
+            'estoque': round(est, 4),   # QUAN3 vem com lixo de float (até 15 casas)
+            'valor': round(val, 2),
+            'estoque_negativo': est < 0,
+            'valor_negativo': val < 0,
+        }
+    return itens
+
+def _classificar_reconciliacao(fiorilli, produtos, data_corte):
+    """Cruza o Fiorilli (só itens com saldo; zerados omitidos) com os produtos do
+    SGEA (saldo inteiro em unidade_consumo) por codigo_fiorilli. Um balde por código."""
+    by_cod = {}
+    for p in produtos:
+        c = (p.get('codigo_fiorilli') or '').strip()
+        if c:
+            by_cod[c] = p
+    resumo = {'confere': 0, 'diverge': 0, 'so_fiorilli': 0, 'so_sgea': 0, 'unidade': 0}
+    itens = []
+    for cod in sorted(set(fiorilli) | set(by_cod)):
+        F, S = fiorilli.get(cod), by_cod.get(cod)
+        flags = []
+        if F and F['estoque_negativo']: flags.append('fiorilli_estoque_negativo')
+        if F and F['valor_negativo']:   flags.append('fiorilli_valor_negativo')
+        qf = qs = delta = None
+
+        if S is None:                                   # Fiorilli tem saldo, SGEA não cadastrou
+            balde, qf, unid = 'so_fiorilli', F['estoque'], F['unidade']
+        elif F is None:                                 # ausente do Fiorilli => saldo 0 lá (omite zerados)
+            qs = float(S['estoque_fisico'] or 0)
+            unid = S.get('unidade_consumo') or 'UN'
+            if abs(qs) <= _RECON_EPS:
+                balde, qf, delta = 'confere', 0.0, 0.0  # zero implícito
+            else:
+                balde, qf, delta = 'so_sgea', 0.0, qs
+        else:                                           # ambos presentes
+            qs = float(S['estoque_fisico'] or 0)
+            unid = S.get('unidade_consumo') or 'UN'
+            uf = _norm_unid(F['unidade'])
+            uc, ul = _norm_unid(unid), _norm_unid(S.get('unidade_licitada') or '')
+            fator = 1.0 if uf == uc else (float(S.get('qtd_por_embalagem') or 1) if ul and uf == ul else None)
+            if fator is None:                           # unidade não casa nem com consumo nem com licitada
+                balde, qf = 'unidade', F['estoque']
+            else:
+                qf = round(F['estoque'] * fator, 4)     # Fiorilli trazido p/ unidade de consumo
+                delta = round(qs - qf, 4)
+                if abs(delta) < _RECON_EPS:
+                    balde = 'confere'
+                    if abs((F['valor'] or 0) - float(S['estoque_financeiro'] or 0)) > 0.02:
+                        flags.append('valor_divergente')
+                else:
+                    balde = 'diverge'
+        resumo[balde] += 1
+        itens.append({
+            'codigo': cod, 'balde': balde,
+            'descricao': (S['nome'] if S else F['descricao']),
+            'fiorilli_qtd': qf, 'sgea_qtd': qs, 'delta': delta, 'unidade': unid,
+            'valor_fiorilli': (F['valor'] if F else None), 'flags': flags,
+        })
+    resumo['total'] = len(itens)
+    return {'data_corte': data_corte, 'resumo': resumo, 'itens': itens}
+
 
 def _require(data, *fields):
     for f in fields:
@@ -799,6 +902,8 @@ class SGEAHandler(http.server.SimpleHTTPRequestHandler):
             self._create_user(data)
         elif p == '/api/audit':
             self._add_audit(data, s)
+        elif p == '/api/reconciliacao':
+            self._reconciliacao(data, s)
         elif p == '/send-email':
             self._send_email(data)
         elif p == '/api/backup/restore':
@@ -1083,6 +1188,37 @@ class SGEAHandler(http.server.SimpleHTTPRequestHandler):
                 {w} ORDER BY p.nome ASC
             ''', params).fetchall()
         self._json(200, {'items': [dict(r) for r in rows]})
+
+    def _reconciliacao(self, data, s):
+        csv_text = data.get('csv') or ''
+        data_corte = (data.get('data_corte') or '').strip()
+        nome_arq = (data.get('nome') or 'extrato.csv').strip()
+        if not csv_text.strip():
+            self._json(400, {'error': 'CSV vazio.'}); return
+        try:
+            fiorilli = _parse_fiorilli_posicao(csv_text)
+        except ValueError as e:
+            self._json(400, {'error': str(e)}); return
+        with get_db() as conn:
+            # Todos os produtos (não só ativos): item inativo com saldo ainda precisa reconciliar.
+            rows = conn.execute('''
+                SELECT p.codigo_fiorilli, p.nome, p.unidade_consumo, p.unidade_licitada, p.qtd_por_embalagem,
+                       COALESCE(v.estoque_fisico,0) AS estoque_fisico,
+                       COALESCE(v.estoque_financeiro,0) AS estoque_financeiro
+                FROM produtos p LEFT JOIN v_estoque v ON v.produto_id=p.id
+            ''').fetchall()
+        resultado = _classificar_reconciliacao(fiorilli, [dict(r) for r in rows], data_corte)
+        r = resultado['resumo']
+        detalhe = (f"{nome_arq} · corte {data_corte or '—'} · {r['total']} itens: "
+                   f"{r['confere']} confere, {r['diverge']} diverge, {r['so_fiorilli']} só Fiorilli, "
+                   f"{r['so_sgea']} só SGEA, {r['unidade']} unidade")
+        with get_db() as conn:
+            conn.execute(
+                '''INSERT INTO audit_global (id,ts,user_id,user_nome,type,label,detail,process_id)
+                   VALUES (?,?,?,?,?,?,?,?)''',
+                (str(uuid.uuid4()), _now(), s['user_id'], s['nome'],
+                 'RECONCILIACAO_IMPORTADA', 'RECONCILIACAO_IMPORTADA', detalhe, None))
+        self._json(200, resultado)
 
     def _get_produto(self, pid):
         with get_db() as conn:

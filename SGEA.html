@@ -101,6 +101,9 @@
     <button class="nav-item" id="nav-alertas" onclick="showAlertas()">
       <span class="nav-ico">⏰</span> Alertas de Validade
     </button>
+    <button class="nav-item" id="nav-reconciliacao" onclick="showReconciliacao()">
+      <span class="nav-ico">🔄</span> Reconciliação
+    </button>
     <div class="nav-section">Cadastros</div>
     <button class="nav-item" id="nav-centros-custo" onclick="showCrud('centros-custo')">
       <span class="nav-ico">🏛️</span> Centros de Custo
@@ -209,6 +212,54 @@
       </div>
     </div>
     <div id="alertas-list"></div>
+  </div>
+
+  <!-- ── Reconciliação com o Fiorilli (import read-only do relatório de posição) ── -->
+  <div id="view-reconciliacao" class="view">
+    <div class="dash-top">
+      <h2>Reconciliação com o Fiorilli</h2>
+      <div class="view-actions">
+        <input type="file" id="recon-file" accept=".csv,text/csv" class="hidden" onchange="_reconImportar(this.files[0]); this.value='';">
+        <button class="btn btn-primary btn-sm" onclick="document.getElementById('recon-file').click()">⬆️ Importar CSV do Fiorilli</button>
+        <button class="btn btn-outline btn-sm hidden" id="recon-btn-exportar" onclick="_reconExportarPendencias()">⬇️ Exportar pendências</button>
+      </div>
+    </div>
+    <p style="font-size:.82rem;color:var(--gray-500);margin:-8px 0 4px">
+      Somente leitura — o Fiorilli é o razão oficial. Exporte a <b>Posição do Estoque</b> como <b>CSV (Dados)</b> e importe aqui. As quantidades são convertidas para a unidade de consumo do SGEA.
+    </p>
+
+    <div class="reconciliacao-inner" style="max-width:980px;margin:0 auto">
+      <div class="reconciliacao-controls" style="display:flex;align-items:center;gap:12px;flex-wrap:wrap;margin:10px 0">
+        <label for="recon-data-corte" style="font-size:.85rem;color:var(--gray-700)">Data de corte do extrato</label>
+        <input type="date" id="recon-data-corte" class="btn btn-outline btn-sm" onchange="_reconGuardaData()">
+      </div>
+
+      <div id="recon-guarda" class="alert-banner hidden" role="status" style="display:flex;gap:10px;align-items:center;padding:8px 12px;border-radius:var(--radius);margin-bottom:12px;background:#fef3c7;color:#92400e;font-size:.83rem">
+        <span aria-hidden="true">⚠️</span><span id="recon-guarda-msg"></span>
+      </div>
+
+      <div id="recon-cards" class="recon-cards hidden" style="display:grid;grid-template-columns:repeat(5,1fr);gap:8px;margin-bottom:14px"></div>
+
+      <div id="recon-vazio" class="empty" style="padding:32px 0;text-align:center;color:var(--gray-500)">
+        Nenhum extrato importado ainda. Clique em <b>Importar CSV do Fiorilli</b>.
+      </div>
+
+      <div id="recon-conteudo" class="hidden">
+        <div class="view-actions" style="margin-bottom:12px;display:flex;gap:8px;flex-wrap:wrap">
+          <div class="search-box"><span>🔎</span><input type="text" id="recon-q" placeholder="Buscar por código ou item..." aria-label="Buscar" oninput="_reconFiltrar()"></div>
+          <select id="recon-balde" class="btn btn-outline btn-sm" aria-label="Filtrar por situação" onchange="_reconFiltrar()">
+            <option value="">Todos</option>
+            <option value="pendencias">Só pendências</option>
+            <option value="confere">Confere</option>
+            <option value="diverge">Diverge qtd</option>
+            <option value="so_fiorilli">Só Fiorilli</option>
+            <option value="so_sgea">Só SGEA</option>
+            <option value="unidade">Unidade incompatível</option>
+          </select>
+        </div>
+        <div id="recon-tabela"></div>
+      </div>
+    </div>
   </div>
 
   <!-- ── CRUD genérico (Centros de Custo, Fornecedores, Funcionários, Frota, Pedidos) ── -->
@@ -758,7 +809,7 @@
 // ══════════════════════════════════════════════════════════════
 // API / SESSÃO
 // ══════════════════════════════════════════════════════════════
-const SGEA_VERSION = '0.13.7';
+const SGEA_VERSION = '0.14.0';
 document.title = `SGEA v${SGEA_VERSION}`;
 
 let _apiToken = localStorage.getItem('sgea-token') || null;
@@ -2390,6 +2441,135 @@ async function _auditEvento(type, detail, processId) {
 
 let _auditPage = 0;
 let _auditFiltros = { q: '', tipo: '', de: '', ate: '' };
+
+// ══════════════════════════════════════════════════════════════
+// RECONCILIAÇÃO COM O FIORILLI — import read-only do relatório de posição
+// (razão oficial; nunca escreve no Fiorilli). Backend faz parse + classificação.
+// ══════════════════════════════════════════════════════════════
+const _RECON_BALDE = {
+  confere:     { label: 'Confere',     cor: '#0F6E56' },
+  diverge:     { label: 'Diverge qtd', cor: '#A32D2D' },
+  so_fiorilli: { label: 'Só Fiorilli', cor: '#185FA5' },
+  so_sgea:     { label: 'Só SGEA',     cor: '#854F0B' },
+  unidade:     { label: 'Unidade',     cor: '#3C3489' },
+};
+const _RECON_FLAG = { valor_divergente: 'valor ≠', fiorilli_valor_negativo: 'valor −', fiorilli_estoque_negativo: 'estoque −' };
+let _reconDados = null;  // { data_corte, resumo, itens }
+
+function _hojeISO() { return new Date().toISOString().slice(0, 10); }
+
+function showReconciliacao() {
+  _showView('view-reconciliacao', 'nav-reconciliacao');
+  const dc = document.getElementById('recon-data-corte');
+  if (!dc.value) dc.value = _hojeISO();
+}
+
+function _reconGuardaData() {
+  const dc = document.getElementById('recon-data-corte').value;
+  const g = document.getElementById('recon-guarda');
+  if (dc && dc !== _hojeISO()) {
+    const dias = Math.round((Date.parse(_hojeISO()) - Date.parse(dc)) / 86400000);
+    document.getElementById('recon-guarda-msg').textContent =
+      `Extrato de ${fmtDate(dc)}${dias > 0 ? ` — ${dias} dia(s) atrás` : ''}. A posição do SGEA mudou desde então; para exatidão, reconcilie com um extrato de hoje.`;
+    g.classList.remove('hidden');
+  } else {
+    g.classList.add('hidden');
+  }
+}
+
+async function _reconImportar(file) {
+  if (!file) return;
+  const dc = document.getElementById('recon-data-corte').value || _hojeISO();
+  let csv;
+  try { csv = await file.text(); } catch { toast('Não consegui ler o arquivo.', 'error'); return; }
+  const r = await API.post('/api/reconciliacao', { csv, data_corte: dc, nome: file.name });
+  const d = await API.json(r);
+  if (!r || !r.ok) { toast(d?.error || 'Falha ao processar o extrato.', 'error'); return; }
+  _reconDados = d;
+  _reconGuardaData();
+  _reconRender();
+  toast(`${d.resumo.total} item(ns) reconciliado(s).`, 'success');
+}
+
+function _reconNum(v) {
+  return Number.isInteger(v) ? String(v) : (Math.round(v * 10000) / 10000).toLocaleString('pt-BR');
+}
+
+function _reconCard(k, label) {
+  const n = _reconDados.resumo[k] || 0;
+  const cor = _RECON_BALDE[k] ? _RECON_BALDE[k].cor : 'var(--gray-700)';
+  return `<div style="background:var(--bg-card);border:1px solid var(--gray-200);border-radius:var(--radius);padding:10px">
+    <div style="font-size:.72rem;color:var(--gray-500)">${label}</div>
+    <div style="font-size:1.5rem;font-weight:600;color:${cor}">${n}</div>
+  </div>`;
+}
+
+function _reconRender() {
+  document.getElementById('recon-vazio').classList.add('hidden');
+  document.getElementById('recon-conteudo').classList.remove('hidden');
+  document.getElementById('recon-btn-exportar').classList.remove('hidden');
+  const cards = document.getElementById('recon-cards');
+  cards.classList.remove('hidden');
+  cards.innerHTML = _reconCard('confere', 'Confere') + _reconCard('diverge', 'Diverge qtd')
+    + _reconCard('so_fiorilli', 'Só Fiorilli') + _reconCard('so_sgea', 'Só SGEA') + _reconCard('unidade', 'Unidade');
+  _reconFiltrar();
+}
+
+function _reconLinha(i) {
+  const b = _RECON_BALDE[i.balde] || { label: i.balde, cor: 'var(--gray-700)' };
+  const badge = `<span style="display:inline-block;padding:2px 8px;border-radius:4px;font-size:11px;font-weight:700;color:#fff;background:${b.cor}">${esc(b.label)}</span>`;
+  const flags = (i.flags || []).map(f =>
+    `<span style="display:inline-block;padding:2px 6px;border-radius:4px;font-size:10px;background:var(--gray-100);color:var(--gray-600);margin-left:4px">${esc(_RECON_FLAG[f] || f)}</span>`).join('');
+  const un = esc(i.unidade || '');
+  const cel = v => (v === null || v === undefined) ? '—' : `${_reconNum(v)} ${un}`;
+  const deltaTxt = (i.delta === null || i.delta === undefined) ? '—' : (i.delta === 0 ? '0' : `${i.delta > 0 ? '+' : ''}${_reconNum(i.delta)}`);
+  const deltaCor = (i.delta && i.delta !== 0) ? (i.balde === 'diverge' ? '#A32D2D' : '#854F0B') : 'var(--gray-400)';
+  return `<tr>
+    <td style="white-space:nowrap;color:var(--gray-500)">${esc(i.codigo)}</td>
+    <td>${esc(i.descricao || '')}</td>
+    <td style="text-align:right;white-space:nowrap">${cel(i.fiorilli_qtd)}</td>
+    <td style="text-align:right;white-space:nowrap">${cel(i.sgea_qtd)}</td>
+    <td style="text-align:right;white-space:nowrap;color:${deltaCor};font-weight:600">${deltaTxt}</td>
+    <td>${badge}${flags}</td>
+  </tr>`;
+}
+
+function _reconFiltrar() {
+  const q = document.getElementById('recon-q').value.trim().toLowerCase();
+  const bf = document.getElementById('recon-balde').value;
+  const lista = (_reconDados?.itens || []).filter(i => {
+    if (bf === 'pendencias' && i.balde === 'confere') return false;
+    if (bf && bf !== 'pendencias' && i.balde !== bf) return false;
+    if (q && !(`${i.codigo} ${i.descricao || ''}`.toLowerCase().includes(q))) return false;
+    return true;
+  });
+  const el = document.getElementById('recon-tabela');
+  if (!lista.length) { el.innerHTML = '<div class="empty">Nenhum item nessa seleção.</div>'; return; }
+  el.innerHTML = `<div class="audit-table-wrap"><table class="audit-table">
+    <thead><tr><th>Código</th><th>Item</th><th style="text-align:right">Fiorilli</th><th style="text-align:right">SGEA</th><th style="text-align:right">Δ</th><th>Situação</th></tr></thead>
+    <tbody>${lista.map(_reconLinha).join('')}</tbody>
+  </table></div>`;
+}
+
+function _reconExportarPendencias() {
+  const lista = (_reconDados?.itens || []).filter(i => i.balde !== 'confere');
+  if (!lista.length) { toast('Nenhuma pendência para exportar.', 'info'); return; }
+  const cel = v => `"${String(v ?? '').replace(/"/g, '""')}"`;
+  const header = ['Código', 'Item', 'Situação', 'Fiorilli', 'SGEA', 'Delta', 'Unidade', 'Flags'];
+  const linhas = lista.map(i => [
+    i.codigo, i.descricao || '', (_RECON_BALDE[i.balde]?.label || i.balde),
+    i.fiorilli_qtd ?? '', i.sgea_qtd ?? '', i.delta ?? '', i.unidade || '',
+    (i.flags || []).map(f => _RECON_FLAG[f] || f).join(' '),
+  ].map(cel).join(','));
+  const csv = '﻿' + [header.map(cel).join(','), ...linhas].join('\r\n');
+  const blob = new Blob([csv], { type: 'text/csv;charset=utf-8;' });
+  const url = URL.createObjectURL(blob);
+  const a = document.createElement('a');
+  a.href = url; a.download = `SGEA_reconciliacao_${_reconDados.data_corte || _hojeISO()}.csv`;
+  document.body.appendChild(a); a.click();
+  document.body.removeChild(a); URL.revokeObjectURL(url);
+  toast(`${lista.length} pendência(s) exportada(s).`, 'success');
+}
 
 function showAuditoria() {
   _showView('view-auditoria', 'nav-auditoria');

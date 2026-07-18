@@ -1,6 +1,6 @@
 # SGEA — Sistema de Gestão de Estoque do Almoxarifado
 
-![Versão](https://img.shields.io/badge/versão-v0.13.7-blue) ![Tecnologia](https://img.shields.io/badge/tecnologia-Python%20%2B%20SQLite-orange) ![Licença](https://img.shields.io/badge/licença-MIT-green) ![Multiusuário](https://img.shields.io/badge/acesso-multiusuário-blueviolet)
+![Versão](https://img.shields.io/badge/versão-v0.14.0-blue) ![Tecnologia](https://img.shields.io/badge/tecnologia-Python%20%2B%20SQLite-orange) ![Licença](https://img.shields.io/badge/licença-MIT-green) ![Multiusuário](https://img.shields.io/badge/acesso-multiusuário-blueviolet)
 
 ## Descrição
 
@@ -22,6 +22,7 @@ Funciona em rede local: um único computador executa o servidor e todos os usuá
 - **Reversão segura** — excluir uma saída devolve exatamente as quantidades aos lotes de origem; excluir uma entrada é bloqueado se algum de seus lotes já foi parcialmente consumido
 - **Cadastros de apoio** — Centros de Custo, Fornecedores (com consulta automática de CNPJ), Funcionários (solicitantes de saída) e Frota (veículos, para correlacionar saídas de combustível/peças)
 - **Autenticação multiusuário** com hashing PBKDF2-HMAC-SHA256 e gestão de usuários pelo admin
+- **Reconciliação com o Fiorilli** — importa o relatório de Posição do Estoque do Fiorilli (CSV Dados) e compara item a item por `codigo_fiorilli`, classificando em confere / diverge / só-Fiorilli / só-SGEA / unidade incompatível; converte as quantidades do Fiorilli para a unidade de consumo do SGEA e é **somente leitura** (o Fiorilli continua o razão oficial). Exporta as pendências em CSV
 - **Auditoria** — trilha de eventos de criação/edição/exclusão em todos os módulos, com tela de consulta filtrável (admin)
 - **Lixeira** — Entradas e Saídas excluídas ficam disponíveis para restaurar por 30 dias
 - **Alerta diário por e-mail** (SMTP configurável) resumindo lotes vencidos ou vencendo nos próximos 7 dias

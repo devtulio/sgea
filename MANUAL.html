@@ -89,8 +89,9 @@
     <div class="toc-item h2"><a href="#sec8">8. Cadastros de Apoio</a></div>
     <div class="toc-item h2"><a href="#sec9">9. Configurações</a></div>
     <div class="toc-item h2"><a href="#sec10">10. Auditoria e Lixeira</a></div>
-    <div class="toc-item h2"><a href="#sec11">11. Diagnóstico de Rede</a></div>
-    <div class="toc-item h2"><a href="#sec12">12. Histórico de Versões</a></div>
+    <div class="toc-item h2"><a href="#sec11">11. Reconciliação com o Fiorilli</a></div>
+    <div class="toc-item h2"><a href="#sec12">12. Diagnóstico de Rede</a></div>
+    <div class="toc-item h2"><a href="#sec13">13. Histórico de Versões</a></div>
   </div>
 </div>
 
@@ -108,7 +109,7 @@
   <div class="aviso">No primeiro login, o sistema exige a troca imediata da senha padrão. Escolha uma senha com pelo menos 6 caracteres.</div>
 
   <h2 id="sec3">3. Visão Geral da Interface</h2>
-  <p>A navegação principal fica na barra lateral esquerda, dividida em três grupos: as telas operacionais do dia a dia (Estoque, Entradas, Saídas, Alertas de Validade), os cadastros de apoio (Centros de Custo, Fornecedores, Funcionários, Frota, Pedidos) e, por último, Configurações.</p>
+  <p>A navegação principal fica na barra lateral esquerda, dividida em três grupos: as telas operacionais do dia a dia (Estoque, Entradas, Saídas, Alertas de Validade, Reconciliação), os cadastros de apoio (Centros de Custo, Fornecedores, Funcionários, Frota, Pedidos) e, por último, Configurações.</p>
   <p>Depois do login, o sistema abre direto na tela <strong>Estoque</strong>, que lista todos os produtos com seu saldo físico atual, valor financeiro e a validade mais próxima entre os lotes com saldo.</p>
   <p>No topo da barra lateral fica o botão <strong>Buscar</strong> (atalho <code>Ctrl+K</code>) — abre uma busca que procura ao mesmo tempo em produtos, centros de custo, fornecedores, funcionários, frota e pedidos; clicar num resultado leva direto à tela e abre o item para edição. Logo abaixo, a data de hoje é exibida por extenso. Junto ao usuário, no rodapé da barra lateral, fica o <strong>sino de notificações</strong>, que mostra quantos lotes estão vencidos ou vencendo nos próximos 7 dias e um atalho para a tela de Alertas de Validade.</p>
 
@@ -165,12 +166,24 @@
   <p>A tela <strong>Lixeira</strong> lista as Entradas e Saídas excluídas, com o botão <strong>Restaurar</strong> disponível por até 30 dias (depois disso, o registro é apagado de vez automaticamente). Restaurar uma entrada devolve o saldo aos lotes que ela gerou; restaurar uma saída consome o estoque novamente pela regra FEFO — podendo, se o estoque tiver mudado nesse meio-tempo, sair de lotes diferentes dos originais, mas com o mesmo efeito final na quantidade.</p>
   <div class="aviso">Excluir uma entrada zera o saldo dos lotes que ela gerou (não é permitido se algum lote já foi parcialmente consumido por uma saída) — o efeito no estoque é imediato, não só uma remoção da lista.</div>
 
-  <h2 id="sec11">11. Diagnóstico de Rede</h2>
+  <h2 id="sec11">11. Reconciliação com o Fiorilli</h2>
+  <p>A tela <strong>Reconciliação</strong> confere o estoque do SGEA contra o <strong>Fiorilli</strong>, que continua sendo o razão oficial do órgão — o SGEA é apoio gerencial e <strong>nunca escreve no Fiorilli</strong>. No Fiorilli, exporte o relatório de <strong>Posição do Estoque</strong> no formato <strong>CSV (Dados)</strong>; no SGEA, informe a data de corte do extrato e clique em <strong>Importar CSV do Fiorilli</strong>. O sistema cruza os dois lados pelo <strong>código Fiorilli</strong> (CADPRO) de cada produto e mostra um resumo com cinco situações:</p>
+  <ul>
+    <li><strong>Confere</strong> — as quantidades batem (inclui o caso em que ambos estão zerados; o relatório do Fiorilli omite itens sem saldo).</li>
+    <li><strong>Diverge qtd</strong> — os dois lados conhecem o item, mas os saldos discordam. A coluna Δ mostra a diferença.</li>
+    <li><strong>Só Fiorilli</strong> — o Fiorilli tem saldo de um item que o SGEA ainda não cadastrou.</li>
+    <li><strong>Só SGEA</strong> — o SGEA tem saldo de um item que o Fiorilli não listou (por exemplo, uma compra direta avulsa).</li>
+    <li><strong>Unidade incompatível</strong> — a unidade do Fiorilli não corresponde à unidade do produto no SGEA; a quantidade não é comparável até o cadastro ser padronizado.</li>
+  </ul>
+  <p>As quantidades do Fiorilli são <strong>convertidas para a unidade de consumo</strong> do SGEA usando o fator <em>unidades por embalagem</em> do produto (ex.: <code>0,68 CX</code> aparece como <code>17 UN</code>), para que o almoxarife leia tudo na unidade de prateleira. O valor é uma conferência secundária (o Fiorilli usa custo médio), e estoque ou valor negativos do Fiorilli são sinalizados. Como a posição do estoque muda a cada movimento, a tela <strong>avisa quando o extrato não é do dia</strong> — o ideal é gerar o relatório no Fiorilli e reconciliar no mesmo dia. O botão <strong>Exportar pendências</strong> gera um CSV só com os itens que não conferem, e cada importação fica registrada na Trilha de Auditoria.</p>
+
+  <h2 id="sec12">12. Diagnóstico de Rede</h2>
   <p>Ao usar o SGEA em rede local (um computador como servidor, outros acessando pelo navegador), execute <code>Diagnostico SGEA.bat</code> na máquina servidora sempre que outra máquina não conseguir acessar o sistema. Ele verifica automaticamente o IP local, a porta, o perfil de rede do Windows e a regra de firewall, corrigindo o que for possível.</p>
 
-  <h2 id="sec12">12. Histórico de Versões</h2>
+  <h2 id="sec13">13. Histórico de Versões</h2>
   <table>
     <tr><th>Versão</th><th>Data</th><th>Resumo</th></tr>
+    <tr><td>0.14.0</td><td>18/07/2026</td><td>Nova tela <strong>Reconciliação com o Fiorilli</strong>: importa o CSV de Posição do Estoque, cruza por código Fiorilli (confere / diverge / só-Fiorilli / só-SGEA / unidade), converte para a unidade de consumo, avisa quando o extrato não é do dia e exporta pendências. Somente leitura.</td></tr>
     <tr><td>0.13.6</td><td>18/07/2026</td><td>Parsing de valores (moeda) mais robusto — aceita o formato brasileiro com separador de milhar (1.234,56) sem virar nulo.</td></tr>
     <tr><td>0.13.5</td><td>18/07/2026</td><td>Corrigida a bolinha de cor em Configurações → "Cor de destaque" (a classe não tinha dimensões e não aparecia); agora segue o padrão de círculo dos sistemas irmãos.</td></tr>
     <tr><td>0.13.4</td><td>17/07/2026</td><td>Painel de notificações (sino) passou a abrir à direita da barra lateral, sem sobrepô-la — mesmo padrão dos sistemas irmãos.</td></tr>

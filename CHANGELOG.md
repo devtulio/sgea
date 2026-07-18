@@ -5,6 +5,16 @@
 
 ---
 
+## [0.14.0] — 2026-07-18
+
+### Adicionado
+- **Reconciliação com o Fiorilli** — nova tela (menu **Reconciliação**) que importa o relatório de **Posição do Estoque** do Fiorilli (exportado como **CSV (Dados)**) e compara, item a item, com o estoque do SGEA. É **somente leitura**: o Fiorilli continua sendo o razão oficial, o SGEA nunca escreve nele.
+  - **Casamento por `codigo_fiorilli`** (CADPRO), com cinco situações: **Confere**, **Diverge qtd**, **Só Fiorilli** (item que o SGEA não cadastrou), **Só SGEA** (saldo que o Fiorilli omitiu) e **Unidade incompatível** (cadastro a padronizar).
+  - **Conversão de unidade automática** — as quantidades do Fiorilli são convertidas para a **unidade de consumo** do SGEA usando a `qtd_por_embalagem` do produto (ex.: `0,68 CX` vira `17 UN`). O almoxarife lê tudo na unidade de prateleira.
+  - **Guarda de data de corte** — avisa quando o extrato não é do dia (a posição do SGEA muda a cada movimento), recomendando reconciliar com um extrato de hoje.
+  - **Valor como conferência secundária** e sinalização de estoque/valor negativo do Fiorilli; **Exportar pendências** em CSV.
+  - O import fica registrado na **Trilha de Auditoria** (`RECONCILIACAO_IMPORTADA`).
+
 ## [0.13.7] — 2026-07-18
 
 ### Corrigido (acessibilidade — WCAG 2.1 AA)
