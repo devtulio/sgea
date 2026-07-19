@@ -1084,13 +1084,16 @@ async function _onLoginSuccess() {
   document.getElementById('sidebar-nome').textContent = _apiUser.nome;
   document.getElementById('sidebar-avatar').textContent = (_apiUser.nome || '?').trim().slice(0, 1).toUpperCase();
   document.getElementById('footer-version').textContent = `v${SGEA_VERSION}`;
+  // showDashboard() roda antes do fetch do brasão (não depende dele) — se ficasse
+  // depois de um await, uma navegação manual do usuário/teste feita nesse intervalo
+  // seria silenciosamente sobrescrita quando essa promise resolvesse mais tarde.
+  showDashboard();
+  atualizarNotifCount();
   const r = await API.get('/api/settings/brasao');
   const d = await API.json(r);
   if (d?.brasao_dataurl) localStorage.setItem('sgea-brasao-dataurl', d.brasao_dataurl);
   else localStorage.removeItem('sgea-brasao-dataurl');
   _aplicarBrasaoSidebar();
-  atualizarNotifCount();
-  showDashboard();
 }
 
 // Fundo animado da tela de login (rede de partículas com interação de mouse)
