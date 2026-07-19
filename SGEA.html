@@ -809,7 +809,7 @@
 // ══════════════════════════════════════════════════════════════
 // API / SESSÃO
 // ══════════════════════════════════════════════════════════════
-const SGEA_VERSION = '0.15.1';
+const SGEA_VERSION = '0.15.2';
 document.title = `SGEA v${SGEA_VERSION}`;
 
 let _apiToken = localStorage.getItem('sgea-token') || null;
@@ -2167,6 +2167,15 @@ function fmtSize(b) {
   return (b/1048576).toFixed(1) + ' MB';
 }
 
+// Rodapé mínimo para os relatórios impressos do SGEA (sem QR — os relatórios são
+// gerenciais, não documentos formais como os do SGCD/SGCA). Padrão alinhado ao SGDP.
+function _rodapeRelatorioSGEA() {
+  const dt = new Date().toLocaleDateString('pt-BR', { day: '2-digit', month: '2-digit', year: 'numeric' })
+    + ' ' + new Date().toLocaleTimeString('pt-BR', { hour: '2-digit', minute: '2-digit' });
+  return `<div style="margin-top:28pt;border-top:1px solid #ccc;padding-top:8pt;font-size:7.5pt;color:#666;text-align:center">`
+    + `Documento gerado pelo <strong>SGEA</strong> — Sistema de Gestão de Estoque do Almoxarifado &nbsp;·&nbsp; ${esc(dt)} &nbsp;·&nbsp; por ${esc(_apiUser?.nome || '—')}</div>`;
+}
+
 async function gerarRelatorioIntegridade() {
   const [r, rSet, rBrasao] = await Promise.all([
     API.get('/api/relatorio/integridade'), API.get('/api/settings'), API.get('/api/settings/brasao'),
@@ -2238,6 +2247,7 @@ ${d.eventos_recentes?.length ? `<table>
   <thead><tr><th style="width:110pt">Data/hora</th><th style="width:100pt">Usuário</th><th style="width:110pt">Ação</th><th>Detalhes</th></tr></thead>
   <tbody>${linhasEventos}</tbody>
 </table>` : '<p style="font-size:10pt;color:#666">Nenhum evento de backup/restauração registrado.</p>'}
+${_rodapeRelatorioSGEA()}
 </body></html>`;
 
   const win = window.open('', '_blank', 'width=900,height=720');
@@ -2702,6 +2712,7 @@ ${lista.length ? `<table>
   <thead><tr><th style="width:110pt">Data/Hora</th><th style="width:120pt">Usuário</th><th style="width:130pt">Ação</th><th>Detalhes</th></tr></thead>
   <tbody>${linhas}</tbody>
 </table>` : '<p style="font-size:10pt;color:#666;text-align:center">Nenhum evento encontrado para os filtros aplicados.</p>'}
+${_rodapeRelatorioSGEA()}
 </body></html>`;
 
   const win = window.open('', '_blank', 'width=900,height=720');

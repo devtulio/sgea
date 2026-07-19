@@ -5,6 +5,11 @@
 
 ---
 
+## [0.15.2] — 2026-07-18
+
+### Alterado
+- **Rodapé nos relatórios impressos** (Trilha de Auditoria e Backup e Integridade): "Documento gerado pelo SGEA · data · por usuário", alinhado ao padrão dos sistemas irmãos. Sem QR — os relatórios do SGEA são gerenciais, não documentos formais.
+
 ## [0.15.1] — 2026-07-18
 
 ### Alterado
