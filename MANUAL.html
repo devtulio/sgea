@@ -3,7 +3,7 @@
 <head>
 <meta charset="UTF-8">
 <meta name="viewport" content="width=device-width, initial-scale=1.0">
-<title>Manual Operacional — SGEA v0.16.0</title>
+<title>Manual Operacional — SGEA v0.17.0</title>
 <style>
   * { box-sizing: border-box; margin: 0; padding: 0; }
   body { font-family: 'Times New Roman', Times, serif; font-size: 12pt; color: #000; background: #f5f5f5; }
@@ -63,7 +63,7 @@
     <div class="cover-title">Manual Operacional</div>
     <div class="cover-subtitle">SGEA — Sistema de Gestão de Estoque do Almoxarifado</div>
     <div class="cover-system">Entradas, Saídas, Lotes/Validade e cadastros de apoio</div>
-    <div class="cover-version">Versão v0.16.0</div>
+    <div class="cover-version">Versão v0.17.0</div>
     <br>
     <div style="font-size:11pt; color:#555; line-height:1.8;">
       Aplicação web multiusuário para o Almoxarifado<br>
@@ -82,16 +82,17 @@
     <div class="toc-item h2"><a href="#sec1">1. Introdução</a></div>
     <div class="toc-item h2"><a href="#sec2">2. Primeiro Acesso</a></div>
     <div class="toc-item h2"><a href="#sec3">3. Visão Geral da Interface</a></div>
-    <div class="toc-item h2"><a href="#sec4">4. Cadastro de Produtos e Estoque</a></div>
-    <div class="toc-item h2"><a href="#sec5">5. Entradas</a></div>
-    <div class="toc-item h2"><a href="#sec6">6. Saídas e Consumo por Lote (FEFO)</a></div>
-    <div class="toc-item h2"><a href="#sec7">7. Alertas de Validade</a></div>
-    <div class="toc-item h2"><a href="#sec8">8. Cadastros de Apoio</a></div>
-    <div class="toc-item h2"><a href="#sec9">9. Configurações</a></div>
-    <div class="toc-item h2"><a href="#sec10">10. Auditoria e Lixeira</a></div>
-    <div class="toc-item h2"><a href="#sec11">11. Reconciliação com o Fiorilli</a></div>
-    <div class="toc-item h2"><a href="#sec12">12. Diagnóstico de Rede</a></div>
-    <div class="toc-item h2"><a href="#sec13">13. Histórico de Versões</a></div>
+    <div class="toc-item h2"><a href="#sec4">4. Dashboard e Relatórios</a></div>
+    <div class="toc-item h2"><a href="#sec5">5. Cadastro de Produtos e Estoque</a></div>
+    <div class="toc-item h2"><a href="#sec6">6. Entradas</a></div>
+    <div class="toc-item h2"><a href="#sec7">7. Saídas e Consumo por Lote (FEFO)</a></div>
+    <div class="toc-item h2"><a href="#sec8">8. Alertas de Validade</a></div>
+    <div class="toc-item h2"><a href="#sec9">9. Cadastros de Apoio</a></div>
+    <div class="toc-item h2"><a href="#sec10">10. Configurações</a></div>
+    <div class="toc-item h2"><a href="#sec11">11. Auditoria e Lixeira</a></div>
+    <div class="toc-item h2"><a href="#sec12">12. Reconciliação com o Fiorilli</a></div>
+    <div class="toc-item h2"><a href="#sec13">13. Diagnóstico de Rede</a></div>
+    <div class="toc-item h2"><a href="#sec14">14. Histórico de Versões</a></div>
   </div>
 </div>
 
@@ -109,11 +110,23 @@
   <div class="aviso">No primeiro login, o sistema exige a troca imediata da senha padrão. Escolha uma senha com pelo menos 6 caracteres.</div>
 
   <h2 id="sec3">3. Visão Geral da Interface</h2>
-  <p>A navegação principal fica na barra lateral esquerda, dividida em três grupos: as telas operacionais do dia a dia (Estoque, Entradas, Saídas, Alertas de Validade, Reconciliação), os cadastros de apoio (Centros de Custo, Fornecedores, Funcionários, Frota, Pedidos) e, por último, Configurações.</p>
-  <p>Depois do login, o sistema abre direto na tela <strong>Estoque</strong>, que lista todos os produtos com seu saldo físico atual, valor financeiro e a validade mais próxima entre os lotes com saldo.</p>
+  <p>A navegação principal fica na barra lateral esquerda, dividida em três grupos: as telas operacionais do dia a dia (Dashboard, Estoque, Entradas, Saídas, Alertas de Validade, Reconciliação), os cadastros de apoio (Centros de Custo, Fornecedores, Funcionários, Frota, Pedidos) e, por último, a área de Administração (Relatórios, Lixeira, Auditoria, Configurações).</p>
+  <p>Depois do login, o sistema abre direto no <strong>Dashboard</strong>, com os indicadores gerais do estoque (veja a seção seguinte).</p>
   <p>No topo da barra lateral fica o botão <strong>Buscar</strong> (atalho <code>Ctrl+K</code>) — abre uma busca que procura ao mesmo tempo em produtos, centros de custo, fornecedores, funcionários, frota e pedidos; clicar num resultado leva direto à tela e abre o item para edição. Logo abaixo, a data de hoje é exibida por extenso. Junto ao usuário, no rodapé da barra lateral, fica o <strong>sino de notificações</strong>, que mostra quantos lotes estão vencidos ou vencendo nos próximos 7 dias e um atalho para a tela de Alertas de Validade.</p>
 
-  <h2 id="sec4">4. Cadastro de Produtos e Estoque</h2>
+  <h2 id="sec4">4. Dashboard e Relatórios</h2>
+  <p>O <strong>Dashboard</strong> reúne seis indicadores calculados em tempo real: <strong>valor em estoque</strong> (soma do valor financeiro de todos os produtos ativos), <strong>produtos ativos</strong>, <strong>produtos com estoque zerado</strong>, <strong>lotes vencendo</strong> e <strong>lotes vencidos</strong> (janela de 30 dias) e <strong>pedidos em aberto</strong>. Os três últimos são clicáveis e levam direto para a tela correspondente (Alertas de Validade ou Pedidos). Abaixo dos indicadores, um gráfico de barras mostra o valor de entradas e saídas dos últimos 6 meses, mês a mês.</p>
+  <p>A tela <strong>Relatórios</strong> (menu Administração) reúne cinco documentos imprimíveis, cada um com um botão <strong>Gerar</strong> que abre o documento numa nova janela pronta para impressão ou exportação em PDF:</p>
+  <ul>
+    <li><strong>Posição de Estoque Valorizado</strong> — quantidade, valor unitário médio, valor total e próxima validade de cada produto ativo, com total geral</li>
+    <li><strong>Movimentação por Período</strong> — entradas e saídas detalhadas (produto, quantidade, valor) num intervalo de datas escolhido no próprio card do relatório</li>
+    <li><strong>Lotes a Vencer/Vencidos</strong> — mesma janela de 90 dias usada na tela de Alertas de Validade, com badge indicando se o lote já venceu ou está vencendo</li>
+    <li><strong>Pedidos em Aberto</strong> — uma seção por pedido em aberto, com os itens ainda pendentes (quantidade pedida, recebida e saldo)</li>
+    <li><strong>Curva ABC</strong> — classifica os produtos por participação no valor total do estoque: classe A até 80% do valor acumulado, B até 95%, C o restante</li>
+  </ul>
+  <p>Todos os relatórios seguem o mesmo padrão visual do relatório de Backup e Integridade e da Trilha de Auditoria: cabeçalho com o brasão e nome do órgão, tipografia Times New Roman e numeração de página no rodapé — sem código QR nem bloco de assinatura, por serem documentos gerenciais, não formais.</p>
+
+  <h2 id="sec5">5. Cadastro de Produtos e Estoque</h2>
   <p>Cada produto precisa de um <strong>Código Fiorilli</strong> (a chave usada no sistema oficial do município) e de um nome. Os campos mais importantes:</p>
   <ul>
     <li><strong>Unidade Licitada</strong> — a embalagem de compra (ex.: CAIXA, FRASCO)</li>
@@ -124,7 +137,7 @@
   <p>Clicar em uma linha da lista de produtos expande um painel com o detalhamento por lote (número do lote, validade, quantidade recebida e saldo atual), na mesma ordem em que serão consumidos numa saída (lotes com validade mais próxima primeiro).</p>
   <div class="nota">Um produto só pode ser excluído se não tiver nenhum lote ou movimentação vinculada — o sistema bloqueia a exclusão nesse caso para preservar o histórico.</div>
 
-  <h2 id="sec5">5. Entradas</h2>
+  <h2 id="sec6">6. Entradas</h2>
   <p>Uma entrada registra o recebimento de mercadoria e pode seguir dois fluxos:</p>
   <ul>
     <li><strong>Com pedido</strong> — vincula a entrada a um Pedido previamente cadastrado (número + código de licitação), refletindo o fluxo formal: o setor faz o pedido, o fornecedor entrega, o almoxarifado confirma o recebimento</li>
@@ -133,21 +146,21 @@
   <p>Cada item da entrada informa a quantidade em <strong>embalagens</strong> (ex.: 5 caixas) — o sistema converte automaticamente para unidades usando o fator cadastrado no produto, e mostra essa conversão em tempo real no formulário. Cada item também pode receber um número de lote e uma data de validade, que passam a valer para o lote gerado.</p>
   <div class="nota">Depois de criada, uma entrada só permite editar os dados de cabeçalho (NF, observação, recebedor) — quantidades e valores dos itens são imutáveis, porque já viraram saldo de lote. Para corrigir uma quantidade errada, exclua a entrada (se ainda não tiver sido consumida por nenhuma saída) e registre novamente.</div>
 
-  <h2 id="sec6">6. Saídas e Consumo por Lote (FEFO)</h2>
+  <h2 id="sec7">7. Saídas e Consumo por Lote (FEFO)</h2>
   <p>A saída é lançada diretamente pelo almoxarife: produto, quantidade (sempre em unidade), solicitante, centro de custo de destino e, opcionalmente, um veículo da Frota (para correlacionar saídas de combustível ou peças).</p>
   <p>Ao salvar, o sistema decide automaticamente de qual lote tirar a quantidade pedida, seguindo a regra <strong>FEFO</strong>: primeiro os lotes com validade mais próxima, depois os lotes sem validade cadastrada (na ordem em que entraram no estoque). Se um único lote não tiver saldo suficiente, o sistema divide o consumo entre dois ou mais lotes automaticamente — o usuário não precisa se preocupar com isso.</p>
   <div class="aviso">Se o estoque total do produto for menor que a quantidade pedida, a saída é recusada por inteiro (nenhum lote é alterado) e o sistema informa o saldo disponível.</div>
   <div class="dica">Excluir uma saída devolve exatamente as quantidades consumidas aos mesmos lotes de origem — é seguro reverter um lançamento feito por engano.</div>
 
-  <h2 id="sec7">7. Alertas de Validade</h2>
+  <h2 id="sec8">8. Alertas de Validade</h2>
   <p>Esta tela lista todos os lotes com saldo que estão vencidos ou vencendo dentro de uma janela configurável (30, 60 ou 90 dias), mostrando o produto, o lote, a data de validade, o saldo restante e o centro de custo de origem do produto. Use-a periodicamente para priorizar o consumo de itens perto do vencimento.</p>
 
-  <h2 id="sec8">8. Cadastros de Apoio</h2>
+  <h2 id="sec9">9. Cadastros de Apoio</h2>
   <p>As telas de <strong>Centros de Custo</strong>, <strong>Fornecedores</strong>, <strong>Funcionários</strong> e <strong>Frota</strong> seguem o mesmo padrão de lista + formulário. No cadastro de Fornecedores, o campo CNPJ pode ser preenchido manualmente; a consulta automática de dados do CNPJ está disponível via a API pública da ReceitaWS.</p>
   <p><strong>Funcionários</strong> são usados como solicitantes de saída (nome, cargo e unidade). <strong>Frota</strong> cadastra os veículos do município (número, placa, marca/modelo) para permitir vincular uma saída de combustível ou peça a um veículo específico.</p>
   <p><strong>Pedidos</strong> vão além do cadastro simples: cada pedido (número + código de licitação) agrupa <strong>vários produtos</strong>, cada um com a quantidade pedida. Ao registrar uma Entrada vinculada a um pedido, o sistema abate automaticamente a quantidade recebida dos itens correspondentes — a quantidade recebida nunca é digitada nem armazenada à parte, é sempre calculada a partir das entradas reais. Assim cada item mostra seu <strong>saldo em aberto</strong> e um <strong>status</strong> (aberto, parcial, atendido) e o pedido mostra um status agregado. É possível <strong>cancelar</strong> um pedido inteiro ou <strong>anular o saldo</strong> de um item específico (quando o restante não vai mais ser entregue), sem afetar o que já foi recebido.</p>
 
-  <h2 id="sec9">9. Configurações</h2>
+  <h2 id="sec10">10. Configurações</h2>
   <p>A tela <strong>Configurações</strong> reúne, em sete abas, tudo que não é operação de estoque no dia a dia. Um único botão <strong>Salvar</strong>, fixo no topo, grava as alterações das abas Interface/Organização/Comunicação/Dados de uma só vez — ele pulsa quando há alterações não salvas. O botão "← Voltar" retorna para o Estoque.</p>
   <ul>
     <li><strong>Interface</strong> — tema claro/escuro; <strong>largura do conteúdo</strong> (compacta ou expandida); <strong>tamanho da fonte</strong> (Normal/Pequena/Grande); e <strong>cor de destaque</strong> (Institucional, Azul, Verde ou Roxo). Essas escolhas ficam salvas no navegador de cada usuário e só entram em vigor ao clicar em Salvar</li>
@@ -161,12 +174,12 @@
   <p>A tela de login também segue o mesmo padrão visual dos demais sistemas da família: cartão institucional com identificação do órgão (nome cadastrado em Organização), alternância de mostrar/ocultar senha, aviso quando o Caps Lock está ativo e a data do último backup automático, para facilitar perceber rapidamente se os backups estão em dia.</p>
   <div class="nota">Quando o SMTP está configurado, o sistema envia automaticamente, uma vez por dia, um e-mail para o destinatário interno resumindo os lotes vencidos ou vencendo nos próximos 7 dias.</div>
 
-  <h2 id="sec10">10. Auditoria e Lixeira</h2>
+  <h2 id="sec11">11. Auditoria e Lixeira</h2>
   <p>A tela <strong>Auditoria</strong> <em>(somente administradores)</em> registra todo evento de criação, edição ou exclusão nos módulos de Produtos, Entradas, Saídas, cadastros de apoio, Pedidos e Usuários — quem fez, quando e o quê. Cada ação aparece com um rótulo legível e uma cor conforme a família (verde para criação, azul para edição, vermelho para exclusão, âmbar para anulação/restauração), com filtros ao vivo por texto, tipo de evento e período. O autor de cada evento é sempre o usuário autenticado no momento, nunca um dado enviado pela tela. Os botões <strong>Exportar CSV</strong> e <strong>Relatório</strong> geram, respectivamente, uma planilha com os eventos filtrados e um documento imprimível (com cabeçalho do órgão) para arquivo ou prestação de contas.</p>
   <p>A tela <strong>Lixeira</strong> lista as Entradas e Saídas excluídas, com o botão <strong>Restaurar</strong> disponível por até 30 dias (depois disso, o registro é apagado de vez automaticamente). Restaurar uma entrada devolve o saldo aos lotes que ela gerou; restaurar uma saída consome o estoque novamente pela regra FEFO — podendo, se o estoque tiver mudado nesse meio-tempo, sair de lotes diferentes dos originais, mas com o mesmo efeito final na quantidade.</p>
   <div class="aviso">Excluir uma entrada zera o saldo dos lotes que ela gerou (não é permitido se algum lote já foi parcialmente consumido por uma saída) — o efeito no estoque é imediato, não só uma remoção da lista.</div>
 
-  <h2 id="sec11">11. Reconciliação com o Fiorilli</h2>
+  <h2 id="sec12">12. Reconciliação com o Fiorilli</h2>
   <p>A tela <strong>Reconciliação</strong> confere o estoque do SGEA contra o <strong>Fiorilli</strong>, que continua sendo o razão oficial do órgão — o SGEA é apoio gerencial e <strong>nunca escreve no Fiorilli</strong>. No Fiorilli, exporte o relatório de <strong>Posição do Estoque</strong> no formato <strong>CSV (Dados)</strong>; no SGEA, informe a data de corte do extrato e clique em <strong>Importar CSV do Fiorilli</strong>. O sistema cruza os dois lados pelo <strong>código Fiorilli</strong> (CADPRO) de cada produto e mostra um resumo com cinco situações:</p>
   <ul>
     <li><strong>Confere</strong> — as quantidades batem (inclui o caso em que ambos estão zerados; o relatório do Fiorilli omite itens sem saldo).</li>
@@ -177,12 +190,13 @@
   </ul>
   <p>As quantidades do Fiorilli são <strong>convertidas para a unidade de consumo</strong> do SGEA usando o fator <em>unidades por embalagem</em> do produto (ex.: <code>0,68 CX</code> aparece como <code>17 UN</code>), para que o almoxarife leia tudo na unidade de prateleira. O valor é uma conferência secundária (o Fiorilli usa custo médio), e estoque ou valor negativos do Fiorilli são sinalizados. Como a posição do estoque muda a cada movimento, a tela <strong>avisa quando o extrato não é do dia</strong> — o ideal é gerar o relatório no Fiorilli e reconciliar no mesmo dia. O botão <strong>Exportar pendências</strong> gera um CSV só com os itens que não conferem, e cada importação fica registrada na Trilha de Auditoria.</p>
 
-  <h2 id="sec12">12. Diagnóstico de Rede</h2>
+  <h2 id="sec13">13. Diagnóstico de Rede</h2>
   <p>Ao usar o SGEA em rede local (um computador como servidor, outros acessando pelo navegador), execute <code>Diagnostico SGEA.bat</code> na máquina servidora sempre que outra máquina não conseguir acessar o sistema. Ele verifica automaticamente o IP local, a porta, o perfil de rede do Windows e a regra de firewall, corrigindo o que for possível.</p>
 
-  <h2 id="sec13">13. Histórico de Versões</h2>
+  <h2 id="sec14">14. Histórico de Versões</h2>
   <table>
     <tr><th>Versão</th><th>Data</th><th>Resumo</th></tr>
+    <tr><td>0.17.0</td><td>19/07/2026</td><td><strong>Dashboard</strong> (tela inicial após o login, com 6 indicadores e gráfico de entradas × saídas dos últimos 6 meses) e tela de <strong>Relatórios</strong> com 5 documentos imprimíveis: Posição de Estoque Valorizado, Movimentação por Período, Lotes a Vencer/Vencidos, Pedidos em Aberto e Curva ABC.</td></tr>
     <tr><td>0.16.0</td><td>19/07/2026</td><td><strong>Auditoria registra a geração de relatórios</strong> (Trilha de Auditoria e Backup e Integridade): a ação "Relatório gerado" passa a aparecer na trilha, fechando a lacuna frente aos sistemas irmãos. Os dois relatórios impressos ganham <strong>numeração de páginas</strong> ("Folha N") no rodapé de cada página.</td></tr>
     <tr><td>0.15.2</td><td>18/07/2026</td><td>Rodapé nos relatórios impressos ("Documento gerado pelo SGEA · data · por usuário"), alinhado ao padrão dos sistemas irmãos.</td></tr>
     <tr><td>0.15.1</td><td>18/07/2026</td><td>Helpers de exportação (<code>_salvarArquivoComo</code>, <code>toCSV</code>) consolidados no <code>base.js</code> compartilhado; sem mudança de comportamento.</td></tr>

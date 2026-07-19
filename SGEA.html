@@ -31,10 +31,12 @@
   body.dark .cfg-tab:hover { color: #fff; }
 
   #app.layout-expanded { padding-right: 24px; }
+  #app:not(.layout-expanded) #view-dashboard,
   #app:not(.layout-expanded) #view-produtos,
   #app:not(.layout-expanded) #view-entradas,
   #app:not(.layout-expanded) #view-saidas,
   #app:not(.layout-expanded) #view-alertas,
+  #app:not(.layout-expanded) #view-relatorios,
   #app:not(.layout-expanded) #view-crud,
   #app:not(.layout-expanded) #view-config { max-width: 1100px; margin: 0 auto; }
 
@@ -68,6 +70,32 @@
 
   /* Bolinha de cor no seletor "Cor de destaque" (padrão dos sistemas irmãos) */
   .cor-swatch { display: inline-block; width: 14px; height: 14px; border-radius: 50%; flex-shrink: 0; }
+
+  /* Dashboard — cards .stats/.stat, mesmas classes do SGCD/SGCA (não está no
+     base.css compartilhado, cada sistema duplica localmente). */
+  .stats { display: grid; grid-template-columns: repeat(auto-fit, minmax(150px,1fr)); gap: 12px; margin-bottom: 24px; }
+  .stat { background: #fff; border-radius: var(--radius); padding: 16px 18px; box-shadow: var(--shadow); border: 1px solid var(--gray-200); display: flex; flex-direction: column; gap: 2px; border-left: 4px solid var(--gray-200); cursor: default; transition: box-shadow .15s, transform .15s; }
+  .stat:hover { box-shadow: var(--shadow-md); transform: translateY(-1px); }
+  .stat[data-filter] { cursor: pointer; }
+  .stat.brand   { border-left-color: var(--brand); }
+  .stat.done    { border-left-color: var(--success); }
+  .stat.prog    { border-left-color: var(--warning); }
+  .stat.blocked { border-left-color: var(--danger); }
+  .stat-top { display: flex; align-items: center; justify-content: space-between; margin-bottom: 6px; }
+  .stat-val { font-size: 2rem; font-weight: 700; line-height: 1; color: var(--gray-900); font-variant-numeric: tabular-nums; }
+  .stat-lbl { font-size: .72rem; color: var(--gray-500); text-transform: uppercase; letter-spacing: .5px; }
+  .stat-sub { font-size: .7rem; color: var(--gray-400); margin-top: 6px; padding-top: 6px; border-top: 1px solid var(--gray-100); }
+  body.dark .stat-sub { border-top-color: #383838; }
+  body.dark .stat { background: #2a2a2a; }
+
+  /* Relatórios — grid de cards, um por relatório */
+  .rel-grid { display: grid; grid-template-columns: repeat(auto-fit, minmax(260px,1fr)); gap: 14px; }
+  .rel-card { background: #fff; border-radius: var(--radius); box-shadow: var(--shadow); border: 1px solid var(--gray-200); padding: 16px 18px; display: flex; flex-direction: column; gap: 8px; }
+  .rel-card h3 { font-size: .95rem; }
+  .rel-card p { font-size: .8rem; color: var(--gray-500); flex: 1; }
+  .rel-card .rel-datas { display: flex; gap: 8px; }
+  .rel-card .rel-datas input { flex: 1; padding: 6px 8px; border: 1px solid var(--gray-300); border-radius: 6px; font-size: .8rem; }
+  body.dark .rel-card { background: #2a2a2a; }
 </style>
 </head>
 <body>
@@ -89,7 +117,10 @@
   </div>
   <div class="sidebar-date" id="sidebar-date"></div>
   <nav class="sidebar-nav">
-    <button class="nav-item active" id="nav-produtos" onclick="showProdutos()">
+    <button class="nav-item active" id="nav-dashboard" onclick="showDashboard()">
+      <span class="nav-ico">📊</span> Dashboard
+    </button>
+    <button class="nav-item" id="nav-produtos" onclick="showProdutos()">
       <span class="nav-ico">📦</span> Estoque
     </button>
     <button class="nav-item" id="nav-entradas" onclick="showEntradas()">
@@ -121,6 +152,9 @@
       <span class="nav-ico">📄</span> Pedidos
     </button>
     <div class="nav-section">Administração</div>
+    <button class="nav-item" id="nav-relatorios" onclick="showRelatorios()">
+      <span class="nav-ico">📑</span> Relatórios
+    </button>
     <button class="nav-item" id="nav-lixeira" onclick="showLixeira()">
       <span class="nav-ico">🗑️</span> Lixeira
     </button>
@@ -151,8 +185,17 @@
 
 <main id="app">
 
+  <!-- ── Dashboard ── -->
+  <div id="view-dashboard" class="view active">
+    <div class="dash-top">
+      <h2>Dashboard</h2>
+    </div>
+    <div class="stats" id="dashboard-stats"></div>
+    <div id="dashboard-chart"></div>
+  </div>
+
   <!-- ── Estoque / Produtos ── -->
-  <div id="view-produtos" class="view active">
+  <div id="view-produtos" class="view">
     <div class="dash-top">
       <h2>Estoque</h2>
       <div class="view-actions">
@@ -275,6 +318,14 @@
       </div>
     </div>
     <div id="crud-list"></div>
+  </div>
+
+  <!-- ── Relatórios ── -->
+  <div id="view-relatorios" class="view">
+    <div class="dash-top">
+      <h2>Relatórios</h2>
+    </div>
+    <div id="relatorios-list"></div>
   </div>
 
   <!-- ── Lixeira ── -->
@@ -809,7 +860,7 @@
 // ══════════════════════════════════════════════════════════════
 // API / SESSÃO
 // ══════════════════════════════════════════════════════════════
-const SGEA_VERSION = '0.16.0';
+const SGEA_VERSION = '0.17.0';
 document.title = `SGEA v${SGEA_VERSION}`;
 
 let _apiToken = localStorage.getItem('sgea-token') || null;
@@ -920,7 +971,7 @@ async function _onLoginSuccess() {
   else localStorage.removeItem('sgea-brasao-dataurl');
   _aplicarBrasaoSidebar();
   atualizarNotifCount();
-  showProdutos();
+  showDashboard();
 }
 
 // Fundo animado da tela de login (rede de partículas com interação de mouse)
@@ -1324,6 +1375,85 @@ async function deleteCrudItem(id) {
   await _auditEvento(`${_CRUD_AUDIT_PREFIX[_crudAtual]}_EXCLUIDO`, `${CRUD_MODULES[_crudAtual].titulo.replace(/s$/, '')} "${item ? _crudNome(item) : id}" excluído`, id);
   toast('Excluído.', 'success');
   renderCrud();
+}
+
+// ══════════════════════════════════════════════════════════════
+// DASHBOARD
+// ══════════════════════════════════════════════════════════════
+
+function showDashboard() {
+  _showView('view-dashboard', 'nav-dashboard');
+  renderDashboard();
+}
+
+async function renderDashboard() {
+  const r = await API.get('/api/dashboard');
+  const d = await API.json(r);
+  if (!d) return;
+  const statsEl = document.getElementById('dashboard-stats');
+  statsEl.innerHTML = `
+    <div class="stat brand">
+      <div class="stat-top"><span class="stat-lbl">Valor em Estoque</span></div>
+      <div class="stat-val" style="font-size:1.3rem">${fmtMoney(d.estoque_valor_total)}</div>
+      <div class="stat-sub">produtos ativos, custo médio</div>
+    </div>
+    <div class="stat" style="cursor:pointer" role="button" tabindex="0" onclick="showProdutos()">
+      <div class="stat-top"><span class="stat-lbl">Produtos Ativos</span></div>
+      <div class="stat-val">${d.produtos_ativos}</div>
+    </div>
+    <div class="stat blocked" style="cursor:pointer" role="button" tabindex="0" onclick="showProdutos()">
+      <div class="stat-top"><span class="stat-lbl">Estoque Zerado</span></div>
+      <div class="stat-val">${d.produtos_zerados}</div>
+      <div class="stat-sub">produtos ativos sem saldo</div>
+    </div>
+    <div class="stat prog" style="cursor:pointer" role="button" tabindex="0" onclick="showAlertas()">
+      <div class="stat-top"><span class="stat-lbl">Lotes Vencendo</span></div>
+      <div class="stat-val">${d.lotes_vencendo}</div>
+      <div class="stat-sub">próximos 30 dias</div>
+    </div>
+    <div class="stat blocked" style="cursor:pointer" role="button" tabindex="0" onclick="showAlertas()">
+      <div class="stat-top"><span class="stat-lbl">Lotes Vencidos</span></div>
+      <div class="stat-val">${d.lotes_vencidos}</div>
+    </div>
+    <div class="stat" style="cursor:pointer" role="button" tabindex="0" onclick="showPedidos()">
+      <div class="stat-top"><span class="stat-lbl">Pedidos Abertos</span></div>
+      <div class="stat-val">${d.pedidos_abertos}</div>
+    </div>
+  `;
+  _renderGraficoMovimentacao(d.movimentacao_mensal);
+}
+
+function _renderGraficoMovimentacao(meses) {
+  const el = document.getElementById('dashboard-chart');
+  if (!el) return;
+  const max = Math.max(1, ...meses.map(m => Math.max(m.entradas, m.saidas)));
+  const barW = 18, barGap = 4, groupGap = 28, chartH = 90, topPad = 16;
+  const groupW = barW * 2 + barGap;
+  const svgW = meses.length * (groupW + groupGap);
+  const bars = meses.map((m, i) => {
+    const x = i * (groupW + groupGap);
+    const he = Math.round((m.entradas / max) * chartH);
+    const hs = Math.round((m.saidas / max) * chartH);
+    const label = m.mes.slice(5) + '/' + m.mes.slice(2, 4);
+    return `
+      <rect x="${x}" y="${topPad + chartH - he}" width="${barW}" height="${Math.max(he, 2)}" rx="3" style="fill:var(--success)"></rect>
+      <rect x="${x + barW + barGap}" y="${topPad + chartH - hs}" width="${barW}" height="${Math.max(hs, 2)}" rx="3" style="fill:var(--danger)"></rect>
+      <text x="${x + groupW / 2}" y="${topPad + chartH + 20}" text-anchor="middle" font-size="11" style="fill:var(--gray-500)">${label}</text>
+    `;
+  }).join('');
+  el.innerHTML = `
+    <div style="background:var(--bg-card,#fff);border-radius:var(--radius);padding:16px 18px;box-shadow:var(--shadow);border:1px solid var(--gray-200)">
+      <div class="stat-lbl" style="margin-bottom:10px">Movimentação (valor) — últimos 6 meses
+        <span style="display:inline-flex;align-items:center;gap:4px;margin-left:12px;font-weight:400;text-transform:none">
+          <span style="display:inline-block;width:9px;height:9px;border-radius:2px;background:var(--success)"></span>Entradas
+        </span>
+        <span style="display:inline-flex;align-items:center;gap:4px;margin-left:10px;font-weight:400;text-transform:none">
+          <span style="display:inline-block;width:9px;height:9px;border-radius:2px;background:var(--danger)"></span>Saídas
+        </span>
+      </div>
+      <svg viewBox="0 0 ${svgW} ${topPad + chartH + 32}" width="100%" height="150" style="overflow:visible;display:block">${bars}</svg>
+    </div>
+  `;
 }
 
 // ══════════════════════════════════════════════════════════════
@@ -2261,6 +2391,201 @@ ${_rodapeRelatorioSGEA()}
   win.document.write(html);
   win.document.close();
   _auditEvento('DOCUMENTO_GERADO', 'Relatório de Backup e Integridade');
+}
+
+// ══════════════════════════════════════════════════════════════
+// RELATÓRIOS
+// ══════════════════════════════════════════════════════════════
+
+async function _orgBrasao() {
+  const [rSet, rBrasao] = await Promise.all([API.get('/api/settings'), API.get('/api/settings/brasao')]);
+  const settings = (await API.json(rSet)) || {};
+  const brasao = (await API.json(rBrasao))?.brasao_dataurl || '';
+  return { orgao: settings.orgao || 'Órgão Público', municipio: settings.municipio || '', brasao };
+}
+
+function _abrirRelatorio(org, titulo, corpoHtml, rotuloAuditoria) {
+  const { orgao, municipio, brasao } = org;
+  const html = `<!DOCTYPE html><html lang="pt-BR"><head><meta charset="UTF-8">
+<title>${titulo} — SGEA</title>
+<style>${_RELATORIO_CSS}
+</style></head><body>
+<button class="btn-print" onclick="window.print()">🖨 Imprimir / Salvar PDF</button>
+<div class="header">
+  ${brasao ? `<img src="${brasao}" alt="Brasão">` : ''}
+  <h1>${esc(orgao)}</h1>
+  <h2>${esc(municipio)}</h2>
+</div>
+<div class="doc-title"><h3>${titulo}</h3></div>
+${corpoHtml}
+${_rodapeRelatorioSGEA()}
+</body></html>`;
+  const win = window.open('', '_blank', 'width=900,height=720');
+  if (!win) { toast('Popup bloqueado pelo navegador. Permita popups para este site.', 'error'); return; }
+  win.document.write(html);
+  win.document.close();
+  _auditEvento('DOCUMENTO_GERADO', rotuloAuditoria);
+}
+
+function showRelatorios() {
+  _showView('view-relatorios', 'nav-relatorios');
+  renderRelatoriosList();
+}
+
+function renderRelatoriosList() {
+  const hoje = new Date();
+  const primeiroDia = new Date(hoje.getFullYear(), hoje.getMonth(), 1).toISOString().slice(0, 10);
+  const ultimoDia = hoje.toISOString().slice(0, 10);
+  document.getElementById('relatorios-list').innerHTML = `
+    <div class="rel-grid">
+      <div class="rel-card">
+        <h3>📦 Posição de Estoque Valorizado</h3>
+        <p>Quantidade e valor em estoque de cada produto ativo, com próxima validade.</p>
+        <button class="btn btn-primary" onclick="gerarRelatorioEstoque()">Gerar</button>
+      </div>
+      <div class="rel-card">
+        <h3>🔄 Movimentação por Período</h3>
+        <p>Entradas e saídas detalhadas num intervalo de datas.</p>
+        <div class="rel-datas">
+          <input type="date" id="rel-mov-de" value="${primeiroDia}" aria-label="Data inicial">
+          <input type="date" id="rel-mov-ate" value="${ultimoDia}" aria-label="Data final">
+        </div>
+        <button class="btn btn-primary" onclick="gerarRelatorioMovimentacao()">Gerar</button>
+      </div>
+      <div class="rel-card">
+        <h3>⏰ Lotes a Vencer/Vencidos</h3>
+        <p>Lotes com validade nos próximos 90 dias, incluindo os já vencidos.</p>
+        <button class="btn btn-primary" onclick="gerarRelatorioLotes()">Gerar</button>
+      </div>
+      <div class="rel-card">
+        <h3>📄 Pedidos em Aberto</h3>
+        <p>Pedidos com saldo pendente e os itens que faltam receber.</p>
+        <button class="btn btn-primary" onclick="gerarRelatorioPedidosAbertos()">Gerar</button>
+      </div>
+      <div class="rel-card">
+        <h3>📊 Curva ABC</h3>
+        <p>Classificação dos produtos por participação no valor total do estoque.</p>
+        <button class="btn btn-primary" onclick="gerarRelatorioABC()">Gerar</button>
+      </div>
+    </div>
+  `;
+}
+
+async function gerarRelatorioEstoque() {
+  const org = await _orgBrasao();
+  const r = await API.get('/api/produtos?somente_ativos=1');
+  const produtos = (await API.json(r))?.items || [];
+  const totalValor = produtos.reduce((s, p) => s + (p.estoque_financeiro || 0), 0);
+  const linhas = produtos.map(p => {
+    const valorUnitMedio = p.estoque_fisico ? p.estoque_financeiro / p.estoque_fisico : 0;
+    return `<tr>
+      <td>${esc(p.nome)}</td><td>${esc(p.codigo_fiorilli || '—')}</td><td>${esc(p.centro_custo_nome || '—')}</td>
+      <td style="text-align:right">${p.estoque_fisico} ${esc(p.unidade_consumo || '')}</td>
+      <td style="text-align:right">${fmtMoney(valorUnitMedio)}</td>
+      <td style="text-align:right;font-weight:700">${fmtMoney(p.estoque_financeiro)}</td>
+      <td>${p.proxima_validade ? fmtDate(p.proxima_validade) : '—'}</td>
+    </tr>`;
+  }).join('');
+  const corpo = `
+    <div class="meta">${produtos.length} produto(s) ativo(s) · valor total ${fmtMoney(totalValor)}</div>
+    <table>
+      <thead><tr><th>Produto</th><th>Cód. Fiorilli</th><th>Centro de Custo</th><th>Qtd.</th><th>Valor Unit. Médio</th><th>Valor Total</th><th>Próx. Validade</th></tr></thead>
+      <tbody>${linhas}</tbody>
+      <tfoot><tr><td colspan="5" style="text-align:right;font-weight:700">Total geral</td><td style="text-align:right;font-weight:700">${fmtMoney(totalValor)}</td><td></td></tr></tfoot>
+    </table>`;
+  _abrirRelatorio(org, 'Posição de Estoque Valorizado', corpo, 'Relatório de Posição de Estoque Valorizado');
+}
+
+async function gerarRelatorioMovimentacao() {
+  const de = document.getElementById('rel-mov-de').value;
+  const ate = document.getElementById('rel-mov-ate').value;
+  if (!de || !ate) { toast('Informe o período.', 'error'); return; }
+  const org = await _orgBrasao();
+  const r = await API.get(`/api/relatorio/movimentacao?de=${de}&ate=${ate}`);
+  const d = await API.json(r);
+  const linhasEnt = (d.entradas || []).map(e => `<tr>
+    <td>${fmtDate(e.data)}</td><td>${esc(e.produto_nome)}</td><td>${esc(e.nfe_numero || '—')}</td>
+    <td style="text-align:right">${e.quantidade_unidades}</td>
+    <td style="text-align:right">${fmtMoney(e.valor_unitario)}</td>
+    <td style="text-align:right;font-weight:700">${fmtMoney(e.valor_total)}</td>
+  </tr>`).join('');
+  const linhasSai = (d.saidas || []).map(s => `<tr>
+    <td>${fmtDate(s.data)}</td><td>${esc(s.produto_nome)}</td><td>${esc(s.numero_solicitacao || '—')}</td>
+    <td style="text-align:right">${s.quantidade}</td>
+    <td style="text-align:right">${fmtMoney(s.valor_unitario_medio)}</td>
+    <td style="text-align:right;font-weight:700">${fmtMoney(s.valor_total)}</td>
+  </tr>`).join('');
+  const corpo = `
+    <div class="meta">Período de ${fmtDate(de)} a ${fmtDate(ate)}</div>
+    <h4 style="font-size:11pt;margin-bottom:6pt">Entradas — total ${fmtMoney(d.totais.entradas_valor)}</h4>
+    ${linhasEnt ? `<table><thead><tr><th>Data</th><th>Produto</th><th>NF-e</th><th>Qtd.</th><th>Valor Unit.</th><th>Valor Total</th></tr></thead><tbody>${linhasEnt}</tbody></table>`
+      : '<p style="font-size:10pt;color:#666">Nenhuma entrada no período.</p>'}
+    <h4 style="font-size:11pt;margin:16pt 0 6pt">Saídas — total ${fmtMoney(d.totais.saidas_valor)}</h4>
+    ${linhasSai ? `<table><thead><tr><th>Data</th><th>Produto</th><th>Solicitação</th><th>Qtd.</th><th>Valor Unit. Médio</th><th>Valor Total</th></tr></thead><tbody>${linhasSai}</tbody></table>`
+      : '<p style="font-size:10pt;color:#666">Nenhuma saída no período.</p>'}`;
+  _abrirRelatorio(org, 'Movimentação por Período', corpo, 'Relatório de Movimentação por Período');
+}
+
+async function gerarRelatorioLotes() {
+  const org = await _orgBrasao();
+  const r = await API.get('/api/alertas/validade?dias=90');
+  const lotes = (await API.json(r))?.items || [];
+  const linhas = lotes.map(l => `<tr>
+    <td>${esc(l.produto_nome)}</td><td>${esc(l.lote_numero || '—')}</td>
+    <td style="text-align:right">${l.quantidade_atual} ${esc(l.unidade_consumo || '')}</td>
+    <td>${fmtDate(l.data_validade)}</td>
+    <td style="text-align:center">${l.vencido ? '<span style="color:#dc2626;font-weight:700">Vencido</span>' : '<span style="color:#d97706">Vencendo</span>'}</td>
+  </tr>`).join('');
+  const corpo = `
+    <div class="meta">${lotes.length} lote(s) nos próximos 90 dias, incluindo vencidos</div>
+    ${linhas ? `<table><thead><tr><th>Produto</th><th>Lote</th><th>Qtd.</th><th>Validade</th><th>Situação</th></tr></thead><tbody>${linhas}</tbody></table>`
+      : '<p style="font-size:10pt;color:#666">Nenhum lote a vencer ou vencido.</p>'}`;
+  _abrirRelatorio(org, 'Lotes a Vencer/Vencidos', corpo, 'Relatório de Lotes a Vencer/Vencidos');
+}
+
+async function gerarRelatorioPedidosAbertos() {
+  const org = await _orgBrasao();
+  const r = await API.get('/api/relatorio/pedidos-abertos');
+  const pedidos = (await API.json(r))?.items || [];
+  const secoes = pedidos.map(p => {
+    const linhas = (p.itens || []).map(i => `<tr>
+      <td>${esc(i.produto_nome)}</td>
+      <td style="text-align:right">${i.quantidade_pedida}</td>
+      <td style="text-align:right">${i.quantidade_recebida}</td>
+      <td style="text-align:right;font-weight:700">${i.saldo}</td>
+    </tr>`).join('');
+    return `<h4 style="font-size:11pt;margin:14pt 0 4pt">Pedido ${esc(p.numero)}${p.fornecedor_nome ? ' — ' + esc(p.fornecedor_nome) : ''}</h4>
+      <table><thead><tr><th>Produto</th><th>Pedida</th><th>Recebida</th><th>Saldo</th></tr></thead><tbody>${linhas}</tbody></table>`;
+  }).join('');
+  const corpo = `
+    <div class="meta">${pedidos.length} pedido(s) em aberto</div>
+    ${secoes || '<p style="font-size:10pt;color:#666">Nenhum pedido em aberto.</p>'}`;
+  _abrirRelatorio(org, 'Pedidos em Aberto', corpo, 'Relatório de Pedidos em Aberto');
+}
+
+async function gerarRelatorioABC() {
+  const org = await _orgBrasao();
+  const r = await API.get('/api/produtos?somente_ativos=1');
+  const produtos = (await API.json(r))?.items || [];
+  const totalValor = produtos.reduce((s, p) => s + (p.estoque_financeiro || 0), 0);
+  const ordenados = [...produtos].sort((a, b) => (b.estoque_financeiro || 0) - (a.estoque_financeiro || 0));
+  let acumulado = 0;
+  const linhas = ordenados.map(p => {
+    acumulado += p.estoque_financeiro || 0;
+    const pctAcum = totalValor ? (acumulado / totalValor) * 100 : 0;
+    const classe = pctAcum <= 80 ? 'A' : pctAcum <= 95 ? 'B' : 'C';
+    const cor = classe === 'A' ? '#16a34a' : classe === 'B' ? '#d97706' : '#6b7280';
+    return `<tr>
+      <td>${esc(p.nome)}</td>
+      <td style="text-align:right;font-weight:700">${fmtMoney(p.estoque_financeiro)}</td>
+      <td style="text-align:right">${pctAcum.toFixed(1)}%</td>
+      <td style="text-align:center"><span style="color:${cor};font-weight:700">${classe}</span></td>
+    </tr>`;
+  }).join('');
+  const corpo = `
+    <div class="meta">${produtos.length} produto(s) ativo(s) · valor total ${fmtMoney(totalValor)} · A: até 80% · B: até 95% · C: restante</div>
+    <table><thead><tr><th>Produto</th><th>Valor em Estoque</th><th>% Acumulado</th><th>Classe</th></tr></thead><tbody>${linhas}</tbody></table>`;
+  _abrirRelatorio(org, 'Curva ABC de Estoque', corpo, 'Relatório de Curva ABC');
 }
 
 // ── Comunicação (SMTP) ──────────────────────────────────────────

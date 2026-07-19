@@ -9,6 +9,7 @@ import socketserver
 import sys
 import tempfile
 import threading
+import time
 import unittest
 import uuid
 
@@ -438,6 +439,84 @@ class TestEntradasSaidas(SGEATestCase):
         }, token)
         status, data = self.request('PUT', f'/api/pedidos/{ped3["id"]}/cancelar', {}, token)
         self.assertEqual(status, 409, data)
+
+    # ── Dashboard e relatórios ───────────────────────────────────────────────
+    # (métodos aqui pelo mesmo motivo dos testes de Pedidos acima: não sortear
+    # depois de TestLixeiraEWipe)
+
+    def test_dashboard_agrega_estoque_lotes_e_pedidos(self):
+        # DB é compartilhado por toda a classe (testes anteriores já criaram
+        # produtos/pedidos) — comparar contra uma baseline em vez de valor
+        # absoluto, senão a ordem de execução dos outros testes quebra isto.
+        token = self.login()
+        hoje = time.strftime('%Y-%m-%d')
+        status, base = self.request('GET', '/api/dashboard', token=token)
+        self.assertEqual(status, 200, base)
+
+        pid = self._criar_produto(token)
+        self.request('POST', '/api/entradas', {
+            'tipo': 'compra_direta', 'data_entrega': hoje,
+            'itens': [{'produto_id': pid, 'quantidade_unidades': 10, 'valor_unitario': 3.0,
+                       'data_validade': '2000-01-01'}]
+        }, token)
+        pid_zerado = self._criar_produto(token)
+        ped = self._criar_pedido(token, pid_zerado, quantidade_pedida=5)
+        self.assertEqual(ped['status'], 'aberto')
+
+        status, dash = self.request('GET', '/api/dashboard', token=token)
+        self.assertEqual(status, 200, dash)
+        self.assertEqual(dash['produtos_ativos'] - base['produtos_ativos'], 2)
+        self.assertEqual(dash['produtos_zerados'] - base['produtos_zerados'], 1)
+        self.assertAlmostEqual(dash['estoque_valor_total'] - base['estoque_valor_total'], 30.0)
+        self.assertEqual(dash['lotes_vencidos'] - base['lotes_vencidos'], 1)  # validade 2000-01-01
+        self.assertEqual(dash['pedidos_abertos'] - base['pedidos_abertos'], 1)
+        self.assertEqual(len(dash['movimentacao_mensal']), 6)
+        self.assertEqual(dash['movimentacao_mensal'][-1]['mes'], hoje[:7])
+        delta_mes = dash['movimentacao_mensal'][-1]['entradas'] - base['movimentacao_mensal'][-1]['entradas']
+        self.assertAlmostEqual(delta_mes, 30.0)
+
+    def test_relatorio_movimentacao_filtra_por_periodo_e_soma_totais(self):
+        # data fora do padrão '2026-07-01'/hoje usado pelos outros testes da
+        # classe, pra não ter entrada/saída de outro teste contaminando o filtro.
+        token = self.login()
+        data = '2031-06-15'
+        pid = self._criar_produto(token)
+        self.request('POST', '/api/entradas', {
+            'tipo': 'compra_direta', 'data_entrega': data,
+            'itens': [{'produto_id': pid, 'quantidade_unidades': 10, 'valor_unitario': 2.0}]
+        }, token)
+        self.request('POST', '/api/saidas', {
+            'data': data, 'itens': [{'produto_id': pid, 'quantidade': 4}]
+        }, token)
+        status, rel = self.request('GET', f'/api/relatorio/movimentacao?de={data}&ate={data}', token=token)
+        self.assertEqual(status, 200, rel)
+        self.assertEqual(len(rel['entradas']), 1)
+        self.assertEqual(len(rel['saidas']), 1)
+        self.assertAlmostEqual(rel['totais']['entradas_valor'], 20.0)
+        self.assertAlmostEqual(rel['totais']['saidas_valor'], 4 * rel['saidas'][0]['valor_unitario_medio'])
+
+        status, vazio = self.request('GET', '/api/relatorio/movimentacao?de=2000-01-01&ate=2000-01-02', token=token)
+        self.assertEqual(vazio['entradas'], [])
+        self.assertEqual(vazio['saidas'], [])
+
+    def test_relatorio_pedidos_abertos_so_lista_status_aberto(self):
+        token = self.login()
+        pid_aberto = self._criar_produto(token)
+        ped_aberto = self._criar_pedido(token, pid_aberto, quantidade_pedida=10)
+        pid_atendido = self._criar_produto(token)
+        ped_atendido = self._criar_pedido(token, pid_atendido, quantidade_pedida=5)
+        self.request('POST', '/api/entradas', {
+            'tipo': 'pedido', 'pedido_id': ped_atendido['id'], 'data_entrega': '2026-07-01',
+            'itens': [{'produto_id': pid_atendido, 'quantidade_unidades': 5, 'valor_unitario': 1.0}]
+        }, token)
+
+        status, rel = self.request('GET', '/api/relatorio/pedidos-abertos', token=token)
+        self.assertEqual(status, 200, rel)
+        ids = [p['id'] for p in rel['items']]
+        self.assertIn(ped_aberto['id'], ids)
+        self.assertNotIn(ped_atendido['id'], ids)
+        item = next(p for p in rel['items'] if p['id'] == ped_aberto['id'])['itens'][0]
+        self.assertEqual(item['saldo'], 10)
 
 
 class TestLixeiraEWipe(SGEATestCase):

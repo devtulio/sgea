@@ -5,6 +5,12 @@
 
 ---
 
+## [0.17.0] — 2026-07-19
+
+### Adicionado
+- **Dashboard** — nova tela inicial (aberta automaticamente após o login, no lugar de Estoque), com 6 indicadores: valor total em estoque, produtos ativos, produtos com estoque zerado, lotes vencendo e vencidos (30 dias) e pedidos em aberto — os três últimos levam direto para a tela correspondente. Abaixo, um gráfico de barras (entradas × saídas em valor, últimos 6 meses).
+- **Tela de Relatórios**, com 5 documentos imprimíveis: **Posição de Estoque Valorizado** (quantidade e valor por produto, com próxima validade), **Movimentação por Período** (entradas e saídas detalhadas num intervalo de datas escolhido), **Lotes a Vencer/Vencidos** (mesma janela de 90 dias da tela de Alertas), **Pedidos em Aberto** (itens ainda pendentes de cada pedido) e **Curva ABC** (classificação dos produtos por participação no valor total do estoque, com corte em 80%/95%). Todos seguem o mesmo padrão visual já usado pelo Backup e Integridade e pela Trilha de Auditoria (cabeçalho com brasão, Times New Roman, numeração de página, sem QR — relatórios gerenciais, não documentos formais).
+
 ## [0.16.0] — 2026-07-19
 
 ### Adicionado

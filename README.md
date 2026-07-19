@@ -1,6 +1,6 @@
 # SGEA — Sistema de Gestão de Estoque do Almoxarifado
 
-![Versão](https://img.shields.io/badge/versão-v0.16.0-blue) ![Tecnologia](https://img.shields.io/badge/tecnologia-Python%20%2B%20SQLite-orange) ![Licença](https://img.shields.io/badge/licença-MIT-green) ![Multiusuário](https://img.shields.io/badge/acesso-multiusuário-blueviolet)
+![Versão](https://img.shields.io/badge/versão-v0.17.0-blue) ![Tecnologia](https://img.shields.io/badge/tecnologia-Python%20%2B%20SQLite-orange) ![Licença](https://img.shields.io/badge/licença-MIT-green) ![Multiusuário](https://img.shields.io/badge/acesso-multiusuário-blueviolet)
 
 ## Descrição
 
@@ -14,6 +14,8 @@ Funciona em rede local: um único computador executa o servidor e todos os usuá
 
 ## Funcionalidades Principais
 
+- **Dashboard** — tela inicial após o login, com indicadores de valor em estoque, produtos ativos/zerados, lotes vencendo/vencidos e pedidos em aberto, e um gráfico de entradas × saídas dos últimos 6 meses
+- **Relatórios** — Posição de Estoque Valorizado, Movimentação por Período, Lotes a Vencer/Vencidos, Pedidos em Aberto e Curva ABC, todos imprimíveis no mesmo padrão visual dos demais documentos do sistema
 - **Estoque sempre em unidade de consumo** — produtos guardam um fator de conversão (unidades por embalagem); a entrada informa quantas embalagens chegaram e o sistema converte para unidades automaticamente, permitindo que a saída seja de qualquer quantidade fracionária (ex.: 2 unidades de uma caixa de 12)
 - **Controle de lote e validade** — cada entrada gera um lote com data de validade opcional; o painel do produto mostra o saldo por lote e destaca lotes vencidos
 - **Saída por FEFO** (*first-expire, first-out*) — ao registrar uma saída, o sistema consome primeiro o lote que vence mais cedo, dividindo automaticamente entre lotes quando um não é suficiente
@@ -33,7 +35,7 @@ Funciona em rede local: um único computador executa o servidor e todos os usuá
 - **Backup automático** (JSON + banco de dados SQLite) ao encerrar a última sessão, com rotação configurável, restauração a partir de arquivo e reset de fábrica com confirmação em 3 etapas
 - **Diagnóstico e correção automática de rede** — verifica IP, porta, perfil de rede e firewall
 
-> Fora de escopo nesta versão, planejado para depois: dashboard, relatórios de consumo por período e curva ABC — o schema já foi desenhado para suportá-los sem alterações estruturais. Importação do histórico da planilha também fica para um módulo futuro; o código Fiorilli como chave única de produto já prepara esse caminho.
+> Fora de escopo nesta versão, planejado para depois: importação do histórico da planilha — o código Fiorilli como chave única de produto já prepara esse caminho.
 
 ---
 

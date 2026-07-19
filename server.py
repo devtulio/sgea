@@ -1,4 +1,4 @@
-# SGEA v0.16.0 — Servidor local: SQLite, autenticação, REST API, controle de estoque por lote (FEFO), backup automático
+# SGEA v0.17.0 — Servidor local: SQLite, autenticação, REST API, controle de estoque por lote (FEFO), backup automático
 import http.server
 import socketserver
 import os
@@ -576,6 +576,34 @@ def _lotes_vencendo(dias):
         items.append(d)
     return items
 
+def _movimentacao_mensal(conn):
+    """Série de 6 meses (mais antigo → mais recente) de valor_total de entradas e
+    saídas, agrupada por mês com zero-fill — mês sem movimento aparece com 0, não
+    some da série (senão o gráfico do dashboard distorceria a escala)."""
+    meses = []
+    hoje = time.localtime()
+    for i in range(5, -1, -1):
+        ano, mes = hoje.tm_year, hoje.tm_mon - i
+        while mes <= 0:
+            mes += 12; ano -= 1
+        meses.append(f'{ano:04d}-{mes:02d}')
+    entradas_por_mes = dict(conn.execute('''
+        SELECT strftime('%Y-%m', e.data_entrega) AS m, SUM(ei.valor_total)
+        FROM entrada_itens ei JOIN entradas e ON e.id = ei.entrada_id
+        WHERE e.deleted_at IS NULL AND strftime('%Y-%m', e.data_entrega) >= ?
+        GROUP BY m
+    ''', (meses[0],)).fetchall())
+    saidas_por_mes = dict(conn.execute('''
+        SELECT strftime('%Y-%m', s.data) AS m, SUM(si.valor_total)
+        FROM saida_itens si JOIN saidas s ON s.id = si.saida_id
+        WHERE s.deleted_at IS NULL AND strftime('%Y-%m', s.data) >= ?
+        GROUP BY m
+    ''', (meses[0],)).fetchall())
+    return [
+        {'mes': m, 'entradas': entradas_por_mes.get(m, 0) or 0, 'saidas': saidas_por_mes.get(m, 0) or 0}
+        for m in meses
+    ]
+
 def _find_browser():
     for c in [
         os.path.expandvars(r'%ProgramFiles%\Google\Chrome\Application\chrome.exe'),
@@ -794,6 +822,14 @@ class SGEAHandler(http.server.SimpleHTTPRequestHandler):
 
         elif p == '/api/alertas/validade':
             self._alertas_validade(qs)
+
+        elif p == '/api/dashboard':
+            self._dashboard()
+
+        elif p == '/api/relatorio/movimentacao':
+            self._relatorio_movimentacao(qs)
+        elif p == '/api/relatorio/pedidos-abertos':
+            self._relatorio_pedidos_abertos()
 
         elif p == '/api/pedidos':
             self._list_pedidos(qs)
@@ -1905,6 +1941,80 @@ class SGEAHandler(http.server.SimpleHTTPRequestHandler):
             'backups_db_size_bytes': sum(os.path.getsize(os.path.join(bdir, f)) for f in backups_db),
             'contagens': contagens, 'eventos_recentes': eventos,
         })
+
+    def _dashboard(self):
+        with get_db() as conn:
+            estoque_valor_total = conn.execute('''
+                SELECT COALESCE(SUM(v.estoque_financeiro), 0)
+                FROM v_estoque v JOIN produtos p ON p.id = v.produto_id
+                WHERE p.ativo = 1
+            ''').fetchone()[0]
+            produtos_ativos = conn.execute('SELECT COUNT(*) FROM produtos WHERE ativo=1').fetchone()[0]
+            produtos_zerados = conn.execute('''
+                SELECT COUNT(*) FROM v_estoque v JOIN produtos p ON p.id = v.produto_id
+                WHERE p.ativo = 1 AND v.estoque_fisico = 0
+            ''').fetchone()[0]
+            lotes = _lotes_vencendo(30)
+            pedidos_abertos = 0
+            for pe in conn.execute('SELECT id, status FROM pedidos').fetchall():
+                itens = _pedido_itens_com_saldo(conn, pe['id'])
+                if _pedido_status_agregado(pe['status'], itens) == 'aberto':
+                    pedidos_abertos += 1
+            movimentacao_mensal = _movimentacao_mensal(conn)
+        self._json(200, {
+            'estoque_valor_total': estoque_valor_total,
+            'produtos_ativos': produtos_ativos,
+            'produtos_zerados': produtos_zerados,
+            'lotes_vencendo': sum(1 for l in lotes if not l['vencido']),
+            'lotes_vencidos': sum(1 for l in lotes if l['vencido']),
+            'pedidos_abertos': pedidos_abertos,
+            'movimentacao_mensal': movimentacao_mensal,
+        })
+
+    def _relatorio_movimentacao(self, qs):
+        de = (qs.get('de', [''])[0] or '0000-01-01')
+        ate = (qs.get('ate', [''])[0] or '9999-12-31')
+        with get_db() as conn:
+            entradas = [dict(r) for r in conn.execute('''
+                SELECT e.data_entrega AS data, e.nfe_numero, p.nome AS produto_nome,
+                       ei.quantidade_unidades, ei.valor_unitario, ei.valor_total
+                FROM entrada_itens ei JOIN entradas e ON e.id = ei.entrada_id
+                JOIN produtos p ON p.id = ei.produto_id
+                WHERE e.deleted_at IS NULL AND e.data_entrega BETWEEN ? AND ?
+                ORDER BY e.data_entrega ASC
+            ''', (de, ate)).fetchall()]
+            saidas = [dict(r) for r in conn.execute('''
+                SELECT s.data AS data, s.numero_solicitacao, p.nome AS produto_nome,
+                       si.quantidade, si.valor_unitario_medio, si.valor_total
+                FROM saida_itens si JOIN saidas s ON s.id = si.saida_id
+                JOIN produtos p ON p.id = si.produto_id
+                WHERE s.deleted_at IS NULL AND s.data BETWEEN ? AND ?
+                ORDER BY s.data ASC
+            ''', (de, ate)).fetchall()]
+        self._json(200, {
+            'entradas': entradas, 'saidas': saidas,
+            'totais': {
+                'entradas_valor': sum(e['valor_total'] for e in entradas),
+                'saidas_valor': sum(s['valor_total'] for s in saidas),
+            },
+        })
+
+    def _relatorio_pedidos_abertos(self):
+        with get_db() as conn:
+            rows = conn.execute('''
+                SELECT pe.*, f.razao_social AS fornecedor_nome
+                FROM pedidos pe LEFT JOIN fornecedores f ON f.id = pe.fornecedor_id
+                ORDER BY pe.created_at DESC
+            ''').fetchall()
+            abertos = []
+            for r in rows:
+                d = dict(r)
+                itens = _pedido_itens_com_saldo(conn, d['id'])
+                if _pedido_status_agregado(d['status'], itens) != 'aberto':
+                    continue
+                d['itens'] = [i for i in itens if i['saldo'] > 0]
+                abertos.append(d)
+        self._json(200, {'items': abertos})
 
     # ── Helpers HTTP ─────────────────────────────────────────────────────────
 
