@@ -5,6 +5,11 @@
 
 ---
 
+## [0.15.1] — 2026-07-18
+
+### Alterado
+- **Helpers de exportação consolidados no esqueleto compartilhado** (`base.js`): `_salvarArquivoComo` (diálogo "Salvar como") e `toCSV` (montagem de CSV) deixam de ser duplicados no HTML e passam a vir do `base.js` comum aos 4 sistemas. Sem mudança de comportamento — as exportações do SGEA já usavam o diálogo.
+
 ## [0.15.0] — 2026-07-18
 
 ### Adicionado

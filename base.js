@@ -115,6 +115,46 @@ function setNavActive(id) {
   document.getElementById(id)?.classList.add('active');
 }
 
+// ── Exportação de arquivos ─────────────────────────────────────────────────
+// Salva um arquivo pedindo ao usuário onde salvar (File System Access API,
+// suportada no Chrome/Edge — navegadores recomendados). Em contexto sem suporte
+// (ex.: acesso pela rede por IP, sem localhost) cai no download tradicional pra
+// pasta padrão. Retorna false se o usuário cancelou o diálogo (o chamador não
+// deve seguir como se tivesse salvo). Aceita string ou Blob em `conteudo`.
+async function _salvarArquivoComo(conteudo, nomeArquivo, mimeType) {
+  if (window.showSaveFilePicker) {
+    try {
+      const ext = '.' + nomeArquivo.split('.').pop();
+      const handle = await window.showSaveFilePicker({
+        suggestedName: nomeArquivo,
+        types: [{ description: 'Arquivo', accept: { [mimeType]: [ext] } }],
+      });
+      const writable = await handle.createWritable();
+      await writable.write(conteudo);
+      await writable.close();
+      return true;
+    } catch (e) {
+      if (e.name === 'AbortError') return false;  // usuário cancelou o diálogo
+      // outros erros (ex.: navegador bloqueou por política): cai no fallback abaixo
+    }
+  }
+  const blob = conteudo instanceof Blob ? conteudo : new Blob([conteudo], { type: mimeType });
+  const url = URL.createObjectURL(blob);
+  const link = document.createElement('a');
+  link.href = url;
+  link.download = nomeArquivo;
+  link.click();
+  URL.revokeObjectURL(url);
+  return true;
+}
+
+// Monta uma string CSV (com BOM UTF-8) a partir de um cabeçalho e linhas —
+// cada linha é um array de valores; células são escapadas (aspas duplicadas).
+function toCSV(header, linhas) {
+  const cel = v => `"${String(v ?? '').replace(/"/g, '""')}"`;
+  return '﻿' + [header.map(cel).join(','), ...linhas.map(l => l.map(cel).join(','))].join('\r\n');
+}
+
 // ── Tela de login: mostrar/ocultar senha + aviso de Caps Lock ──────────────
 function _pinToggleOlho() {
   const inp = document.getElementById('pin-input');

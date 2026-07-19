@@ -809,7 +809,7 @@
 // ══════════════════════════════════════════════════════════════
 // API / SESSÃO
 // ══════════════════════════════════════════════════════════════
-const SGEA_VERSION = '0.15.0';
+const SGEA_VERSION = '0.15.1';
 document.title = `SGEA v${SGEA_VERSION}`;
 
 let _apiToken = localStorage.getItem('sgea-token') || null;
@@ -2551,15 +2551,13 @@ function _reconFiltrar() {
 async function _reconExportarPendencias() {
   const lista = (_reconDados?.itens || []).filter(i => i.balde !== 'confere');
   if (!lista.length) { toast('Nenhuma pendência para exportar.', 'info'); return; }
-  const cel = v => `"${String(v ?? '').replace(/"/g, '""')}"`;
   const header = ['Código', 'Item', 'Situação', 'Fiorilli', 'SGEA', 'Delta', 'Unidade', 'Flags'];
   const linhas = lista.map(i => [
     i.codigo, i.descricao || '', (_RECON_BALDE[i.balde]?.label || i.balde),
     i.fiorilli_qtd ?? '', i.sgea_qtd ?? '', i.delta ?? '', i.unidade || '',
     (i.flags || []).map(f => _RECON_FLAG[f] || f).join(' '),
-  ].map(cel).join(','));
-  const csv = '﻿' + [header.map(cel).join(','), ...linhas].join('\r\n');
-  const salvou = await _salvarArquivoComo(csv, `SGEA_reconciliacao_${_reconDados.data_corte || _hojeISO()}.csv`, 'text/csv;charset=utf-8;');
+  ]);
+  const salvou = await _salvarArquivoComo(toCSV(header, linhas), `SGEA_reconciliacao_${_reconDados.data_corte || _hojeISO()}.csv`, 'text/csv;charset=utf-8;');
   if (salvou) toast(`${lista.length} pendência(s) exportada(s).`, 'success');
 }
 
@@ -2641,46 +2639,13 @@ async function _auditFetchAll() {
   return todos;
 }
 
-// Salva um arquivo pedindo ao usuário onde salvar (File System Access API,
-// suportada no Chrome/Edge); em navegadores/contexto sem suporte (ex.: acesso por
-// IP na rede local, sem localhost), cai no download tradicional pra pasta padrão.
-// Retorna false se o usuário cancelou o diálogo. Aceita string ou Blob em conteudo.
-async function _salvarArquivoComo(conteudo, nomeArquivo, mimeType) {
-  if (window.showSaveFilePicker) {
-    try {
-      const ext = '.' + nomeArquivo.split('.').pop();
-      const handle = await window.showSaveFilePicker({
-        suggestedName: nomeArquivo,
-        types: [{ description: 'Arquivo', accept: { [mimeType]: [ext] } }],
-      });
-      const writable = await handle.createWritable();
-      await writable.write(conteudo);
-      await writable.close();
-      return true;
-    } catch (e) {
-      if (e.name === 'AbortError') return false; // usuário cancelou o diálogo
-      // outros erros (ex.: navegador bloqueou por política): cai no fallback abaixo
-    }
-  }
-  const blob = conteudo instanceof Blob ? conteudo : new Blob([conteudo], { type: mimeType });
-  const url = URL.createObjectURL(blob);
-  const link = document.createElement('a');
-  link.href = url;
-  link.download = nomeArquivo;
-  link.click();
-  URL.revokeObjectURL(url);
-  return true;
-}
-
 async function exportarAuditoriaCSV() {
   const lista = await _auditFetchAll();
-  const cel = v => `"${String(v ?? '').replace(/"/g, '""')}"`;
   const header = ['Data/Hora', 'Usuário', 'Ação', 'Detalhes'];
   const linhas = lista.map(a => [
     fmtDateTime(a.ts), a.user_nome || '', _AUDIT_EVENT_LABELS[a.type] || a.type || '', a.detail || '',
-  ].map(cel).join(','));
-  const csv = '﻿' + [header.map(cel).join(','), ...linhas].join('\r\n');
-  const salvou = await _salvarArquivoComo(csv, `SGEA_auditoria_${new Date().toISOString().slice(0, 10)}.csv`, 'text/csv;charset=utf-8;');
+  ]);
+  const salvou = await _salvarArquivoComo(toCSV(header, linhas), `SGEA_auditoria_${new Date().toISOString().slice(0, 10)}.csv`, 'text/csv;charset=utf-8;');
   if (salvou) toast(`${lista.length} registro(s) exportado(s).`, 'success');
 }
 
