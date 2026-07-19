@@ -5,6 +5,11 @@
 
 ---
 
+## [0.15.0] — 2026-07-18
+
+### Adicionado
+- **Diálogo "Salvar como" ao exportar arquivos** — as exportações geradas no navegador (CSV da Trilha de Auditoria, CSV de pendências da Reconciliação e o backup de segurança baixado antes do reset de fábrica) passam a abrir o explorador nativo do Windows para escolher a pasta de destino (File System Access API `showSaveFilePicker`), em vez de salvar direto na pasta de Downloads. Em contexto sem suporte (ex.: acesso pela rede por IP, sem `localhost`), cai automaticamente no download tradicional, sem quebrar. Alinha o SGEA ao comportamento dos sistemas irmãos.
+
 ## [0.14.0] — 2026-07-18
 
 ### Adicionado
