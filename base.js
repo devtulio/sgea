@@ -155,6 +155,125 @@ function toCSV(header, linhas) {
   return '﻿' + [header.map(cel).join(','), ...linhas.map(l => l.map(cel).join(','))].join('\r\n');
 }
 
+// ── Exportar Excel (.xlsx) ─────────────────────────────────────────────────
+// Writer OOXML mínimo, sem dependências: ZIP em modo "store" (sem compressão)
+// + XML mínimo (1 planilha, células inline-string ou numéricas) — evita puxar
+// uma lib de compressão só para gerar uma tabela simples. Chame _exportarXlsx.
+function _crc32(bytes) {
+  let crc = 0xFFFFFFFF;
+  for (let i = 0; i < bytes.length; i++) {
+    crc ^= bytes[i];
+    for (let j = 0; j < 8; j++) crc = (crc >>> 1) ^ (0xEDB88320 & -(crc & 1));
+  }
+  return (crc ^ 0xFFFFFFFF) >>> 0;
+}
+function _zipStore(files) {
+  const now = new Date();
+  const dosTime = ((now.getHours() << 11) | (now.getMinutes() << 5) | (now.getSeconds() >> 1)) & 0xFFFF;
+  const dosDate = (((now.getFullYear() - 1980) << 9) | ((now.getMonth() + 1) << 5) | now.getDate()) & 0xFFFF;
+  const enc = new TextEncoder();
+  const parts = [];
+  const central = [];
+  let offset = 0;
+  for (const f of files) {
+    const nameBytes = enc.encode(f.name);
+    const crc = _crc32(f.data);
+    const size = f.data.length;
+
+    const local = new Uint8Array(30 + nameBytes.length);
+    const lv = new DataView(local.buffer);
+    lv.setUint32(0, 0x04034b50, true);
+    lv.setUint16(4, 20, true);
+    lv.setUint16(6, 0, true);
+    lv.setUint16(8, 0, true);
+    lv.setUint16(10, dosTime, true);
+    lv.setUint16(12, dosDate, true);
+    lv.setUint32(14, crc, true);
+    lv.setUint32(18, size, true);
+    lv.setUint32(22, size, true);
+    lv.setUint16(26, nameBytes.length, true);
+    lv.setUint16(28, 0, true);
+    local.set(nameBytes, 30);
+    parts.push(local, f.data);
+
+    const centralEntry = new Uint8Array(46 + nameBytes.length);
+    const cv = new DataView(centralEntry.buffer);
+    cv.setUint32(0, 0x02014b50, true);
+    cv.setUint16(4, 20, true);
+    cv.setUint16(6, 20, true);
+    cv.setUint16(8, 0, true);
+    cv.setUint16(10, 0, true);
+    cv.setUint16(12, dosTime, true);
+    cv.setUint16(14, dosDate, true);
+    cv.setUint32(16, crc, true);
+    cv.setUint32(20, size, true);
+    cv.setUint32(24, size, true);
+    cv.setUint16(28, nameBytes.length, true);
+    cv.setUint32(42, offset, true);
+    centralEntry.set(nameBytes, 46);
+    central.push(centralEntry);
+
+    offset += local.length + f.data.length;
+  }
+  const centralSize   = central.reduce((s, c) => s + c.length, 0);
+  const centralOffset = offset;
+  const end = new Uint8Array(22);
+  const ev = new DataView(end.buffer);
+  ev.setUint32(0, 0x06054b50, true);
+  ev.setUint16(8, files.length, true);
+  ev.setUint16(10, files.length, true);
+  ev.setUint32(12, centralSize, true);
+  ev.setUint32(16, centralOffset, true);
+  return new Blob([...parts, ...central, end], { type: 'application/vnd.openxmlformats-officedocument.spreadsheetml.sheet' });
+}
+function _colLetter(n) {
+  let s = '', i = n + 1;
+  while (i > 0) { const r = (i - 1) % 26; s = String.fromCharCode(65 + r) + s; i = Math.floor((i - 1) / 26); }
+  return s;
+}
+function _xlsxCellXml(col, row, value) {
+  const ref = `${col}${row}`;
+  if (value == null || value === '') return `<c r="${ref}"/>`;
+  if (typeof value === 'number' && isFinite(value)) return `<c r="${ref}"><v>${value}</v></c>`;
+  const esc = String(value).replace(/&/g,'&amp;').replace(/</g,'&lt;').replace(/>/g,'&gt;');
+  return `<c r="${ref}" t="inlineStr"><is><t xml:space="preserve">${esc}</t></is></c>`;
+}
+// Retorna false se o usuário cancelou o diálogo "Salvar como" (ver _salvarArquivoComo).
+async function _exportarXlsx(nomeArquivo, cabecalho, linhas) {
+  const rowsXml = [cabecalho, ...linhas].map((row, ri) =>
+    `<row r="${ri + 1}">${row.map((v, ci) => _xlsxCellXml(_colLetter(ci), ri + 1, v)).join('')}</row>`
+  ).join('');
+  const sheetXml = `<?xml version="1.0" encoding="UTF-8" standalone="yes"?>
+<worksheet xmlns="http://schemas.openxmlformats.org/spreadsheetml/2006/main"><sheetData>${rowsXml}</sheetData></worksheet>`;
+  const contentTypes = `<?xml version="1.0" encoding="UTF-8" standalone="yes"?>
+<Types xmlns="http://schemas.openxmlformats.org/package/2006/content-types">
+<Default Extension="rels" ContentType="application/vnd.openxmlformats-package.relationships+xml"/>
+<Default Extension="xml" ContentType="application/xml"/>
+<Override PartName="/xl/workbook.xml" ContentType="application/vnd.openxmlformats-officedocument.spreadsheetml.sheet.main+xml"/>
+<Override PartName="/xl/worksheets/sheet1.xml" ContentType="application/vnd.openxmlformats-officedocument.spreadsheetml.worksheet+xml"/>
+</Types>`;
+  const rootRels = `<?xml version="1.0" encoding="UTF-8" standalone="yes"?>
+<Relationships xmlns="http://schemas.openxmlformats.org/package/2006/relationships">
+<Relationship Id="rId1" Type="http://schemas.openxmlformats.org/officeDocument/2006/relationships/officeDocument" Target="xl/workbook.xml"/>
+</Relationships>`;
+  const workbookXml = `<?xml version="1.0" encoding="UTF-8" standalone="yes"?>
+<workbook xmlns="http://schemas.openxmlformats.org/spreadsheetml/2006/main" xmlns:r="http://schemas.openxmlformats.org/officeDocument/2006/relationships">
+<sheets><sheet name="Dados" sheetId="1" r:id="rId1"/></sheets></workbook>`;
+  const workbookRels = `<?xml version="1.0" encoding="UTF-8" standalone="yes"?>
+<Relationships xmlns="http://schemas.openxmlformats.org/package/2006/relationships">
+<Relationship Id="rId1" Type="http://schemas.openxmlformats.org/officeDocument/2006/relationships/worksheet" Target="worksheets/sheet1.xml"/>
+</Relationships>`;
+  const enc = new TextEncoder();
+  const blob = _zipStore([
+    { name: '[Content_Types].xml',        data: enc.encode(contentTypes) },
+    { name: '_rels/.rels',                data: enc.encode(rootRels) },
+    { name: 'xl/workbook.xml',            data: enc.encode(workbookXml) },
+    { name: 'xl/_rels/workbook.xml.rels', data: enc.encode(workbookRels) },
+    { name: 'xl/worksheets/sheet1.xml',   data: enc.encode(sheetXml) },
+  ]);
+  return _salvarArquivoComo(blob, nomeArquivo, 'application/vnd.openxmlformats-officedocument.spreadsheetml.sheet');
+}
+
 // ── Tela de login: mostrar/ocultar senha + aviso de Caps Lock ──────────────
 function _pinToggleOlho() {
   const inp = document.getElementById('pin-input');

@@ -3,7 +3,7 @@
 <head>
 <meta charset="UTF-8">
 <meta name="viewport" content="width=device-width, initial-scale=1.0">
-<title>Manual Operacional — SGEA v0.19.0</title>
+<title>Manual Operacional — SGEA v0.20.0</title>
 <style>
   * { box-sizing: border-box; margin: 0; padding: 0; }
   body { font-family: 'Times New Roman', Times, serif; font-size: 12pt; color: #000; background: #f5f5f5; }
@@ -63,7 +63,7 @@
     <div class="cover-title">Manual Operacional</div>
     <div class="cover-subtitle">SGEA — Sistema de Gestão de Estoque do Almoxarifado</div>
     <div class="cover-system">Entradas, Saídas, Lotes/Validade e cadastros de apoio</div>
-    <div class="cover-version">Versão v0.19.0</div>
+    <div class="cover-version">Versão v0.20.0</div>
     <br>
     <div style="font-size:11pt; color:#555; line-height:1.8;">
       Aplicação web multiusuário para o Almoxarifado<br>
@@ -168,8 +168,8 @@
     <li><strong>Certidões</strong> — registro manual de certidões (Federal/RFB, Estadual, Municipal, FGTS, Trabalhista ou Outra), cada uma com data de emissão e validade; o sistema calcula automaticamente se está válida, vencendo ou vencida</li>
     <li><strong>Sanções</strong> — registro manual de penalidades aplicadas ao fornecedor (Advertência, Multa, Suspensão Temporária, Impedimento de Licitar ou Declaração de Inidoneidade, conforme o Art. 156 da Lei 14.133/2021), com tipo, data de aplicação, prazo final (se houver) e fundamentação. Uma sanção sem prazo final ou com prazo ainda não vencido aparece como <strong>Vigente</strong>; do contrário, <strong>Encerrada</strong></li>
   </ul>
-  <p>Dois relatórios imprimíveis de sanções estão disponíveis: um por fornecedor (dentro da aba Sanções) e um global com todos os fornecedores (botão na tela de Fornecedores). São os dois únicos relatórios do SGEA com <strong>código QR de autenticidade</strong> no rodapé — os demais relatórios do sistema são gerenciais e não usam QR.</p>
-  <p>O botão <strong>Importar backup</strong> lê um arquivo de backup do SGCA ou do SGDP e traz os fornecedores de lá: fornecedores com o mesmo CNPJ são atualizados (preservando certidões e sanções já cadastradas no SGEA), os demais são adicionados — nada é apagado.</p>
+  <p>Dois relatórios imprimíveis de sanções estão disponíveis: um por fornecedor (dentro da aba Sanções) e um global com todos os fornecedores (botão <strong>Relatório de Sanções</strong> na tela). São os dois únicos relatórios do SGEA com <strong>código QR de autenticidade</strong> no rodapé — os demais relatórios do sistema são gerenciais e não usam QR.</p>
+  <p>A barra de ações no topo da tela dá conta do resto (padrão idêntico ao SGCA/SGCD): <strong>Exportar CSV</strong> e <strong>Exportar Excel</strong> geram a lista de fornecedores — respeitando a busca e o filtro ativos — em .csv ou planilha .xlsx; <strong>Relatório</strong> abre um relatório imprimível de fornecedores; e <strong>Importar CSV</strong> cadastra fornecedores em lote a partir de uma planilha (basta a coluna <code>cnpj</code> com 14 dígitos; marcando a opção, cada CNPJ é consultado na Receita automaticamente, preenchendo os demais campos). A lista tem busca por CNPJ/razão social, ordenação (mais recente, mais antigo, A→Z, Z→A) e os filtros Todos/Ativos/Inativos/Pendências.</p>
   <div class="nota">Excluir um fornecedor não é definitivo: ele vai para a Lixeira (junto com Entradas e Saídas excluídas) e pode ser restaurado por até 30 dias.</div>
 
   <h2 id="sec11">11. Configurações</h2>
@@ -208,6 +208,7 @@
   <h2 id="sec15">15. Histórico de Versões</h2>
   <table>
     <tr><th>Versão</th><th>Data</th><th>Resumo</th></tr>
+    <tr><td>0.20.0</td><td>19/07/2026</td><td>Barra de ações de Fornecedores em <strong>paridade total com o SGCA</strong>: Exportar CSV, Exportar Excel (.xlsx), Relatório, Importar CSV, busca com limpar, ordenação e contagem de resultados. Brasão da barra lateral em 80×80 (igual aos irmãos). Removido o "Importar backup" (JSON) da tela.</td></tr>
     <tr><td>0.19.0</td><td>19/07/2026</td><td>Filtros <strong>Todos/Ativos/Inativos/Pendências</strong> na tela de Fornecedores (paridade com SGCA/SGCD); nome do órgão no topo da barra lateral, igual aos sistemas irmãos.</td></tr>
     <tr><td>0.18.0</td><td>19/07/2026</td><td><strong>Cadastro rico de Fornecedores</strong>: consulta automática de CNPJ (ReceitaWS/BrasilAPI) com endereço, CNAE e quadro societário; consulta de sanções federais (CEIS/CNEP); certidões e sanções manuais (Art. 156, Lei 14.133/2021) com 2 relatórios imprimíveis (os únicos do SGEA com QR code de autenticidade); importação de fornecedores de um backup do SGCA/SGDP; e soft-delete com restauração pela Lixeira.</td></tr>
     <tr><td>0.17.0</td><td>19/07/2026</td><td><strong>Dashboard</strong> (tela inicial após o login, com 6 indicadores e gráfico de entradas × saídas dos últimos 6 meses) e tela de <strong>Relatórios</strong> com 5 documentos imprimíveis: Posição de Estoque Valorizado, Movimentação por Período, Lotes a Vencer/Vencidos, Pedidos em Aberto e Curva ABC.</td></tr>

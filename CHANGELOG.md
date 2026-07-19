@@ -5,6 +5,20 @@
 
 ---
 
+## [0.20.0] — 2026-07-19
+
+### Adicionado
+- **Barra de ações de Fornecedores em paridade total com o SGCA** — a tela ganhou **Exportar CSV**, **Exportar Excel** (planilha .xlsx), **Relatório** de fornecedores imprimível e **Importar CSV** (cadastro em lote a partir de planilha; basta a coluna `cnpj`, com consulta automática opcional à Receita para preencher os demais campos). A busca ganhou botão de limpar (✕), **ordenação** (mais recente / mais antigo / A→Z / Z→A) e **contagem de resultados**.
+- **Motor de exportação .xlsx** (writer OOXML mínimo, sem dependências) adicionado ao `base.js` compartilhado da família.
+
+### Alterado
+- **Brasão da barra lateral em 80×80** (antes 56×56), alinhando ao SGCD/SGCA/SGDP.
+- Botão de sanções renomeado para **"Relatório de Sanções"** (ícone e rótulo idênticos ao SGCA).
+- Campo de busca e seletor de ordenação passam a usar a classe `.filters` do padrão, casando fundo/borda/foco com o SGCA no tema escuro.
+
+### Removido
+- **"Importar backup" (JSON do SGCA/SGDP)** saiu da tela de Fornecedores, para deixar a barra idêntica ao padrão. A importação em lote agora é via **Importar CSV**. (O endpoint `POST /api/fornecedores/import` do servidor foi mantido.)
+
 ## [0.19.0] — 2026-07-19
 
 ### Adicionado

@@ -22,7 +22,7 @@
 
   /* SGEA-specific: brasão menor e escondido até ter imagem (SGCD/SGCA mostram
      sempre, 80px) — preservado como estava. */
-  .sidebar-brasao { width: 56px; height: 56px; object-fit: contain; display: none; margin: 0 auto 8px; filter: drop-shadow(0 2px 4px rgba(0,0,0,.4)); }
+  .sidebar-brasao { width: 80px; height: 80px; object-fit: contain; display: none; margin: 0 auto 8px; filter: drop-shadow(0 2px 4px rgba(0,0,0,.4)); }
 
   /* Dark mode alinhado ao padrão neutro canônico do base.css (#1a1a1a fundo,
      #2a2a2a cards). Fundo/texto do body e tokens --gray-* vêm do base.css. */
@@ -138,6 +138,19 @@
   .forn-cert-badge.expired  { background: var(--danger-light); color: var(--danger); }
   .forn-cert-badge.none     { background: var(--gray-100); color: var(--gray-500); }
   .forn-cert-actions { display: flex; gap: 4px; flex-shrink: 0; }
+  .filters { display: flex; gap: 10px; margin-bottom: 16px; flex-wrap: wrap; }
+  .filters input, .filters select {
+    border: 1px solid var(--gray-200); border-radius: var(--radius);
+    padding: 8px 12px; font-size: .875rem; background: #fff;
+    color: var(--gray-900); outline: none;
+  }
+  .filters input { flex: 1; min-width: 180px; }
+  .filters input:focus, .filters select:focus { border-color: var(--brand); outline: 2px solid color-mix(in srgb, var(--brand) 20%, transparent); }
+  body.dark .filters input, body.dark .filters select { background: #2a2a2a; }
+  .csv-preview-table { width: 100%; border-collapse: collapse; font-size: .76rem; }
+  .csv-preview-table th { background: var(--gray-100); padding: 4px 8px; text-align: left; border: 1px solid var(--gray-200); font-weight: 600; }
+  .csv-preview-table td { padding: 4px 8px; border: 1px solid var(--gray-200); }
+  .csv-preview-table tr:nth-child(even) { background: var(--gray-50); }
   .forn-list-item { background: var(--gray-50); border: 1px solid var(--gray-200); border-radius: var(--radius); padding: 12px 14px; margin-bottom: 10px; cursor: pointer; transition: border-color .15s; }
   .forn-list-item.expanded { border-color: var(--gray-400); cursor: default; }
   .forn-list-item.editing  { border-color: var(--brand); cursor: default; }
@@ -366,15 +379,44 @@
   <div id="view-fornecedores" class="view">
     <div class="dash-top">
       <h2>Fornecedores</h2>
-      <div class="view-actions">
-        <div class="search-box">
-          <span>🔎</span>
-          <input type="text" id="forn-search" placeholder="Buscar por razão social ou CNPJ..." oninput="_debouncedRenderForn()" aria-label="Buscar fornecedor">
-        </div>
-        <button class="btn btn-outline" onclick="abrirImportarFornecedoresModal()">Importar backup</button>
-        <button class="btn btn-outline" onclick="gerarRelatorioSancoesGlobal()">📄 Sanções (todos)</button>
-        <button class="btn btn-primary" onclick="openFornModal()">+ Novo Fornecedor</button>
+      <div style="display:flex;gap:8px;flex-wrap:wrap">
+        <button class="btn btn-outline" onclick="exportarFornecedoresCSV()">
+          <svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true"><path d="M21 15v4a2 2 0 0 1-2 2H5a2 2 0 0 1-2-2v-4"/><polyline points="7 10 12 15 17 10"/><line x1="12" y1="15" x2="12" y2="3"/></svg>
+          Exportar CSV
+        </button>
+        <button class="btn btn-outline" onclick="exportarFornecedoresXlsx()">
+          <svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true"><path d="M21 15v4a2 2 0 0 1-2 2H5a2 2 0 0 1-2-2v-4"/><polyline points="7 10 12 15 17 10"/><line x1="12" y1="15" x2="12" y2="3"/></svg>
+          Exportar Excel
+        </button>
+        <button class="btn btn-outline" onclick="gerarRelatorioFornecedores()">
+          <svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true"><path d="M14 2H6a2 2 0 0 0-2 2v16a2 2 0 0 0 2 2h12a2 2 0 0 0 2-2V8z"/><polyline points="14 2 14 8 20 8"/><line x1="16" y1="13" x2="8" y2="13"/><line x1="16" y1="17" x2="8" y2="17"/><polyline points="10 9 9 9 8 9"/></svg>
+          Relatório
+        </button>
+        <button class="btn btn-outline" onclick="gerarRelatorioSancoesGlobal()" title="Relatório de sanções de todos os fornecedores">
+          <svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><circle cx="12" cy="12" r="10"/><line x1="12" y1="8" x2="12" y2="12"/><line x1="12" y1="16" x2="12.01" y2="16"/></svg>
+          Relatório de Sanções
+        </button>
+        <button class="btn btn-outline" onclick="abrirModalCsv()" title="Importar fornecedores de arquivo CSV">
+          <svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><path d="M21 15v4a2 2 0 0 1-2 2H5a2 2 0 0 1-2-2v-4"/><polyline points="17 8 12 3 7 8"/><line x1="12" y1="3" x2="12" y2="15"/></svg>
+          Importar CSV
+        </button>
+        <button class="btn btn-primary" onclick="openFornModal()">
+          <svg width="14" height="14" viewBox="0 0 14 14" fill="none"><path d="M7 1v12M1 7h12" stroke="#fff" stroke-width="2" stroke-linecap="round"/></svg>
+          Novo Fornecedor
+        </button>
       </div>
+    </div>
+    <div class="filters" style="flex-wrap:nowrap;align-items:center">
+      <div style="position:relative;flex:1;min-width:180px">
+        <input type="text" id="forn-search" placeholder="Buscar por CNPJ, razão social…" oninput="_debouncedRenderForn()" aria-label="Buscar fornecedor" style="width:100%;padding-right:28px">
+        <button onclick="limparBuscaForn()" id="forn-search-clear" title="Limpar busca" style="display:none;position:absolute;right:7px;top:50%;transform:translateY(-50%);background:none;border:none;cursor:pointer;color:var(--gray-400);font-size:.85rem;padding:0;line-height:1">✕</button>
+      </div>
+      <select id="forn-sort" onchange="renderFornecedores()" title="Ordenar fornecedores" style="flex:0 0 auto;width:170px">
+        <option value="recent">↓ Mais recente</option>
+        <option value="oldest">↑ Mais antigo</option>
+        <option value="az">A → Z</option>
+        <option value="za">Z → A</option>
+      </select>
     </div>
     <div id="forn-filtro-buttons" style="display:flex;gap:8px;margin:10px 0;flex-wrap:wrap">
       <button class="btn btn-outline btn-sm forn-filtro-btn active" data-filtro="" onclick="setFornFiltro('')">Todos</button>
@@ -382,6 +424,7 @@
       <button class="btn btn-outline btn-sm forn-filtro-btn" data-filtro="inativos" onclick="setFornFiltro('inativos')">Inativos</button>
       <button class="btn btn-outline btn-sm forn-filtro-btn" data-filtro="pendencias" onclick="setFornFiltro('pendencias')">Pendências</button>
     </div>
+    <div id="forn-results-info" style="display:none;font-size:.75rem;color:var(--gray-500);margin-bottom:8px;padding:0 2px"></div>
     <div id="forn-list"></div>
   </div>
 
@@ -409,20 +452,56 @@
     </div>
   </div>
 
-  <!-- ── Fornecedores: importar backup (SGCA/SGCD) ── -->
-  <div class="overlay hidden" id="forn-import-overlay" role="dialog" aria-modal="true" aria-labelledby="forn-import-titulo">
-    <div class="modal" style="max-width:460px">
+  <!-- ── Fornecedores: importar via CSV ── -->
+  <div class="overlay hidden" id="modal-csv" role="dialog" aria-modal="true" aria-labelledby="modal-csv-titulo">
+    <div class="modal" style="max-width:680px;width:96vw">
       <div class="modal-header">
-        <h2 id="forn-import-titulo">Importar Fornecedores</h2>
-        <button class="btn btn-ghost btn-icon" onclick="fecharImportarFornecedoresModal()">✕</button>
+        <h2 id="modal-csv-titulo">Importar Fornecedores via CSV</h2>
+        <button class="btn btn-ghost btn-icon" onclick="fecharModalCsv()">✕</button>
       </div>
       <div class="modal-body">
-        <p style="font-size:.82rem;color:var(--gray-600);margin-bottom:10px">Selecione um arquivo de backup JSON do SGCA ou SGCD. Fornecedores com o mesmo CNPJ são atualizados (preservando certidões/sanções já cadastradas aqui); os demais são adicionados. Nada é apagado.</p>
-        <input type="file" id="forn-import-file" accept=".json">
+        <div id="csv-step-upload">
+          <div style="background:var(--gray-50);border:1px solid var(--gray-200);border-radius:8px;padding:12px 16px;margin-bottom:14px;font-size:.8rem;color:var(--gray-600)">
+            <div style="font-weight:600;margin-bottom:6px;color:var(--gray-700)">Formato do arquivo</div>
+            O arquivo deve ser CSV com separador <strong>vírgula (,)</strong> ou <strong>ponto e vírgula (;)</strong>.<br>
+            A primeira linha deve conter os nomes das colunas (cabeçalho).<br>
+            Campo obrigatório: <strong>cnpj</strong> (14 dígitos). Os demais são opcionais.<br>
+            Se marcado, os dados serão consultados automaticamente na Receita Federal.
+            <div style="margin-top:10px">
+              <button class="btn btn-outline btn-sm" onclick="baixarModeloCsv()" style="gap:6px">
+                <svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><path d="M21 15v4a2 2 0 0 1-2 2H5a2 2 0 0 1-2-2v-4"/><polyline points="7 10 12 15 17 10"/><line x1="12" y1="15" x2="12" y2="3"/></svg>
+                Baixar modelo CSV
+              </button>
+            </div>
+          </div>
+          <div style="border:2px dashed var(--gray-300);border-radius:8px;padding:32px;text-align:center;cursor:pointer" onclick="document.getElementById('csv-file-input').click()" role="button" tabindex="0">
+            <div style="font-size:2rem;margin-bottom:8px">📂</div>
+            <div style="font-size:.85rem;color:var(--gray-600)">Clique para selecionar o arquivo CSV</div>
+            <input type="file" id="csv-file-input" accept=".csv,text/csv" style="display:none" onchange="carregarCsv(this)">
+          </div>
+        </div>
+        <div id="csv-step-preview" style="display:none">
+          <div style="display:flex;justify-content:space-between;align-items:center;margin-bottom:10px">
+            <span id="csv-preview-count" style="font-size:.82rem;color:var(--gray-600)"></span>
+            <label style="font-size:.78rem;display:flex;align-items:center;gap:6px;cursor:pointer">
+              <input type="checkbox" id="csv-opt-cnpj" checked style="accent-color:var(--brand)">
+              Consultar CNPJ automaticamente
+            </label>
+          </div>
+          <div style="max-height:280px;overflow-y:auto">
+            <table class="csv-preview-table" id="csv-preview-table"></table>
+          </div>
+        </div>
+        <div id="csv-step-progress" style="display:none;text-align:center;padding:24px">
+          <div style="font-size:.9rem;color:var(--gray-600);margin-bottom:12px" id="csv-progress-msg">Importando…</div>
+          <div style="background:var(--gray-200);border-radius:99px;height:8px;overflow:hidden">
+            <div id="csv-progress-bar" style="height:100%;background:var(--brand);border-radius:99px;transition:width .3s;width:0%"></div>
+          </div>
+        </div>
       </div>
       <div class="modal-footer">
-        <button class="btn btn-outline" onclick="fecharImportarFornecedoresModal()">Cancelar</button>
-        <button class="btn btn-primary" onclick="importarFornecedoresArquivo()">Importar</button>
+        <button class="btn btn-ghost" onclick="fecharModalCsv()">Cancelar</button>
+        <button class="btn btn-primary" id="btn-csv-import" style="display:none" onclick="importarCsv()">Importar</button>
       </div>
     </div>
   </div>
@@ -987,7 +1066,7 @@
 // ══════════════════════════════════════════════════════════════
 // API / SESSÃO
 // ══════════════════════════════════════════════════════════════
-const SGEA_VERSION = '0.19.0';
+const SGEA_VERSION = '0.20.0';
 document.title = `SGEA v${SGEA_VERSION}`;
 
 let _apiToken = localStorage.getItem('sgea-token') || null;
@@ -1891,9 +1970,25 @@ async function renderFornecedores() {
   const all = await listarFornecedores();
   const cnpjDupSet = _cnpjDuplicadosSet(all);
   const q = (document.getElementById('forn-search')?.value || '').toLowerCase();
+  const sort = document.getElementById('forn-sort')?.value || 'recent';
+
+  const clearBtn = document.getElementById('forn-search-clear');
+  if (clearBtn) clearBtn.style.display = q ? '' : 'none';
+
+  const _ts = f => { const t = f.updatedAt || f.createdAt || f.addedAt || 0; return typeof t === 'string' ? (Date.parse(t) || 0) : t; };
   const lista = all
     .filter(f => _fornecedorPassaFiltro(f, _fornFiltro, cnpjDupSet) && (!q || f.razao_social?.toLowerCase().includes(q) || f.cnpj?.includes(q) || f.nome_fantasia?.toLowerCase().includes(q)))
-    .sort((a, b) => (a.razao_social || '').localeCompare(b.razao_social || '', 'pt-BR'));
+    .sort((a, b) => {
+      if (sort === 'az') return (a.razao_social || '').localeCompare(b.razao_social || '', 'pt-BR');
+      if (sort === 'za') return (b.razao_social || '').localeCompare(a.razao_social || '', 'pt-BR');
+      return sort === 'oldest' ? _ts(a) - _ts(b) : _ts(b) - _ts(a);
+    });
+
+  const info = document.getElementById('forn-results-info');
+  if (info) {
+    if (q) { info.style.display = ''; info.textContent = `${lista.length} de ${all.length} fornecedor${all.length !== 1 ? 'es' : ''} encontrado${lista.length !== 1 ? 's' : ''}`; }
+    else info.style.display = 'none';
+  }
 
   const el = document.getElementById('forn-list');
   if (!lista.length) {
@@ -2332,37 +2427,6 @@ async function saveFornModal() {
   await renderFornecedores();
 }
 
-// ── Importar fornecedores de um backup (SGCA/SGCD) ────────────────────────
-function abrirImportarFornecedoresModal() {
-  document.getElementById('forn-import-file').value = '';
-  document.getElementById('forn-import-overlay').classList.remove('hidden');
-}
-function fecharImportarFornecedoresModal() {
-  document.getElementById('forn-import-overlay').classList.add('hidden');
-}
-async function importarFornecedoresArquivo() {
-  const file = document.getElementById('forn-import-file').files[0];
-  if (!file) { toast('Selecione um arquivo.', 'error'); return; }
-  let bk;
-  try { bk = JSON.parse(await file.text()); }
-  catch { toast('Arquivo inválido — selecione um backup JSON do SGCA/SGCD.', 'error'); return; }
-  const forns = Array.isArray(bk.fornecedores) ? bk.fornecedores : [];
-  if (!forns.length) { toast('Nenhum fornecedor encontrado no arquivo.', 'error'); return; }
-  const ok = await customConfirm(
-    `O arquivo tem ${forns.length} fornecedor(es). Fornecedores com o mesmo CNPJ serão atualizados (preservando certidões/sanções já cadastradas aqui); os demais serão adicionados. Nada é apagado.`,
-    { title: 'Importar Fornecedores', icon: '🏢', okLabel: 'Importar', okClass: 'btn-primary' }
-  );
-  if (!ok) return;
-  toast('Importando fornecedores…', '');
-  const r = await API.post('/api/fornecedores/import', { fornecedores: forns });
-  const d = await API.json(r);
-  if (!r?.ok) { toast('Erro ao importar: ' + (d?.error || 'falha no servidor'), 'error'); return; }
-  fecharImportarFornecedoresModal();
-  await _auditEvento('FORNECEDOR_IMPORTADO', `${d.novos} novo(s), ${d.atualizados} atualizado(s)${d.ignorados ? `, ${d.ignorados} ignorado(s)` : ''}`);
-  toast(`Importação concluída: ${d.novos} novo(s), ${d.atualizados} atualizado(s)${d.ignorados ? `, ${d.ignorados} ignorado(s)` : ''}.`, 'success');
-  if (document.getElementById('view-fornecedores').classList.contains('active')) await renderFornecedores();
-}
-
 // ── Consulta CEIS/CNEP (Portal da Transparência) ──────────────────────────
 async function consultarCeisCnep(fornId, cnpjDigits) {
   const el = document.getElementById(`forn-ceis-cnep-${fornId}`);
@@ -2617,6 +2681,176 @@ async function gerarRelatorioSancoesGlobal() {
       <tbody>${tbody}</tbody>
     </table>`;
   _abrirDocumentoQR(org, 'Relatório Global de Sanções e Penalidades', 'Todos os fornecedores cadastrados', corpo, 'Relatório Global de Sanções');
+}
+
+function limparBuscaForn() {
+  const inp = document.getElementById('forn-search');
+  if (inp) inp.value = '';
+  renderFornecedores();
+}
+
+// Lista de fornecedores respeitando busca + filtro ativos (a mesma da tela),
+// ordenada A→Z para uma saída estável em CSV/Excel/Relatório.
+async function _fornExportLista() {
+  const all = await listarFornecedores();
+  const cnpjDupSet = _cnpjDuplicadosSet(all);
+  const q = (document.getElementById('forn-search')?.value || '').toLowerCase();
+  return all
+    .filter(f => _fornecedorPassaFiltro(f, _fornFiltro, cnpjDupSet) && (!q || f.razao_social?.toLowerCase().includes(q) || f.cnpj?.includes(q) || f.nome_fantasia?.toLowerCase().includes(q)))
+    .sort((a, b) => (a.razao_social || '').localeCompare(b.razao_social || '', 'pt-BR'));
+}
+const _FORN_EXPORT_COLS = ['Razão Social', 'Nome Fantasia', 'CNPJ', 'Porte', 'Situação', 'Município/UF', 'Certidões vencidas', 'Atualizado em'];
+function _fornExportRows(lista) {
+  const fmtCnpj = d => d ? d.replace(/^(\d{2})(\d{3})(\d{3})(\d{4})(\d{2})$/, '$1.$2.$3/$4-$5') : '';
+  return lista.map(f => {
+    const vencidas = (f.certidoes || []).filter(c => certStatus(c) === 'expired').length;
+    const municipioUf = [f.municipio, f.uf].filter(Boolean).join('/');
+    const at = f.updatedAt || f.createdAt || f.addedAt;
+    return [
+      f.razao_social || '', f.nome_fantasia || '', fmtCnpj(f.cnpj_digits || cleanCnpj(f.cnpj)), f.porte || '', f.situacao || '',
+      municipioUf, vencidas, at ? new Date(at).toLocaleDateString('pt-BR') : '',
+    ];
+  });
+}
+
+async function exportarFornecedoresCSV() {
+  const lista = await _fornExportLista();
+  if (!lista.length) { toast('Nenhum fornecedor para exportar', 'error'); return; }
+  const csv = toCSV(_FORN_EXPORT_COLS, _fornExportRows(lista));
+  if (await _salvarArquivoComo(csv, `SGEA_fornecedores_${new Date().toISOString().slice(0, 10)}.csv`, 'text/csv;charset=utf-8;'))
+    toast(`${lista.length} fornecedor(es) exportado(s).`, 'success');
+}
+
+async function exportarFornecedoresXlsx() {
+  const lista = await _fornExportLista();
+  if (!lista.length) { toast('Nenhum fornecedor para exportar', 'error'); return; }
+  if (await _exportarXlsx(`SGEA_fornecedores_${new Date().toISOString().slice(0, 10)}.xlsx`, _FORN_EXPORT_COLS, _fornExportRows(lista)))
+    toast(`${lista.length} fornecedor(es) exportado(s).`, 'success');
+}
+
+async function gerarRelatorioFornecedores() {
+  const lista = await _fornExportLista();
+  const org = await _orgBrasao();
+  const dtGer = new Date().toLocaleDateString('pt-BR') + ' às ' + new Date().toLocaleTimeString('pt-BR', { hour: '2-digit', minute: '2-digit' });
+  const tbody = lista.length ? lista.map(f => {
+    const vencidas = (f.certidoes || []).filter(c => certStatus(c) === 'expired').length;
+    const municipioUf = [f.municipio, f.uf].filter(Boolean).join('/');
+    return `<tr>
+      <td>${esc(f.razao_social || '—')}</td>
+      <td>${esc(f.cnpj || '—')}</td>
+      <td>${esc(f.porte || '—')}</td>
+      <td>${esc(f.situacao || '—')}</td>
+      <td>${esc(municipioUf || '—')}</td>
+      <td style="text-align:center">${vencidas || '—'}</td>
+    </tr>`;
+  }).join('') : `<tr><td colspan="6" style="text-align:center;padding:20pt;color:#888">Nenhum fornecedor cadastrado.</td></tr>`;
+  const corpo = `
+    <div class="meta">Gerado em: ${dtGer} · Total: ${lista.length} fornecedor${lista.length !== 1 ? 'es' : ''}</div>
+    <table>
+      <colgroup><col style="width:30%"><col style="width:16%"><col style="width:10%"><col style="width:14%"><col style="width:20%"><col style="width:10%"></colgroup>
+      <thead><tr><th>Razão Social</th><th>CNPJ</th><th>Porte</th><th>Situação</th><th>Município/UF</th><th>Cert. vencidas</th></tr></thead>
+      <tbody>${tbody}</tbody>
+    </table>`;
+  _abrirDocumentoQR(org, 'Relatório de Fornecedores', 'Todos os fornecedores cadastrados', corpo, 'Relatório de Fornecedores');
+}
+
+// ── Importar fornecedores via CSV ──────────────────────────────────────────
+let _csvRows = [];
+function abrirModalCsv() {
+  _csvRows = [];
+  document.getElementById('csv-step-upload').style.display = '';
+  document.getElementById('csv-step-preview').style.display = 'none';
+  document.getElementById('csv-step-progress').style.display = 'none';
+  document.getElementById('btn-csv-import').style.display = 'none';
+  document.getElementById('csv-file-input').value = '';
+  const ghost = document.querySelector('#modal-csv .btn-ghost'); if (ghost) ghost.style.display = '';
+  document.getElementById('modal-csv').classList.remove('hidden');
+}
+function fecharModalCsv() {
+  document.getElementById('modal-csv').classList.add('hidden');
+}
+function carregarCsv(input) {
+  const file = input.files[0];
+  if (!file) return;
+  const reader = new FileReader();
+  reader.onload = e => {
+    const text = e.target.result;
+    const lines = text.split(/\r?\n/).filter(l => l.trim());
+    if (lines.length < 2) { toast('CSV vazio ou sem dados.', 'error'); return; }
+    const sep = lines[0].includes(';') ? ';' : ',';
+    const headers = lines[0].split(sep).map(h => h.trim().toLowerCase().replace(/['"]/g, ''));
+    _csvRows = lines.slice(1).map(l => {
+      const vals = l.split(sep).map(v => v.trim().replace(/^["']|["']$/g, ''));
+      const row = {};
+      headers.forEach((h, i) => row[h] = vals[i] || '');
+      return row;
+    }).filter(r => r.cnpj || r.razao_social);
+    if (_csvRows.length === 0) { toast('Nenhuma linha válida encontrada.', 'error'); return; }
+    document.getElementById('csv-step-upload').style.display = 'none';
+    document.getElementById('csv-step-preview').style.display = '';
+    document.getElementById('btn-csv-import').style.display = '';
+    document.getElementById('csv-preview-count').textContent = `${_csvRows.length} fornecedor(es) encontrado(s)`;
+    const colsShow = ['cnpj', 'razao_social', 'email', 'telefone'].filter(c => headers.includes(c));
+    const table = document.getElementById('csv-preview-table');
+    table.innerHTML =
+      `<thead><tr>${colsShow.map(c => `<th>${c}</th>`).join('')}</tr></thead>` +
+      `<tbody>${_csvRows.slice(0, 8).map(r =>
+        `<tr>${colsShow.map(c => `<td>${esc(r[c] || '')}</td>`).join('')}</tr>`
+      ).join('')}${_csvRows.length > 8 ? `<tr><td colspan="${colsShow.length}" style="color:var(--gray-500);font-style:italic">… mais ${_csvRows.length - 8} linha(s)</td></tr>` : ''}</tbody>`;
+  };
+  reader.readAsText(file, 'UTF-8');
+}
+async function importarCsv() {
+  if (!_csvRows.length) return;
+  const consultar = document.getElementById('csv-opt-cnpj').checked;
+  document.getElementById('csv-step-preview').style.display = 'none';
+  document.getElementById('csv-step-progress').style.display = '';
+  document.getElementById('btn-csv-import').style.display = 'none';
+  const ghost = document.querySelector('#modal-csv .btn-ghost'); if (ghost) ghost.style.display = 'none';
+
+  let ok = 0, erros = 0;
+  const bar = document.getElementById('csv-progress-bar');
+  const msg = document.getElementById('csv-progress-msg');
+  for (let i = 0; i < _csvRows.length; i++) {
+    const r = _csvRows[i];
+    bar.style.width = `${Math.round((i / _csvRows.length) * 100)}%`;
+    msg.textContent = `Importando ${i + 1} de ${_csvRows.length}…`;
+    const digits = cleanCnpj(r.cnpj);
+    if (digits.length !== 14) { erros++; continue; }  // no SGEA o id do fornecedor é o CNPJ
+    try {
+      let forn = {
+        id: digits,
+        cnpj: formatCnpj(digits),
+        cnpj_digits: digits,
+        razao_social: r.razao_social || '',
+        nome_fantasia: r.nome_fantasia || '',
+        email: r.email || '',
+        telefone: r.telefone || '',
+        situacao: r.situacao || '',
+        porte: r.porte || '',
+        municipio: r.municipio || '',
+        uf: r.uf || '',
+        certidoes: [],
+        sancoes: [],
+        consultadoEm: new Date().toISOString(),
+      };
+      if (consultar && validarCnpj(digits)) {
+        try { const { data } = await fetchCnpjData(digits); forn = { ...forn, ...data, id: digits }; } catch { /* ignora erro de CNPJ individual */ }
+      }
+      await criarFornecedor(forn);
+      ok++;
+    } catch { erros++; }
+  }
+  bar.style.width = '100%';
+  msg.textContent = `Concluído! ${ok} importado(s)${erros ? ', ' + erros + ' erro(s)' : ''}.`;
+  if (ok) await _auditEvento('FORNECEDOR_CRIADO', `Importação CSV: ${ok} fornecedor(es)`);
+  await renderFornecedores();
+  setTimeout(() => { fecharModalCsv(); toast(`${ok} fornecedor(es) importado(s).`, 'success'); }, 1400);
+}
+function baixarModeloCsv() {
+  const cabecalho = ['cnpj', 'razao_social', 'nome_fantasia', 'email', 'telefone', 'municipio', 'uf', 'porte', 'situacao'];
+  const exemplo = ['12.345.678/0001-99', 'Empresa Exemplo Ltda', 'Exemplo', 'contato@empresa.com.br', '(11) 98765-4321', 'São Paulo', 'SP', 'ME', 'ATIVA'];
+  _salvarArquivoComo('﻿' + [cabecalho.join(';'), exemplo.join(';')].join('\r\n'), 'modelo_importacao_fornecedores.csv', 'text/csv;charset=utf-8');
 }
 
 // ══════════════════════════════════════════════════════════════
