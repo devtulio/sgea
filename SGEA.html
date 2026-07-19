@@ -108,6 +108,7 @@
   .forn-card { margin-top: 10px; background: #fff; border: 1px solid var(--gray-200); border-radius: var(--radius); overflow: hidden; }
   .forn-card-header { display: flex; justify-content: space-between; align-items: flex-start; gap: 8px; padding: 10px 12px; border-bottom: 1px solid var(--gray-100); }
   .forn-razao { font-size: .85rem; font-weight: 700; color: var(--gray-900); }
+  .forn-filtro-btn.active { background: var(--brand); color: #fff; border-color: var(--brand); }
   .forn-fantasia { font-size: .75rem; color: var(--gray-500); }
   .forn-cnpj-row { display: flex; align-items: center; gap: 6px; margin-top: 3px; }
   .forn-cnpj-txt { font-size: .78rem; color: var(--brand); font-weight: 600; letter-spacing: .3px; }
@@ -162,6 +163,7 @@
     <img id="sidebar-brasao" alt="" class="sidebar-brasao" onerror="this.style.display='none'">
     <div class="s-title">SGEA</div>
     <div class="s-sub">Estoque do Almoxarifado</div>
+    <div class="s-muni" id="sidebar-orgao">—</div>
   </div>
   <div class="sidebar-search">
     <button onclick="abrirGlobalSearch()" title="Busca global (Ctrl+K)">
@@ -373,6 +375,12 @@
         <button class="btn btn-outline" onclick="gerarRelatorioSancoesGlobal()">📄 Sanções (todos)</button>
         <button class="btn btn-primary" onclick="openFornModal()">+ Novo Fornecedor</button>
       </div>
+    </div>
+    <div id="forn-filtro-buttons" style="display:flex;gap:8px;margin:10px 0;flex-wrap:wrap">
+      <button class="btn btn-outline btn-sm forn-filtro-btn active" data-filtro="" onclick="setFornFiltro('')">Todos</button>
+      <button class="btn btn-outline btn-sm forn-filtro-btn" data-filtro="ativos" onclick="setFornFiltro('ativos')">Ativos</button>
+      <button class="btn btn-outline btn-sm forn-filtro-btn" data-filtro="inativos" onclick="setFornFiltro('inativos')">Inativos</button>
+      <button class="btn btn-outline btn-sm forn-filtro-btn" data-filtro="pendencias" onclick="setFornFiltro('pendencias')">Pendências</button>
     </div>
     <div id="forn-list"></div>
   </div>
@@ -979,7 +987,7 @@
 // ══════════════════════════════════════════════════════════════
 // API / SESSÃO
 // ══════════════════════════════════════════════════════════════
-const SGEA_VERSION = '0.18.0';
+const SGEA_VERSION = '0.19.0';
 document.title = `SGEA v${SGEA_VERSION}`;
 
 let _apiToken = localStorage.getItem('sgea-token') || null;
@@ -1044,6 +1052,7 @@ async function _showLoginOverlay() {
   fetch('/api/public/org-info').then(r => r.ok ? r.json() : {}).then(d => {
     if (!d?.orgao) return;
     document.getElementById('pin-org-nome').textContent = d.orgao;
+    const _sbOrg = document.getElementById('sidebar-orgao'); if (_sbOrg) _sbOrg.textContent = d.orgao;
     const sigla = d.orgao.split(' ').filter(w => w.length > 3).map(w => w[0]).join('').slice(0, 2).toUpperCase() || 'AL';
     document.getElementById('pin-org-avatar').textContent = sigla;
   }).catch(() => {});
@@ -1849,16 +1858,46 @@ function showFornecedores() {
 }
 function _debouncedRenderForn() { clearTimeout(window.__fornDebounce); window.__fornDebounce = setTimeout(renderFornecedores, 250); }
 
+let _fornFiltro = '';
+function setFornFiltro(v) {
+  _fornFiltro = v;
+  document.querySelectorAll('.forn-filtro-btn').forEach(b => b.classList.toggle('active', b.dataset.filtro === v));
+  renderFornecedores();
+}
+function _cnpjDuplicadosSet(forns) {
+  const vistos = new Set(), dups = new Set();
+  for (const f of forns) {
+    const c = cleanCnpj(f.cnpj);
+    if (!c) continue;
+    if (vistos.has(c)) dups.add(c); else vistos.add(c);
+  }
+  return dups;
+}
+function _fornecedorIssue(f, cnpjDupSet) {
+  const c = cleanCnpj(f.cnpj);
+  if (c && cnpjDupSet.has(c)) return { sev: 'erro', label: c.length === 11 ? 'CPF duplicado' : 'CNPJ duplicado' };
+  if (c.length === 14 && f.cnpj && !validarCnpj(f.cnpj)) return { sev: 'aviso', label: 'CNPJ inválido' };
+  return null;
+}
+// Ativos/Inativos pela situação cadastral (ReceitaWS); Pendências = CNPJ duplicado/inválido ou certidão vencida.
+function _fornecedorPassaFiltro(f, filtro, cnpjDupSet) {
+  if (filtro === 'ativos')     return cnpjSitClass(f.situacao) === 'ativa';
+  if (filtro === 'inativos')   return cnpjSitClass(f.situacao) === 'inativa';
+  if (filtro === 'pendencias') return !!_fornecedorIssue(f, cnpjDupSet) || (f.certidoes || []).some(c => certStatus(c) === 'expired');
+  return true;
+}
+
 async function renderFornecedores() {
   const all = await listarFornecedores();
+  const cnpjDupSet = _cnpjDuplicadosSet(all);
   const q = (document.getElementById('forn-search')?.value || '').toLowerCase();
   const lista = all
-    .filter(f => !q || f.razao_social?.toLowerCase().includes(q) || f.cnpj?.includes(q) || f.nome_fantasia?.toLowerCase().includes(q))
+    .filter(f => _fornecedorPassaFiltro(f, _fornFiltro, cnpjDupSet) && (!q || f.razao_social?.toLowerCase().includes(q) || f.cnpj?.includes(q) || f.nome_fantasia?.toLowerCase().includes(q)))
     .sort((a, b) => (a.razao_social || '').localeCompare(b.razao_social || '', 'pt-BR'));
 
   const el = document.getElementById('forn-list');
   if (!lista.length) {
-    el.innerHTML = `<div class="empty">${q ? 'Nenhum fornecedor encontrado.' : 'Nenhum fornecedor cadastrado ainda.'}</div>`;
+    el.innerHTML = `<div class="empty">${(q || _fornFiltro) ? 'Nenhum fornecedor encontrado.' : 'Nenhum fornecedor cadastrado ainda.'}</div>`;
     return;
   }
   el.innerHTML = lista.map(f => {

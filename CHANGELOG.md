@@ -5,6 +5,14 @@
 
 ---
 
+## [0.19.0] — 2026-07-19
+
+### Adicionado
+- **Filtros na tela de Fornecedores** — botões **Todos / Ativos / Inativos / Pendências** (paridade com SGCA/SGCD). Ativos/Inativos pela situação cadastral (ReceitaWS); **Pendências** lista fornecedores com CNPJ duplicado/inválido ou com certidão vencida.
+
+### Alterado
+- **Nome do órgão no topo da barra lateral** — a sidebar passa a exibir o órgão (ex.: "Prefeitura Municipal de Orindiúva") abaixo do subtítulo, alinhando o cabeçalho ao SGCD/SGCA.
+
 ## [0.18.0] — 2026-07-19
 
 ### Adicionado
