@@ -5,6 +5,11 @@
 
 ---
 
+## [0.18.0] — 2026-07-19
+
+### Adicionado
+- **Cadastro rico de Fornecedores**, saindo do motor CRUD genérico para uma tela dedicada: consulta automática de CNPJ (ReceitaWS, com BrasilAPI como alternativa), preenchendo razão social, situação cadastral, porte, natureza jurídica, endereço, CNAE e quadro societário (QSA); consulta de sanções federais **CEIS/CNEP** via Portal da Transparência (exige chave de API gratuita, configurável em Configurações → Organização); **certidões** e **sanções manuais** (Art. 156, Lei 14.133/2021) com dois relatórios imprimíveis — por fornecedor e global — que são os únicos documentos do SGEA com **código QR de autenticidade** no rodapé; **importação** de fornecedores a partir de um backup do SGCA ou SGDP (upsert por CNPJ, preservando certidões/sanções já cadastradas); e **exclusão reversível** — fornecedor excluído passa a aparecer na Lixeira, junto com Entradas e Saídas, restaurável por 30 dias.
+
 ## [0.17.0] — 2026-07-19
 
 ### Adicionado

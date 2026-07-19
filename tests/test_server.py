@@ -519,6 +519,114 @@ class TestEntradasSaidas(SGEATestCase):
         self.assertEqual(item['saldo'], 10)
 
 
+class TestFornecedores(SGEATestCase):
+    # "Fornecedores" sorta entre "FefoDireto" e "LixeiraEWipe" — não quebra a
+    # suposição de ordem alfabética do wipe (ver comentário na classe abaixo).
+
+    def _criar_fornecedor(self, token, razao_social='Fornecedor de Teste', cnpj=None):
+        cnpj = cnpj or f'{uuid.uuid4().int % 10**14:014d}'
+        status, forn = self.request('POST', '/api/fornecedores', {
+            'razao_social': razao_social, 'cnpj': cnpj, 'cnpj_digits': cnpj,
+        }, token)
+        self.assertEqual(status, 200, forn)
+        return forn
+
+    def test_criar_e_buscar_fornecedor(self):
+        token = self.login()
+        forn = self._criar_fornecedor(token, razao_social='Acme Ltda')
+        status, buscado = self.request('GET', f'/api/fornecedores/{forn["id"]}', token=token)
+        self.assertEqual(status, 200, buscado)
+        self.assertEqual(buscado['razao_social'], 'Acme Ltda')
+        self.assertIn(forn['id'], [f['id'] for f in self.request('GET', '/api/fornecedores', token=token)[1]['items']])
+
+    def test_atualizar_fornecedor_e_conflito_de_concorrencia(self):
+        token = self.login()
+        forn = self._criar_fornecedor(token)
+        status, editado = self.request('PUT', f'/api/fornecedores/{forn["id"]}', {
+            'nome_fantasia': 'Acme', '_baseUpdatedAt': forn['updatedAt'],
+        }, token)
+        self.assertEqual(status, 200, editado)
+        self.assertEqual(editado['nome_fantasia'], 'Acme')
+        self.assertEqual(editado['razao_social'], forn['razao_social'])  # merge preserva o resto
+
+        # _baseUpdatedAt desatualizado (o registro já mudou) -> 409
+        status, conflito = self.request('PUT', f'/api/fornecedores/{forn["id"]}', {
+            'obs': 'tentativa antiga', '_baseUpdatedAt': forn['updatedAt'],
+        }, token)
+        self.assertEqual(status, 409, conflito)
+
+    def test_soft_delete_e_restaurar_fornecedor(self):
+        token = self.login()
+        forn = self._criar_fornecedor(token)
+        status, _ = self.request('DELETE', f'/api/fornecedores/{forn["id"]}', token=token)
+        self.assertEqual(status, 200)
+
+        status, ativos = self.request('GET', '/api/fornecedores', token=token)
+        self.assertNotIn(forn['id'], [f['id'] for f in ativos['items']])
+        status, lixeira = self.request('GET', '/api/fornecedores?trash=1', token=token)
+        self.assertIn(forn['id'], [f['id'] for f in lixeira['items']])
+
+        status, _ = self.request('PUT', f'/api/fornecedores/{forn["id"]}/restore', token=token)
+        self.assertEqual(status, 200)
+        status, ativos2 = self.request('GET', '/api/fornecedores', token=token)
+        self.assertIn(forn['id'], [f['id'] for f in ativos2['items']])
+
+    def test_import_upsert_por_cnpj_preserva_certidoes_e_sancoes_e_ignora_invalido(self):
+        token = self.login()
+        cnpj = f'{uuid.uuid4().int % 10**14:014d}'
+        forn = self._criar_fornecedor(token, razao_social='Fornecedor Original', cnpj=cnpj)
+        # adiciona certidão/sanção locais antes de importar por cima
+        self.request('PUT', f'/api/fornecedores/{forn["id"]}', {
+            'certidoes': [{'tipoId': 'fgts', 'emissao': '2026-01-01', 'validade': '2027-01-01'}],
+            'sancoes': [{'tipo': 'advertencia', 'dataAplicacao': '2026-01-01'}],
+        }, token)
+
+        status, imp = self.request('POST', '/api/fornecedores/import', {
+            'fornecedores': [
+                {'cnpj': cnpj, 'razao_social': 'Fornecedor Atualizado'},  # atualiza por CNPJ
+                {'cnpj': f'{uuid.uuid4().int % 10**14:014d}', 'razao_social': 'Fornecedor Novo'},  # novo
+                {'cnpj': '123', 'razao_social': 'CNPJ Invalido'},  # ignorado (não tem 14 dígitos)
+            ]
+        }, token)
+        self.assertEqual(status, 200, imp)
+        self.assertEqual(imp['novos'], 1)
+        self.assertEqual(imp['atualizados'], 1)
+        self.assertEqual(imp['ignorados'], 1)
+
+        status, atualizado = self.request('GET', f'/api/fornecedores/{forn["id"]}', token=token)
+        self.assertEqual(atualizado['razao_social'], 'Fornecedor Atualizado')
+        self.assertEqual(len(atualizado['certidoes']), 1)  # preservada
+        self.assertEqual(len(atualizado['sancoes']), 1)    # preservada
+
+    def test_import_exige_admin(self):
+        # Cria e depois remove o usuário não-admin — não pode sobrar no banco
+        # compartilhado da suíte, senão quebra a contagem exata em TestLixeiraEWipe.
+        token = self.login()
+        username = f'user{uuid.uuid4().hex[:6]}'
+        status, data = self.request('POST', '/api/usuarios', {
+            'username': username, 'nome': 'Não Admin', 'password': 'abc12345', 'admin': False,
+        }, token)
+        self.assertEqual(status, 201, data)
+        try:
+            _, non_admin = self.request('POST', '/api/auth/login', {'username': username, 'password': 'abc12345'})
+            status, resp = self.request('POST', '/api/fornecedores/import', {'fornecedores': []}, non_admin['token'])
+            self.assertEqual(status, 403, resp)
+        finally:
+            self.request('DELETE', f'/api/usuarios/{data["id"]}', token=token)
+
+    def test_fk_pedido_entrada_resolve_apos_migracao(self):
+        token = self.login()
+        forn = self._criar_fornecedor(token, razao_social='Fornecedor Vinculado')
+        pid = self._criar_produto(token)
+        status, ent = self.request('POST', '/api/entradas', {
+            'tipo': 'compra_direta', 'data_entrega': '2026-07-01', 'fornecedor_id': forn['id'],
+            'itens': [{'produto_id': pid, 'quantidade_unidades': 5, 'valor_unitario': 2.0}]
+        }, token)
+        self.assertEqual(status, 201, ent)
+        status, buscada = self.request('GET', f'/api/entradas/{ent["id"]}', token=token)
+        self.assertEqual(buscada['fornecedor_nome'], 'Fornecedor Vinculado')
+
+
 class TestLixeiraEWipe(SGEATestCase):
     # ponytail: test_wipe_* apaga o banco compartilhado da suíte — depende de
     # unittest descobrir as classes em ordem alfabética ("L" já é a última classe

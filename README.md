@@ -1,6 +1,6 @@
 # SGEA — Sistema de Gestão de Estoque do Almoxarifado
 
-![Versão](https://img.shields.io/badge/versão-v0.17.0-blue) ![Tecnologia](https://img.shields.io/badge/tecnologia-Python%20%2B%20SQLite-orange) ![Licença](https://img.shields.io/badge/licença-MIT-green) ![Multiusuário](https://img.shields.io/badge/acesso-multiusuário-blueviolet)
+![Versão](https://img.shields.io/badge/versão-v0.18.0-blue) ![Tecnologia](https://img.shields.io/badge/tecnologia-Python%20%2B%20SQLite-orange) ![Licença](https://img.shields.io/badge/licença-MIT-green) ![Multiusuário](https://img.shields.io/badge/acesso-multiusuário-blueviolet)
 
 ## Descrição
 
@@ -22,11 +22,12 @@ Funciona em rede local: um único computador executa o servidor e todos os usuá
 - **Alertas de Validade** — tela dedicada com lotes vencidos ou a vencer numa janela de 30/60/90 dias
 - **Entrada com ou sem pedido** — vínculo opcional a um Pedido (nº + código de licitação); sem pedido, a entrada é tratada como compra direta (só NF, fornecedor e produto)
 - **Reversão segura** — excluir uma saída devolve exatamente as quantidades aos lotes de origem; excluir uma entrada é bloqueado se algum de seus lotes já foi parcialmente consumido
-- **Cadastros de apoio** — Centros de Custo, Fornecedores (com consulta automática de CNPJ), Funcionários (solicitantes de saída) e Frota (veículos, para correlacionar saídas de combustível/peças)
+- **Fornecedores** — cadastro rico: consulta automática de CNPJ (ReceitaWS/BrasilAPI) com endereço, CNAE e quadro societário; consulta de sanções federais (CEIS/CNEP); certidões e sanções manuais (Art. 156, Lei 14.133/2021) com relatórios imprimíveis (com QR de autenticidade); importação a partir de um backup do SGCA/SGDP; exclusão reversível pela Lixeira
+- **Cadastros de apoio** — Centros de Custo, Funcionários (solicitantes de saída) e Frota (veículos, para correlacionar saídas de combustível/peças)
 - **Autenticação multiusuário** com hashing PBKDF2-HMAC-SHA256 e gestão de usuários pelo admin
 - **Reconciliação com o Fiorilli** — importa o relatório de Posição do Estoque do Fiorilli (CSV Dados) e compara item a item por `codigo_fiorilli`, classificando em confere / diverge / só-Fiorilli / só-SGEA / unidade incompatível; converte as quantidades do Fiorilli para a unidade de consumo do SGEA e é **somente leitura** (o Fiorilli continua o razão oficial). Exporta as pendências em CSV
 - **Auditoria** — trilha de eventos de criação/edição/exclusão em todos os módulos, com tela de consulta filtrável (admin)
-- **Lixeira** — Entradas e Saídas excluídas ficam disponíveis para restaurar por 30 dias
+- **Lixeira** — Entradas, Saídas e Fornecedores excluídos ficam disponíveis para restaurar por 30 dias
 - **Alerta diário por e-mail** (SMTP configurável) resumindo lotes vencidos ou vencendo nos próximos 7 dias
 - **Tela de Configurações em 7 abas** — Interface (tema, largura do conteúdo, fonte, cor de destaque), Organização (órgão/CNPJ/autoridade competente e brasão), Comunicação (SMTP), Dados (backup/restore, Zona de Perigo), Segurança (troca da própria senha), Diagnóstico (checagens de consistência) e Usuários (admin), com salvamento único e indicador de alterações não salvas — mesmo padrão visual dos sistemas irmãos
 - **Login no padrão visual dos sistemas irmãos** — cartão institucional, identificação do órgão, aviso de Caps Lock e último backup exibido antes de entrar

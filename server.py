@@ -1,4 +1,4 @@
-# SGEA v0.17.0 — Servidor local: SQLite, autenticação, REST API, controle de estoque por lote (FEFO), backup automático
+# SGEA v0.18.0 — Servidor local: SQLite, autenticação, REST API, controle de estoque por lote (FEFO), backup automático
 import http.server
 import socketserver
 import os
@@ -252,6 +252,45 @@ def init_db():
         if 'email' not in cols_usu: conn.execute("ALTER TABLE usuarios ADD COLUMN email TEXT DEFAULT ''")
         if 'cargo' not in cols_usu: conn.execute("ALTER TABLE usuarios ADD COLUMN cargo TEXT DEFAULT ''")
         if 'matricula' not in cols_usu: conn.execute("ALTER TABLE usuarios ADD COLUMN matricula TEXT DEFAULT ''")
+
+        cols_forn = [r[1] for r in conn.execute('PRAGMA table_info(fornecedores)').fetchall()]
+        if 'data' not in cols_forn:
+            # Reescrita rica do fornecedor (paridade com SGCD): schema vira id/data(JSON)/
+            # cnpj/razao_social/updated_at/deleted_at. Precisa recriar a tabela (não dá pra
+            # só ADD COLUMN) porque o UNIQUE em cnpj tem que sair — com ele, o INSERT OR
+            # REPLACE usado no upsert por CNPJ casaria por QUALQUER coluna UNIQUE/PK, podendo
+            # apagar silenciosamente uma linha errada casada pelo cnpj em vez do id (o SGCD
+            # nunca teve esse UNIQUE por isso). Constrói a substituta sob nome temporário e só
+            # DEPOIS derruba a original e renomeia (ver [[feedback_sqlite_fk_rename_migration]])
+            # — nunca renomear a original primeiro: o SQLite reescreve silenciosamente o
+            # REFERENCES fornecedores(id) de pedidos/entradas para apontar pro nome novo,
+            # deixando esses FKs órfãos assim que a tabela temporária é derrubada.
+            old_rows = conn.execute('SELECT * FROM fornecedores').fetchall()
+            conn.execute('''
+                CREATE TABLE fornecedores_new (
+                    id TEXT PRIMARY KEY,
+                    data TEXT NOT NULL,
+                    cnpj TEXT,
+                    razao_social TEXT,
+                    updated_at TEXT,
+                    deleted_at TEXT
+                )
+            ''')
+            for r in old_rows:
+                blob = {
+                    'id': r['id'], 'cnpj': r['cnpj'], 'razao_social': r['razao_social'],
+                    'nome_fantasia': r['nome_fantasia'], 'telefone': r['telefone'],
+                    'email': r['email'], 'ativo': r['ativo'], 'updatedAt': _now_precise(),
+                }
+                conn.execute(
+                    'INSERT INTO fornecedores_new (id,data,cnpj,razao_social,updated_at,deleted_at) VALUES (?,?,?,?,?,NULL)',
+                    (r['id'], json.dumps(blob, ensure_ascii=False), r['cnpj'], r['razao_social'], blob['updatedAt'])
+                )
+            conn.execute('DROP TABLE fornecedores')
+            conn.execute('ALTER TABLE fornecedores_new RENAME TO fornecedores')
+        conn.execute('CREATE INDEX IF NOT EXISTS idx_forn_cnpj ON fornecedores(cnpj)')
+        conn.execute('CREATE INDEX IF NOT EXISTS idx_forn_deleted ON fornecedores(deleted_at)')
+
         conn.execute('''
             CREATE VIEW IF NOT EXISTS v_estoque AS
             SELECT p.id AS produto_id,
@@ -339,6 +378,14 @@ def _check_shutdown():
 
 def _now():
     return time.strftime('%Y-%m-%dT%H:%M:%S')
+
+def _now_precise():
+    # Com precisão de milissegundo — usado especificamente em updatedAt para a
+    # checagem de conflito de edição concorrente (_baseUpdatedAt) do fornecedor
+    # rico. _now(), com precisão de segundo, colide facilmente entre duas
+    # edições rápidas em sequência. Formato ainda parseável por new Date() no cliente.
+    t = time.time()
+    return time.strftime('%Y-%m-%dT%H:%M:%S', time.localtime(t)) + f'.{int((t % 1) * 1000):03d}'
 
 def _float(v):
     if v is None or v == '':
@@ -616,19 +663,17 @@ def _find_browser():
     return None
 
 # ── CRUD genérico de cadastros mestre ───────────────────────────────────────
-# centros_custo/fornecedores/funcionarios/frota/pedidos têm a mesma forma
-# (id + colunas simples + ativo/status + created_at/updated_at), então um
-# único motor parametrizado evita reescrever list/get/create/update 5 vezes.
+# centros_custo/funcionarios/frota/pedidos têm a mesma forma (id + colunas
+# simples + ativo/status + created_at/updated_at), então um único motor
+# parametrizado evita reescrever list/get/create/update 4 vezes.
+# fornecedores NÃO está mais aqui — ganhou handlers dedicados (ver seção
+# "Fornecedores" abaixo) porque o cadastro rico (data JSON, certidões,
+# sanções, CNPJ/CEIS/CNEP) não cabe no motor genérico de campos escalares.
 
 CRUD_TABLES = {
     'centros_custo': {
         'id_type': 'int', 'fields': ['codigo', 'nome', 'ativo'],
         'required': ['nome'], 'order': 'nome ASC', 'search_fields': ['nome', 'codigo'],
-    },
-    'fornecedores': {
-        'id_type': 'uuid', 'fields': ['cnpj', 'razao_social', 'nome_fantasia', 'telefone', 'email', 'ativo'],
-        'required': ['razao_social'], 'order': 'razao_social ASC',
-        'search_fields': ['razao_social', 'nome_fantasia', 'cnpj'],
     },
     'funcionarios': {
         'id_type': 'int', 'fields': ['nome', 'cargo', 'unidade', 'matricula', 'ativo'],
@@ -640,10 +685,11 @@ CRUD_TABLES = {
     },
 }
 CRUD_ROUTES = {  # segmento da URL -> tabela
-    'centros-custo': 'centros_custo', 'fornecedores': 'fornecedores',
+    'centros-custo': 'centros_custo',
     'funcionarios': 'funcionarios', 'frota': 'frota',
-    # pedidos NÃO está aqui — tem itens, o motor genérico não suporta; handlers
-    # dedicados abaixo (_get_pedido_dict/_create_pedido/_update_pedido/etc).
+    # pedidos e fornecedores NÃO estão aqui — pedidos tem itens, fornecedores
+    # tem o cadastro rico (data JSON) — ambos com handlers dedicados abaixo
+    # (_get_pedido_dict/_create_pedido/etc. e _list_fornecedores/etc.).
 }
 
 def _crud_list(table, qs):
@@ -831,6 +877,13 @@ class SGEAHandler(http.server.SimpleHTTPRequestHandler):
         elif p == '/api/relatorio/pedidos-abertos':
             self._relatorio_pedidos_abertos()
 
+        elif p == '/api/fornecedores':
+            self._list_fornecedores(qs)
+        elif re.fullmatch(r'/api/fornecedores/[^/]+', p):
+            self._get_fornecedor(p.split('/')[-1])
+        elif p == '/api/ceis-cnep':
+            self._proxy_ceis_cnep(qs)
+
         elif p == '/api/pedidos':
             self._list_pedidos(qs)
         elif re.fullmatch(r'/api/pedidos/[^/]+', p):
@@ -868,7 +921,7 @@ class SGEAHandler(http.server.SimpleHTTPRequestHandler):
                 rows = conn.execute(
                     "SELECT key,value FROM sys_settings WHERE key IN "
                     "('orgao','municipio','cnpj_orgao','aut_nome','aut_cargo',"
-                    "'auto_backup_enabled','auto_backup_keep')"
+                    "'auto_backup_enabled','auto_backup_keep','portal_transparencia_key')"
                 ).fetchall()
             self._json(200, {r['key']: r['value'] for r in rows})
 
@@ -927,6 +980,11 @@ class SGEAHandler(http.server.SimpleHTTPRequestHandler):
 
         if p == '/api/produtos':
             self._create_produto(data)
+        elif p == '/api/fornecedores':
+            self._create_fornecedor(data)
+        elif p == '/api/fornecedores/import':
+            if not s['admin']: self._json(403, {'error': 'Acesso restrito'}); return
+            self._import_fornecedores(data)
         elif p == '/api/pedidos':
             self._create_pedido(data)
         elif p == '/api/entradas':
@@ -968,6 +1026,10 @@ class SGEAHandler(http.server.SimpleHTTPRequestHandler):
             self._restore_entrada(p.split('/')[-2])
         elif re.fullmatch(r'/api/saidas/[^/]+/restore', p):
             self._restore_saida(p.split('/')[-2])
+        elif re.fullmatch(r'/api/fornecedores/[^/]+/restore', p):
+            self._restore_fornecedor(p.split('/')[-2])
+        elif re.fullmatch(r'/api/fornecedores/[^/]+', p):
+            self._update_fornecedor(p.split('/')[-1], data)
         elif re.fullmatch(r'/api/produtos/[^/]+', p):
             self._update_produto(p.split('/')[-1], data)
         elif re.fullmatch(r'/api/pedidos/[^/]+/cancelar', p):
@@ -983,7 +1045,7 @@ class SGEAHandler(http.server.SimpleHTTPRequestHandler):
             allowed = {'backup_path', 'auto_backup_enabled', 'auto_backup_keep'}
             self._save_settings({k: v for k, v in data.items() if k in allowed})
         elif p in ('/api/settings/org', '/api/settings/org/'):
-            allowed = {'orgao', 'municipio', 'cnpj_orgao', 'aut_nome', 'aut_cargo'}
+            allowed = {'orgao', 'municipio', 'cnpj_orgao', 'aut_nome', 'aut_cargo', 'portal_transparencia_key'}
             self._save_settings({k: v for k, v in data.items() if k in allowed})
         elif p in ('/api/settings/smtp', '/api/settings/smtp/'):
             if not s['admin']: self._json(403, {'error': 'Acesso restrito'}); return
@@ -1026,6 +1088,8 @@ class SGEAHandler(http.server.SimpleHTTPRequestHandler):
                 self._json(200, {'ok': True})
             except sqlite3.IntegrityError:
                 self._json(409, {'error': 'Não é possível excluir: produto possui lotes/movimentações'})
+        elif re.fullmatch(r'/api/fornecedores/[^/]+', p):
+            self._delete_fornecedor(p.split('/')[-1], qs.get('purge', ['0'])[0] == '1', s['admin'])
         elif re.fullmatch(r'/api/entradas/[^/]+', p):
             self._delete_entrada(p.split('/')[-1])
         elif re.fullmatch(r'/api/saidas/[^/]+', p):
@@ -1328,6 +1392,143 @@ class SGEAHandler(http.server.SimpleHTTPRequestHandler):
     def _alertas_validade(self, qs):
         dias = int((qs.get('dias', ['30'])[0]) or 30)
         self._json(200, {'items': _lotes_vencendo(dias), 'dias': dias})
+
+    # ── Fornecedores ─────────────────────────────────────────────────────────
+    # Cadastro rico (paridade com SGCD): a linha do banco só guarda id/cnpj/
+    # razao_social/updated_at/deleted_at como cópia desnormalizada pra JOIN e
+    # busca — o objeto inteiro (endereço, QSA, certidões, sanções, etc.) vive
+    # em `data` (JSON). Diferente do SGCD, o SGEA tem FK real (pedidos/entradas
+    # .fornecedor_id) — não existe `processos[]` embutido pra preservar no
+    # upsert, só `certidoes`/`sancoes`.
+
+    def _list_fornecedores(self, qs):
+        def qp(k, d=None): v = qs.get(k); return v[0] if v else d
+        q = (qp('q', '') or '').strip()
+        page = int(qp('page', 1))
+        per = min(int(qp('per', 500)), 2000)
+        trash = qp('trash') == '1'
+
+        where, params = [], []
+        where.append('deleted_at IS NOT NULL' if trash else 'deleted_at IS NULL')
+        if q:
+            where.append('(razao_social LIKE ? OR cnpj LIKE ?)')
+            params += [f'%{q}%', f'%{q}%']
+        wc = 'WHERE ' + ' AND '.join(where)
+        order = 'deleted_at DESC' if trash else 'razao_social ASC'
+        with get_db() as conn:
+            total = conn.execute(f'SELECT COUNT(*) FROM fornecedores {wc}', params).fetchone()[0]
+            rows = conn.execute(
+                f'SELECT data,deleted_at FROM fornecedores {wc} ORDER BY {order} LIMIT ? OFFSET ?',
+                params + [per, (page - 1) * per]
+            ).fetchall()
+        items = []
+        for r in rows:
+            item = json.loads(r['data'])
+            item['deletedAt'] = r['deleted_at']
+            items.append(item)
+        self._json(200, {'total': total, 'items': items})
+
+    def _get_fornecedor(self, fid):
+        with get_db() as conn:
+            row = conn.execute('SELECT data FROM fornecedores WHERE id=?', (fid,)).fetchone()
+        if not row:
+            self._json(404, {'error': 'Fornecedor não encontrado'}); return
+        self._json(200, json.loads(row['data']))
+
+    def _create_fornecedor(self, data):
+        fid = data.get('id') or str(uuid.uuid4())
+        data['id'] = fid
+        data.setdefault('updatedAt', _now_precise())
+        with get_db() as conn:
+            conn.execute(
+                'INSERT OR REPLACE INTO fornecedores (id,data,cnpj,razao_social,updated_at) VALUES (?,?,?,?,?)',
+                (fid, json.dumps(data, ensure_ascii=False),
+                 data.get('cnpj'), data.get('razao_social'), data['updatedAt'])
+            )
+        self._json(200, data)
+
+    def _update_fornecedor(self, fid, data):
+        with get_db() as conn:
+            row = conn.execute('SELECT data FROM fornecedores WHERE id=?', (fid,)).fetchone()
+            if not row:
+                self._create_fornecedor({**data, 'id': fid}); return
+            existing = json.loads(row['data'])
+            base_updated_at = data.pop('_baseUpdatedAt', None)
+            if base_updated_at is not None and base_updated_at != existing.get('updatedAt'):
+                self._json(409, {
+                    'error': 'Este fornecedor foi alterado por outro usuário. Recarregue antes de salvar.',
+                    'current': existing,
+                })
+                return
+            existing.update(data)
+            existing['updatedAt'] = _now_precise()
+            conn.execute(
+                'UPDATE fornecedores SET data=?,cnpj=?,razao_social=?,updated_at=? WHERE id=?',
+                (json.dumps(existing, ensure_ascii=False),
+                 existing.get('cnpj'), existing.get('razao_social'), existing['updatedAt'], fid)
+            )
+        self._json(200, existing)
+
+    def _delete_fornecedor(self, fid, purge, is_admin):
+        if purge:
+            if not is_admin:
+                self._json(403, {'error': 'Acesso restrito'}); return
+            with get_db() as conn:
+                try:
+                    conn.execute('DELETE FROM fornecedores WHERE id=?', (fid,))
+                except sqlite3.IntegrityError:
+                    self._json(409, {'error': 'Não é possível excluir: fornecedor em uso em pedido/entrada'}); return
+            self._json(200, {'ok': True}); return
+        with get_db() as conn:
+            conn.execute('UPDATE fornecedores SET deleted_at=? WHERE id=?', (_now(), fid))
+        self._json(200, {'ok': True})
+
+    def _restore_fornecedor(self, fid):
+        with get_db() as conn:
+            conn.execute('UPDATE fornecedores SET deleted_at=NULL WHERE id=?', (fid,))
+        self._json(200, {'ok': True})
+
+    def _import_fornecedores(self, data):
+        # Importa fornecedores de um backup (SGCA/SGCD, mesma forma de dado):
+        # upsert por CNPJ. Ao atualizar um existente, preserva certidões e
+        # sanções LOCAIS do SGEA e sobrepõe o resto com os dados do arquivo.
+        incoming = data.get('fornecedores') if isinstance(data, dict) else None
+        if not isinstance(incoming, list):
+            self._json(400, {'error': 'Formato inválido: esperado {"fornecedores": [...]} (backup do SGCA/SGCD)'}); return
+        novos = atualizados = ignorados = 0
+        with get_db() as conn:
+            existentes = {}
+            for r in conn.execute('SELECT id,cnpj FROM fornecedores WHERE deleted_at IS NULL').fetchall():
+                dig = re.sub(r'\D', '', r['cnpj'] or '')
+                if dig: existentes[dig] = r['id']
+            for f in incoming:
+                if not isinstance(f, dict):
+                    ignorados += 1; continue
+                cnpj_d = re.sub(r'\D', '', f.get('cnpj') or '')
+                if len(cnpj_d) != 14:
+                    ignorados += 1; continue
+                if cnpj_d in existentes:
+                    fid = existentes[cnpj_d]
+                    row = conn.execute('SELECT data FROM fornecedores WHERE id=?', (fid,)).fetchone()
+                    existing = json.loads(row['data']) if row else {}
+                    f = {**existing, **f, 'id': fid,
+                         'certidoes': existing.get('certidoes', []),
+                         'sancoes': existing.get('sancoes', [])}
+                    atualizados += 1
+                else:
+                    fid = f.get('id') or str(uuid.uuid4())
+                    existentes[cnpj_d] = fid
+                    f['id'] = fid
+                    novos += 1
+                f['cnpj_digits'] = cnpj_d
+                f['updatedAt'] = _now_precise()
+                conn.execute(
+                    'INSERT OR REPLACE INTO fornecedores (id,data,cnpj,razao_social,updated_at) VALUES (?,?,?,?,?)',
+                    (fid, json.dumps(f, ensure_ascii=False),
+                     f.get('cnpj'), f.get('razao_social'), f['updatedAt'])
+                )
+            conn.commit()
+        self._json(200, {'ok': True, 'novos': novos, 'atualizados': atualizados, 'ignorados': ignorados})
 
     # ── Pedidos ──────────────────────────────────────────────────────────────
     # Fora do motor CRUD genérico (CRUD_TABLES/_crud_*) porque tem itens — o
@@ -1762,6 +1963,37 @@ class SGEAHandler(http.server.SimpleHTTPRequestHandler):
             self.end_headers(); self.wfile.write(body)
         except Exception as e:
             self._json(502, {'status': 'ERROR', 'message': str(e)})
+
+    # ── CEIS/CNEP (Portal da Transparência/CGU) ───────────────────────────────
+    # Consulta automatizada de sanções federais por CNPJ, complementando as
+    # sanções manuais no cadastro de Fornecedores. Exige chave de API gratuita
+    # (cadastro em api.portaldatransparencia.gov.br), salva em Configurações e
+    # lida via sys_settings.
+    def _proxy_ceis_cnep(self, qs):
+        def qp(k): v = qs.get(k); return (v[0] if v else '').strip()
+        cnpj = re.sub(r'\D', '', qp('cnpj'))
+        if len(cnpj) != 14:
+            self._json(400, {'error': 'CNPJ inválido'}); return
+        with get_db() as conn:
+            row = conn.execute(
+                "SELECT value FROM sys_settings WHERE key='portal_transparencia_key'"
+            ).fetchone()
+        api_key = row['value'] if row else ''
+        if not api_key:
+            self._json(400, {'error': 'Chave de API do Portal da Transparência não configurada (Configurações → Organização)'}); return
+
+        resultado = {'ceis': [], 'cnep': [], 'erro': None}
+        for tipo in ('ceis', 'cnep'):
+            url = f'https://api.portaldatransparencia.gov.br/api-de-dados/{tipo}?cnpjSancionado={cnpj}&pagina=1'
+            req = urllib.request.Request(url, headers={'chave-api-dados': api_key, 'User-Agent': 'SGEA/1.0'})
+            try:
+                with urllib.request.urlopen(req, timeout=10) as resp:
+                    resultado[tipo] = json.loads(resp.read())
+            except urllib.error.HTTPError as e:
+                resultado['erro'] = f'{tipo.upper()}: HTTP {e.code} (verifique a chave de API)'
+            except Exception as e:
+                resultado['erro'] = f'{tipo.upper()}: {e}'
+        self._json(200, resultado)
 
     # ── E-mail ───────────────────────────────────────────────────────────────
 

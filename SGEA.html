@@ -37,6 +37,7 @@
   #app:not(.layout-expanded) #view-saidas,
   #app:not(.layout-expanded) #view-alertas,
   #app:not(.layout-expanded) #view-relatorios,
+  #app:not(.layout-expanded) #view-fornecedores,
   #app:not(.layout-expanded) #view-crud,
   #app:not(.layout-expanded) #view-config { max-width: 1100px; margin: 0 auto; }
 
@@ -96,6 +97,60 @@
   .rel-card .rel-datas { display: flex; gap: 8px; }
   .rel-card .rel-datas input { flex: 1; padding: 6px 8px; border: 1px solid var(--gray-300); border-radius: 6px; font-size: .8rem; }
   body.dark .rel-card { background: #2a2a2a; }
+
+  /* Fornecedores — cadastro rico (portado do SGCD/SGCA) */
+  .copy-btn { background: none; border: none; color: var(--gray-400); cursor: pointer; font-size: .68rem; padding: 0; }
+  .copy-btn:hover { color: var(--brand); }
+  .forn-lookup { margin-top: 12px; margin-bottom: 14px; padding: 12px; background: var(--gray-50); border: 1px solid var(--gray-200); border-radius: var(--radius); }
+  .forn-input-row { display: flex; gap: 8px; align-items: center; }
+  .forn-input-row input { flex: 1; border: 1px solid var(--gray-200); border-radius: 6px; padding: 7px 10px; font-size: .85rem; font-family: inherit; color: var(--gray-900); outline: none; }
+  .forn-input-row input:focus { border-color: var(--brand); box-shadow: 0 0 0 3px color-mix(in srgb, var(--brand) 25%, transparent); }
+  .forn-card { margin-top: 10px; background: #fff; border: 1px solid var(--gray-200); border-radius: var(--radius); overflow: hidden; }
+  .forn-card-header { display: flex; justify-content: space-between; align-items: flex-start; gap: 8px; padding: 10px 12px; border-bottom: 1px solid var(--gray-100); }
+  .forn-razao { font-size: .85rem; font-weight: 700; color: var(--gray-900); }
+  .forn-fantasia { font-size: .75rem; color: var(--gray-500); }
+  .forn-cnpj-row { display: flex; align-items: center; gap: 6px; margin-top: 3px; }
+  .forn-cnpj-txt { font-size: .78rem; color: var(--brand); font-weight: 600; letter-spacing: .3px; }
+  .forn-sit { font-size: .7rem; font-weight: 700; padding: 2px 8px; border-radius: 20px; white-space: nowrap; }
+  .forn-sit.ativa   { background: #d4edda; color: #155724; }
+  .forn-sit.inativa { background: #f8d7da; color: #721c24; }
+  .forn-sit.outra   { background: #fff3cd; color: #856404; }
+  .forn-details { padding: 8px 12px; display: flex; flex-direction: column; gap: 4px; }
+  .forn-qsa { padding: 8px 12px; border-top: 1px solid var(--gray-100); }
+  .forn-qsa-title { font-size: .68rem; font-weight: 700; text-transform: uppercase; letter-spacing: .4px; color: var(--gray-500); margin-bottom: 4px; }
+  .forn-qsa-item { font-size: .75rem; color: var(--gray-700); padding: 2px 0; }
+  .forn-tabs { display: flex; border-bottom: 2px solid var(--gray-200); margin-bottom: 14px; gap: 0; }
+  .forn-tab { background: none; border: none; padding: 8px 18px; font-size: .78rem; font-weight: 700; text-transform: uppercase; letter-spacing: .5px; color: var(--gray-500); cursor: pointer; border-bottom: 2px solid transparent; margin-bottom: -2px; }
+  .forn-tab.active { color: var(--brand); border-bottom-color: var(--brand); }
+  .forn-tab:hover:not(.active) { color: var(--gray-700); }
+  .forn-cert-list { display: flex; flex-direction: column; gap: 8px; margin-bottom: 12px; }
+  .forn-cert-item { background: var(--gray-50); border: 1px solid var(--gray-200); border-radius: var(--radius); padding: 10px 12px; display: flex; justify-content: space-between; align-items: flex-start; gap: 8px; border-left: 4px solid var(--gray-300); }
+  .forn-cert-item.valid    { border-left-color: var(--success); }
+  .forn-cert-item.expiring { border-left-color: var(--warning); }
+  .forn-cert-item.expired  { border-left-color: var(--danger); }
+  .forn-cert-item.none     { border-left-color: var(--gray-300); }
+  .forn-cert-tipo { font-size: .75rem; font-weight: 700; color: var(--gray-700); }
+  .forn-cert-dates { font-size: .68rem; color: var(--gray-500); margin-top: 3px; }
+  .forn-cert-badge { font-size: .62rem; font-weight: 700; padding: 1px 7px; border-radius: 12px; white-space: nowrap; }
+  .forn-cert-badge.valid    { background: var(--success-light); color: var(--success); }
+  .forn-cert-badge.expiring { background: var(--warning-light); color: #856404; }
+  .forn-cert-badge.expired  { background: var(--danger-light); color: var(--danger); }
+  .forn-cert-badge.none     { background: var(--gray-100); color: var(--gray-500); }
+  .forn-cert-actions { display: flex; gap: 4px; flex-shrink: 0; }
+  .forn-list-item { background: var(--gray-50); border: 1px solid var(--gray-200); border-radius: var(--radius); padding: 12px 14px; margin-bottom: 10px; cursor: pointer; transition: border-color .15s; }
+  .forn-list-item.expanded { border-color: var(--gray-400); cursor: default; }
+  .forn-list-item.editing  { border-color: var(--brand); cursor: default; }
+  .forn-inline-body { border-top: 1px solid var(--gray-200); padding: 14px; margin: 8px -14px -12px; }
+  .forn-inline-edit-header { background: var(--gray-100); border-radius: var(--radius) var(--radius) 0 0; padding: 8px 14px; margin: 8px -14px 0; border-top: 1px solid var(--gray-200); }
+  .forn-list-header { display: flex; justify-content: space-between; align-items: flex-start; gap: 8px; margin-bottom: 8px; }
+  body.dark .forn-card, body.dark .forn-lookup { background: #2a2a2a; border-color: #383838; }
+  body.dark .forn-card-header { border-color: #383838; }
+  body.dark .forn-input-row input { background: #1e1e1e; color: #e0e0e0; border-color: #444; }
+  body.dark .forn-list-item { background: #2a2a2a; border-color: #383838; }
+  body.dark .forn-list-item.expanded { border-color: #666; }
+  body.dark .forn-inline-body { border-color: #444; }
+  body.dark .forn-inline-edit-header { background: #333; border-color: #444; }
+  body.dark .forn-cert-item { background: #1c1c1c; border-color: #383838; }
 </style>
 </head>
 <body>
@@ -139,7 +194,7 @@
     <button class="nav-item" id="nav-centros-custo" onclick="showCrud('centros-custo')">
       <span class="nav-ico">🏛️</span> Centros de Custo
     </button>
-    <button class="nav-item" id="nav-fornecedores" onclick="showCrud('fornecedores')">
+    <button class="nav-item" id="nav-fornecedores" onclick="showFornecedores()">
       <span class="nav-ico">🏢</span> Fornecedores
     </button>
     <button class="nav-item" id="nav-funcionarios" onclick="showCrud('funcionarios')">
@@ -305,7 +360,66 @@
     </div>
   </div>
 
-  <!-- ── CRUD genérico (Centros de Custo, Fornecedores, Funcionários, Frota, Pedidos) ── -->
+  <!-- ── Fornecedores (cadastro rico: CNPJ/CEIS-CNEP/certidões/sanções) ── -->
+  <div id="view-fornecedores" class="view">
+    <div class="dash-top">
+      <h2>Fornecedores</h2>
+      <div class="view-actions">
+        <div class="search-box">
+          <span>🔎</span>
+          <input type="text" id="forn-search" placeholder="Buscar por razão social ou CNPJ..." oninput="_debouncedRenderForn()" aria-label="Buscar fornecedor">
+        </div>
+        <button class="btn btn-outline" onclick="abrirImportarFornecedoresModal()">Importar backup</button>
+        <button class="btn btn-outline" onclick="gerarRelatorioSancoesGlobal()">📄 Sanções (todos)</button>
+        <button class="btn btn-primary" onclick="openFornModal()">+ Novo Fornecedor</button>
+      </div>
+    </div>
+    <div id="forn-list"></div>
+  </div>
+
+  <!-- ── Fornecedor: novo (consulta CNPJ) ── -->
+  <div class="overlay hidden" id="forn-modal-overlay" role="dialog" aria-modal="true" aria-labelledby="forn-modal-titulo">
+    <div class="modal" style="max-width:520px">
+      <div class="modal-header">
+        <h2 id="forn-modal-titulo">Novo Fornecedor</h2>
+        <button class="btn btn-ghost btn-icon" onclick="closeFornModal()">✕</button>
+      </div>
+      <div class="modal-body">
+        <div class="forn-lookup" style="margin-top:0">
+          <label for="forn-modal-cnpj" style="font-size:.72rem;font-weight:700;text-transform:uppercase;letter-spacing:.4px;color:var(--gray-500);display:block;margin-bottom:6px">CNPJ do Fornecedor</label>
+          <div class="forn-input-row">
+            <input type="text" id="forn-modal-cnpj" placeholder="00.000.000/0000-00" oninput="maskCnpj(this)" maxlength="18">
+            <button class="btn btn-primary btn-sm" onclick="buscarCnpjModal()">🔍 Consultar</button>
+          </div>
+        </div>
+        <div id="forn-modal-card"></div>
+      </div>
+      <div class="modal-footer">
+        <button class="btn btn-outline" onclick="closeFornModal()">Cancelar</button>
+        <button class="btn btn-primary" id="forn-modal-save-btn" disabled onclick="saveFornModal()">Salvar Fornecedor</button>
+      </div>
+    </div>
+  </div>
+
+  <!-- ── Fornecedores: importar backup (SGCA/SGCD) ── -->
+  <div class="overlay hidden" id="forn-import-overlay" role="dialog" aria-modal="true" aria-labelledby="forn-import-titulo">
+    <div class="modal" style="max-width:460px">
+      <div class="modal-header">
+        <h2 id="forn-import-titulo">Importar Fornecedores</h2>
+        <button class="btn btn-ghost btn-icon" onclick="fecharImportarFornecedoresModal()">✕</button>
+      </div>
+      <div class="modal-body">
+        <p style="font-size:.82rem;color:var(--gray-600);margin-bottom:10px">Selecione um arquivo de backup JSON do SGCA ou SGCD. Fornecedores com o mesmo CNPJ são atualizados (preservando certidões/sanções já cadastradas aqui); os demais são adicionados. Nada é apagado.</p>
+        <input type="file" id="forn-import-file" accept=".json">
+      </div>
+      <div class="modal-footer">
+        <button class="btn btn-outline" onclick="fecharImportarFornecedoresModal()">Cancelar</button>
+        <button class="btn btn-primary" onclick="importarFornecedoresArquivo()">Importar</button>
+      </div>
+    </div>
+  </div>
+
+  <!-- ── CRUD genérico (Centros de Custo, Funcionários, Frota, Pedidos) ── -->
   <div id="view-crud" class="view">
     <div class="dash-top">
       <h2 id="crud-titulo">—</h2>
@@ -433,6 +547,11 @@
         <legend>Autoridade Competente</legend>
         <div class="info-field"><label for="cfg-aut-nome">Nome</label><input type="text" id="cfg-aut-nome" placeholder="Nome completo"></div>
         <div class="info-field"><label for="cfg-aut-cargo">Cargo</label><input type="text" id="cfg-aut-cargo" placeholder="Ex: Secretário de Administração"></div>
+      </fieldset>
+      <fieldset class="cfg-fieldset">
+        <legend>Consulta de Sanções (CEIS/CNEP)</legend>
+        <div class="info-field"><label for="cfg-portal-transparencia-key">Chave de API — Portal da Transparência <span style="color:var(--gray-400);font-weight:400">(consulta automática de CEIS/CNEP no cadastro de Fornecedores)</span></label>
+          <input type="text" id="cfg-portal-transparencia-key" placeholder="Obtida gratuitamente em api.portaldatransparencia.gov.br"></div>
       </fieldset>
       <fieldset class="cfg-fieldset">
         <legend>Brasão do Município</legend>
@@ -860,7 +979,7 @@
 // ══════════════════════════════════════════════════════════════
 // API / SESSÃO
 // ══════════════════════════════════════════════════════════════
-const SGEA_VERSION = '0.17.0';
+const SGEA_VERSION = '0.18.0';
 document.title = `SGEA v${SGEA_VERSION}`;
 
 let _apiToken = localStorage.getItem('sgea-token') || null;
@@ -1221,18 +1340,9 @@ const CRUD_MODULES = {
     ],
     columns: [{ h: 'Código', k: 'codigo' }, { h: 'Nome', k: 'nome' }, { h: 'Status', k: 'ativo', badge: true }],
   },
-  'fornecedores': {
-    titulo: 'Fornecedores', navId: 'nav-fornecedores',
-    fields: [
-      { key: 'razao_social', label: 'Razão Social', required: true },
-      { key: 'nome_fantasia', label: 'Nome Fantasia' },
-      { key: 'cnpj', label: 'CNPJ' },
-      { key: 'telefone', label: 'Telefone' },
-      { key: 'email', label: 'E-mail', type: 'email' },
-      { key: 'ativo', label: 'Ativo', type: 'checkbox', default: true },
-    ],
-    columns: [{ h: 'Razão Social', k: 'razao_social' }, { h: 'CNPJ', k: 'cnpj' }, { h: 'Telefone', k: 'telefone' }, { h: 'Status', k: 'ativo', badge: true }],
-  },
+  // fornecedores NÃO está aqui — cadastro rico (CNPJ/CEIS-CNEP/certidões/
+  // sanções), tela própria: showFornecedores/renderFornecedores/
+  // toggleFornCard, mais abaixo.
   'funcionarios': {
     titulo: 'Funcionários', navId: 'nav-funcionarios',
     fields: [
@@ -1592,6 +1702,879 @@ async function deleteProduto(id) {
   await _auditEvento('PRODUTO_EXCLUIDO', `Produto "${item?.nome || id}" excluído`, id);
   toast('Produto excluído.', 'success');
   renderProdutos();
+}
+
+// ══════════════════════════════════════════════════════════════
+// FORNECEDORES — cadastro rico (CNPJ/CEIS-CNEP/certidões/sanções),
+// portado do SGCD/SGCA. Não usa o motor CRUD genérico — ver server.py.
+// ══════════════════════════════════════════════════════════════
+
+function cleanCnpj(s) { return (s || '').replace(/\D/g, ''); }
+
+// Valida dígitos verificadores do CNPJ (algoritmo oficial da Receita Federal)
+function validarCnpj(s) {
+  const d = cleanCnpj(s);
+  if (d.length !== 14) return false;
+  if (/^(\d)\1+$/.test(d)) return false;
+  const calc = (n) => {
+    let sum = 0, pos = n - 7;
+    for (let i = 0; i < n; i++) {
+      sum += parseInt(d[i]) * pos--;
+      if (pos < 2) pos = 9;
+    }
+    const r = sum % 11;
+    return r < 2 ? 0 : 11 - r;
+  };
+  return calc(12) === parseInt(d[12]) && calc(13) === parseInt(d[13]);
+}
+
+function formatCnpj(s) {
+  const d = cleanCnpj(s);
+  if (d.length !== 14) return s;
+  return `${d.slice(0,2)}.${d.slice(2,5)}.${d.slice(5,8)}/${d.slice(8,12)}-${d.slice(12)}`;
+}
+function maskCnpj(input) {
+  let v = cleanCnpj(input.value).slice(0, 14);
+  if (v.length > 12) v = v.replace(/^(\d{2})(\d{3})(\d{3})(\d{4})(\d{0,2})/, '$1.$2.$3/$4-$5');
+  else if (v.length > 8) v = v.replace(/^(\d{2})(\d{3})(\d{3})(\d{0,4})/, '$1.$2.$3/$4');
+  else if (v.length > 5) v = v.replace(/^(\d{2})(\d{3})(\d{0,3})/, '$1.$2.$3');
+  else if (v.length > 2) v = v.replace(/^(\d{2})(\d{0,3})/, '$1.$2');
+  input.value = v;
+}
+function cnpjSitClass(sit) {
+  if (!sit) return 'outra';
+  const s = sit.toUpperCase();
+  if (s.includes('ATIVA')) return 'ativa';
+  if (s.includes('BAIXADA') || s.includes('INAPTA') || s.includes('CANCELADA')) return 'inativa';
+  return 'outra';
+}
+
+// Normaliza resposta da ReceitaWS pro formato interno
+function _normReceitaWS(d) {
+  const logr = d.logradouro || '', num = d.numero || '', comp = d.complemento || '', bair = d.bairro || '';
+  const mun = d.municipio || '', uf = d.uf || '', cep = (d.cep || '').replace(/\D/g, '');
+  const end = [logr, num, comp, bair, mun ? `${mun}/${uf}` : '', cep ? `CEP ${cep}` : ''].filter(Boolean).join(', ');
+  return {
+    razao_social: d.nome || '', nome_fantasia: d.fantasia || '',
+    situacao: d.situacao || '', data_situacao: d.data_situacao || '',
+    porte: d.porte || '', capital_social: d.capital_social ? parseFloat(d.capital_social) : null,
+    abertura: d.abertura || '', natureza_juridica: d.natureza_juridica || '',
+    cnae_cod: (d.atividade_principal?.[0]?.code || '').replace(/\D/g, ''),
+    cnae: d.atividade_principal?.[0]?.text || '',
+    logradouro: logr, numero: num, complemento: comp, bairro: bair, municipio: mun, uf, cep, endereco: end,
+    email: d.email || '', telefone: d.telefone ? d.telefone.replace(/\D/g, '') : '', telefone2: '',
+    opcao_simples: !!(d.simples?.optante), opcao_mei: !!(d.simei?.optante),
+    qsa: (d.qsa || []).map(s => ({ nome: s.nome, qual: s.qual })),
+  };
+}
+
+// Normaliza resposta da BrasilAPI pro formato interno
+function _normBrasilAPI(d) {
+  const logr = [d.descricao_tipo_de_logradouro, d.logradouro].filter(Boolean).join(' ');
+  const num = d.numero || '', comp = d.complemento || '', bair = d.bairro || '';
+  const mun = d.municipio || '', uf = d.uf || '', cep = (d.cep || '').replace(/\D/g, '');
+  const end = [logr, num, comp, bair, mun ? `${mun}/${uf}` : '', cep ? `CEP ${cep}` : ''].filter(Boolean).join(', ');
+  return {
+    razao_social: d.razao_social || '', nome_fantasia: d.nome_fantasia || '',
+    situacao: d.descricao_situacao_cadastral || '', data_situacao: d.data_situacao_cadastral || '',
+    porte: d.descricao_porte || '', capital_social: d.capital_social || null,
+    abertura: d.data_inicio_atividade || '', natureza_juridica: d.natureza_juridica || '',
+    cnae_cod: d.cnae_fiscal || '', cnae: d.cnae_fiscal_descricao || '',
+    logradouro: logr, numero: num, complemento: comp, bairro: bair, municipio: mun, uf, cep, endereco: end,
+    email: d.email || '', telefone: d.ddd_telefone_1 || '', telefone2: d.ddd_telefone_2 || '',
+    opcao_simples: !!d.opcao_pelo_simples, opcao_mei: !!d.opcao_pelo_mei,
+    qsa: (d.qsa || []).map(s => ({ nome: s.nome_socio, qual: s.qualificacao_socio })),
+  };
+}
+
+// Consulta CNPJ: proxy local (server.py → ReceitaWS) → ReceitaWS direto → BrasilAPI
+async function fetchCnpjData(digits) {
+  try {
+    const r = await fetch(`/cnpj/${digits}`, { signal: AbortSignal.timeout(10000) });
+    if (r.ok) { const d = await r.json(); if (d.status === 'OK') return { data: _normReceitaWS(d), fonte: 'ReceitaWS' }; }
+  } catch (_) { /* servidor local indisponível — tenta direto */ }
+  try {
+    const r = await fetch(`https://receitaws.com.br/v1/cnpj/${digits}`, { signal: AbortSignal.timeout(8000) });
+    if (r.ok) { const d = await r.json(); if (d.status === 'OK') return { data: _normReceitaWS(d), fonte: 'ReceitaWS' }; }
+  } catch (_) { /* rate limit ou CORS — tenta BrasilAPI */ }
+  const r2 = await fetch(`https://brasilapi.com.br/api/cnpj/v1/${digits}`, { signal: AbortSignal.timeout(10000) });
+  if (!r2.ok) throw new Error('CNPJ não encontrado ou inválido.');
+  const d2 = await r2.json();
+  if (d2.message) throw new Error(d2.message);
+  return { data: _normBrasilAPI(d2), fonte: 'BrasilAPI' };
+}
+
+let _cnpjQueryInProgress = false;
+
+async function listarFornecedores(trash = false) {
+  const r = await API.get(`/api/fornecedores?per=2000${trash ? '&trash=1' : ''}`);
+  const d = await API.json(r);
+  return d?.items || [];
+}
+async function buscarFornecedor(id) {
+  const r = await API.get(`/api/fornecedores/${id}`);
+  return r?.ok ? API.json(r) : null;
+}
+async function salvarFornecedor(data) {
+  const r = await API.put(`/api/fornecedores/${data.id}`, data);
+  if (!r) throw new Error('Falha de rede ao salvar o fornecedor.');
+  if (r.status === 409) {
+    const body = await API.json(r);
+    const err = new Error(body?.error || 'Fornecedor foi alterado por outro usuário.');
+    err.conflict = true;
+    throw err;
+  }
+  if (!r.ok) {
+    const body = await API.json(r).catch(() => null);
+    throw new Error(body?.error || `Erro ao salvar (HTTP ${r.status}).`);
+  }
+  return API.json(r);
+}
+async function criarFornecedor(data) {
+  const r = await API.post('/api/fornecedores', data);
+  if (!r?.ok) throw new Error('Erro ao criar fornecedor.');
+  return API.json(r);
+}
+
+let _expandedFornId = null;
+let _currentForn = null;
+let _fornTab = 'dados';
+
+function showFornecedores() {
+  _showView('view-fornecedores', 'nav-fornecedores');
+  renderFornecedores();
+}
+function _debouncedRenderForn() { clearTimeout(window.__fornDebounce); window.__fornDebounce = setTimeout(renderFornecedores, 250); }
+
+async function renderFornecedores() {
+  const all = await listarFornecedores();
+  const q = (document.getElementById('forn-search')?.value || '').toLowerCase();
+  const lista = all
+    .filter(f => !q || f.razao_social?.toLowerCase().includes(q) || f.cnpj?.includes(q) || f.nome_fantasia?.toLowerCase().includes(q))
+    .sort((a, b) => (a.razao_social || '').localeCompare(b.razao_social || '', 'pt-BR'));
+
+  const el = document.getElementById('forn-list');
+  if (!lista.length) {
+    el.innerHTML = `<div class="empty">${q ? 'Nenhum fornecedor encontrado.' : 'Nenhum fornecedor cadastrado ainda.'}</div>`;
+    return;
+  }
+  el.innerHTML = lista.map(f => {
+    const sitCls = cnpjSitClass(f.situacao);
+    return `<div class="forn-list-item" data-forn-id="${f.id}" onclick="toggleFornCard('${f.id}')" role="button" tabindex="0">
+      <div class="forn-list-header">
+        <div>
+          <div class="forn-razao">${esc(f.razao_social)}</div>
+          ${f.nome_fantasia ? `<div class="forn-fantasia">${esc(f.nome_fantasia)}</div>` : ''}
+          <div class="forn-cnpj-row">
+            <span class="forn-cnpj-txt">${esc(f.cnpj)}</span>
+            <button class="copy-btn" onclick="event.stopPropagation();navigator.clipboard.writeText('${f.cnpj_digits || ''}');toast('CNPJ copiado!','success')">📋 copiar</button>
+          </div>
+        </div>
+        <div style="display:flex;flex-direction:column;align-items:flex-end;gap:6px">
+          <span class="forn-sit ${sitCls}">${esc(f.situacao || '—')}</span>
+          <button class="btn btn-outline btn-sm" style="font-size:.68rem;padding:2px 10px" onclick="event.stopPropagation();toggleFornCard('${f.id}',true)">✏ Editar</button>
+        </div>
+      </div>
+    </div>`;
+  }).join('');
+}
+
+async function toggleFornCard(id, editMode = false, tab = 'dados') {
+  if (_expandedFornId && _expandedFornId !== id) _collapseFornCard(_expandedFornId);
+  if (_expandedFornId === id && !editMode) { _collapseFornCard(id); return; }
+  _currentForn = await buscarFornecedor(id);
+  if (!_currentForn) return;
+  _currentForn._baseUpdatedAt = _currentForn.updatedAt;
+  _expandedFornId = id;
+  _fornTab = tab;
+  if (editMode) _renderFornCardEdit();
+  else if (tab === 'sancoes') _renderFornCardSancoes();
+  else if (tab === 'certs') _renderFornCardCerts();
+  else _renderFornCardView();
+}
+function _collapseFornCard(id) {
+  const el = document.querySelector(`.forn-list-item[data-forn-id="${id}"]`);
+  if (el) {
+    el.classList.remove('expanded', 'editing');
+    el.querySelector('.forn-inline-body')?.remove();
+    el.querySelector('.forn-inline-edit-header')?.remove();
+  }
+  if (_expandedFornId === id) { _expandedFornId = null; _currentForn = null; }
+}
+function _getFornCardEl() {
+  return document.querySelector(`.forn-list-item[data-forn-id="${_expandedFornId}"]`);
+}
+function _setFornCardBody(html, mode = 'view') {
+  const el = _getFornCardEl();
+  if (!el) return;
+  el.classList.remove('expanded', 'editing');
+  el.classList.add(mode === 'edit' ? 'editing' : 'expanded');
+  el.querySelector('.forn-inline-body')?.remove();
+  el.querySelector('.forn-inline-edit-header')?.remove();
+  el.insertAdjacentHTML('beforeend', html);
+  el.scrollIntoView({ behavior: 'smooth', block: 'nearest' });
+}
+
+function _fornTabsHtml(active) {
+  return `<div class="forn-tabs">
+    <button class="forn-tab ${active==='dados'?'active':''}" onclick="event.stopPropagation();_switchFornTab('dados')">Dados</button>
+    <button class="forn-tab ${active==='certs'?'active':''}" onclick="event.stopPropagation();_switchFornTab('certs')">Certidões</button>
+    <button class="forn-tab ${active==='sancoes'?'active':''}" onclick="event.stopPropagation();_switchFornTab('sancoes')">Sanções</button>
+  </div>`;
+}
+function _switchFornTab(tab) {
+  _fornTab = tab;
+  if (tab === 'dados') _renderFornCardView();
+  else if (tab === 'sancoes') _renderFornCardSancoes();
+  else _renderFornCardCerts();
+}
+
+function _fornViewHtml(f) {
+  const sitCls = cnpjSitClass(f.situacao);
+  const fmtD = s => {
+    if (!s) return '—';
+    const iso = /^\d{2}\/\d{2}\/\d{4}$/.test(s) ? s.split('/').reverse().join('-') : s;
+    const d = new Date(iso + 'T00:00:00');
+    return isNaN(d) ? s : fmtDate(iso);
+  };
+  const fmtCap = v => v != null ? v.toLocaleString('pt-BR', { style: 'currency', currency: 'BRL' }) : null;
+  const row = (icon, label, val) => val ? `<div style="display:flex;gap:6px;align-items:baseline;font-size:.78rem;color:var(--gray-700);padding:3px 0;border-bottom:1px solid var(--gray-100)"><span style="min-width:14px">${icon}</span><span style="color:var(--gray-400);min-width:110px;font-size:.72rem">${label}</span><span>${val}</span></div>` : '';
+
+  let endStr = '';
+  if (f.logradouro || f.municipio) {
+    endStr = [[f.logradouro, f.numero].filter(Boolean).join(', '), f.complemento, f.bairro,
+      f.cep ? `CEP ${f.cep}` : '', [f.municipio, f.uf].filter(Boolean).join('/')].filter(Boolean).join(' — ');
+  } else { endStr = f.endereco || ''; }
+
+  const qsaHtml = (f.qsa || []).length
+    ? `<div class="forn-qsa"><div class="forn-qsa-title">Quadro Societário (QSA)</div>
+        ${f.qsa.map(s => `<div class="forn-qsa-item">👤 ${esc(s.nome)}${s.qual ? ` — ${esc(s.qual)}` : ''}</div>`).join('')}
+      </div>` : '';
+
+  const regimeBadges = [
+    f.opcao_simples ? `<span style="font-size:.68rem;background:#dcfce7;color:#166534;border-radius:20px;padding:2px 8px;font-weight:600">Simples Nacional</span>` : '',
+    f.opcao_mei ? `<span style="font-size:.68rem;background:#dbeafe;color:#1e40af;border-radius:20px;padding:2px 8px;font-weight:600">MEI</span>` : '',
+  ].filter(Boolean).join(' ');
+
+  return `<div>
+    <div style="display:flex;justify-content:space-between;align-items:flex-start;padding-bottom:10px;border-bottom:2px solid var(--gray-100);margin-bottom:10px">
+      <div style="flex:1;min-width:0">
+        <div class="forn-razao" style="font-size:.95rem">${esc(f.razao_social)}</div>
+        ${f.nome_fantasia && f.nome_fantasia !== f.razao_social ? `<div class="forn-fantasia">${esc(f.nome_fantasia)}</div>` : ''}
+        <div class="forn-cnpj-row" style="margin-top:5px">
+          <span class="forn-cnpj-txt">${esc(f.cnpj)}</span>
+          <button class="copy-btn" onclick="navigator.clipboard.writeText('${f.cnpj_digits || ''}');toast('CNPJ copiado!','success')">📋 copiar</button>
+        </div>
+        <div style="display:flex;gap:6px;flex-wrap:wrap;margin-top:7px">
+          <a href="https://portaldatransparencia.gov.br/sancoes/consulta?cpfCnpj=${f.cnpj_digits || ''}" target="_blank" rel="noopener" class="btn btn-outline btn-sm" style="font-size:.7rem;padding:2px 8px">Sanções (Portal)</a>
+          <button class="btn btn-outline btn-sm" style="font-size:.7rem;padding:2px 8px" onclick="consultarCeisCnep('${f.id}','${f.cnpj_digits || ''}')">🔍 Consultar CEIS/CNEP</button>
+        </div>
+        <div id="forn-ceis-cnep-${f.id}" style="font-size:.75rem;margin-top:6px"></div>
+      </div>
+      <div style="text-align:right;flex-shrink:0;margin-left:10px">
+        <span class="forn-sit ${sitCls}">${esc(f.situacao || '—')}</span>
+      </div>
+    </div>
+
+    <div style="margin-bottom:10px">
+      <div class="forn-qsa-title">Identificação</div>
+      ${row('📅', 'Data de Abertura', f.abertura ? fmtD(f.abertura) : null)}
+      ${row('🏢', 'Porte', f.porte || null)}
+      ${row('📋', 'Natureza Jurídica', f.natureza_juridica || null)}
+      ${row('💰', 'Capital Social', fmtCap(f.capital_social))}
+      ${regimeBadges ? `<div style="margin-top:5px;display:flex;gap:4px;flex-wrap:wrap">${regimeBadges}</div>` : ''}
+    </div>
+
+    ${endStr ? `<div style="margin-bottom:10px"><div class="forn-qsa-title">Endereço</div>
+      <div style="font-size:.78rem;color:var(--gray-700);line-height:1.6">${esc(endStr)}</div></div>` : ''}
+
+    ${f.cnae ? `<div style="margin-bottom:10px"><div class="forn-qsa-title">Atividade Econômica</div>
+      <div style="font-size:.78rem;color:var(--gray-700)"><span style="color:var(--gray-400);font-size:.72rem">Principal${f.cnae_cod ? ` (${f.cnae_cod})` : ''} </span>${esc(f.cnae)}</div></div>` : ''}
+
+    ${(f.telefone || f.telefone2 || f.email) ? `<div style="margin-bottom:10px"><div class="forn-qsa-title">Contato</div>
+      ${row('📞', 'Telefone', f.telefone || null)}
+      ${row('📞', 'Telefone 2', f.telefone2 || null)}
+      ${row('✉️', 'E-mail', f.email ? `<a href="mailto:${esc(f.email)}" style="color:var(--brand)">${esc(f.email)}</a>` : null)}
+    </div>` : ''}
+
+    ${qsaHtml}
+
+    ${f.obs ? `<div style="margin-top:10px;padding:8px 10px;background:var(--gray-50);border-radius:var(--radius);font-size:.78rem;color:var(--gray-700);border-left:3px solid var(--brand)"><strong>Obs:</strong> ${esc(f.obs)}</div>` : ''}
+
+    <div style="font-size:.65rem;color:var(--gray-400);margin-top:10px;padding-top:8px;border-top:1px solid var(--gray-100)">
+      Atualizado em ${fmtDateTime(f.updatedAt)}
+    </div>
+  </div>`;
+}
+
+function _renderFornCardView() {
+  const f = _currentForn;
+  _setFornCardBody(`<div class="forn-inline-body" onclick="event.stopPropagation()">
+    ${_fornTabsHtml('dados')}
+    ${_fornViewHtml(f)}
+    <div style="display:flex;justify-content:flex-end;gap:8px;margin-top:12px;padding-top:10px;border-top:1px solid var(--gray-200)">
+      <button class="btn btn-outline" onclick="_collapseFornCard('${f.id}')">Fechar</button>
+      <button class="btn btn-primary" onclick="_renderFornCardEdit()">✏ Editar</button>
+    </div>
+  </div>`, 'view');
+}
+
+// ── Certidões (tipos simplificados — não é catálogo aberto/editável) ──────
+const CERT_TIPOS = [
+  { id: 'rfb', label: 'Receita Federal (RFB/PGFN)' },
+  { id: 'estadual', label: 'Fazenda Estadual' },
+  { id: 'municipal', label: 'Fazenda Municipal' },
+  { id: 'fgts', label: 'FGTS (CRF)' },
+  { id: 'trabalhista', label: 'Trabalhista (CNDT)' },
+  { id: 'outro', label: 'Outra' },
+];
+function certTipoLabel(c) {
+  if (c.tipoId === 'outro') return c.tipoDesc || 'Outra';
+  return CERT_TIPOS.find(t => t.id === c.tipoId)?.label || c.tipoDesc || 'Certidão';
+}
+function certDaysLeft(c) {
+  if (!c.validade) return null;
+  const hoje = new Date(); hoje.setHours(0, 0, 0, 0);
+  const v = new Date(c.validade + 'T00:00:00');
+  return Math.round((v - hoje) / 86400000);
+}
+function certStatus(c) {
+  const d = certDaysLeft(c);
+  if (d === null) return 'none';
+  if (d < 0) return 'expired';
+  if (d <= 30) return 'expiring';
+  return 'valid';
+}
+function certStatusLabel(status, days) {
+  if (status === 'expired') return `Vencida há ${Math.abs(days)} dia${Math.abs(days) === 1 ? '' : 's'}`;
+  if (status === 'expiring') return `Vence em ${days} dia${days === 1 ? '' : 's'}`;
+  if (status === 'valid') return 'Válida';
+  return 'Sem validade';
+}
+
+function _renderFornCardCerts() {
+  _fornTab = 'certs';
+  const f = _currentForn;
+  const certs = f.certidoes || [];
+  const itemsHtml = certs.length ? certs.map((c, i) => {
+    const st = certStatus(c);
+    return `<div class="forn-cert-item ${st}">
+      <div style="flex:1;min-width:0">
+        <div class="forn-cert-tipo">${esc(certTipoLabel(c))}</div>
+        <div class="forn-cert-dates">Emissão: ${fmtDate(c.emissao)} · Validade: ${fmtDate(c.validade)}</div>
+        <span class="forn-cert-badge ${st}">${certStatusLabel(st, certDaysLeft(c))}</span>
+      </div>
+      <div class="forn-cert-actions">
+        <button class="btn btn-outline btn-sm" style="padding:2px 8px;font-size:.65rem" onclick="openCertEdit('${f.id}',${i})">✏</button>
+        <button class="btn btn-danger btn-sm" style="padding:2px 8px;font-size:.65rem" onclick="deleteCert('${f.id}',${i})">✕</button>
+      </div>
+    </div>`;
+  }).join('') : '<p style="color:var(--gray-500);font-size:.8rem;text-align:center;padding:20px 0">Nenhuma certidão cadastrada.</p>';
+  _setFornCardBody(`<div class="forn-inline-body" onclick="event.stopPropagation()">
+    ${_fornTabsHtml('certs')}
+    <div class="forn-cert-list">${itemsHtml}</div>
+    <button class="btn btn-outline" style="width:100%" onclick="openCertEdit('${f.id}', -1)">+ Adicionar Certidão</button>
+    <div style="display:flex;justify-content:flex-end;gap:8px;margin-top:12px;padding-top:10px;border-top:1px solid var(--gray-200)">
+      <button class="btn btn-outline" onclick="_collapseFornCard('${f.id}')">Fechar</button>
+      <button class="btn btn-primary" onclick="_renderFornCardEdit()">✏ Editar</button>
+    </div>
+  </div>`, 'view');
+}
+
+let _certEditFornId = null, _certEditIdx = -1;
+function openCertEdit(fornId, idx) {
+  _certEditFornId = fornId;
+  _certEditIdx = idx;
+  const f = _currentForn;
+  const c = idx >= 0 ? (f.certidoes || [])[idx] : {};
+  const tiposHtml = CERT_TIPOS.map(t => `<option value="${t.id}" ${c.tipoId === t.id ? 'selected' : ''}>${esc(t.label)}</option>`).join('');
+  _setFornCardBody(`<div class="forn-inline-body" onclick="event.stopPropagation()">
+    <div style="font-size:.78rem;font-weight:700;margin-bottom:10px">${idx >= 0 ? 'Editar' : 'Nova'} Certidão</div>
+    <div class="info-field"><label for="ce-tipo">Tipo</label><select id="ce-tipo">${tiposHtml}</select></div>
+    <div class="info-field" id="ce-tipo-outro-wrap" style="${c.tipoId === 'outro' || !c.tipoId ? '' : 'display:none'}">
+      <label for="ce-tipo-outro">Descrição (se "Outra")</label><input type="text" id="ce-tipo-outro" value="${esc(c.tipoDesc || '')}"></div>
+    <div class="info-field"><label for="ce-emissao">Data de Emissão</label><input type="date" id="ce-emissao" value="${esc(c.emissao || '')}"></div>
+    <div class="info-field"><label for="ce-validade">Data de Validade</label><input type="date" id="ce-validade" value="${esc(c.validade || '')}"></div>
+    <div style="display:flex;justify-content:flex-end;gap:8px;margin-top:12px;padding-top:10px;border-top:1px solid var(--gray-200)">
+      <button class="btn btn-outline" onclick="_renderFornCardCerts()">Cancelar</button>
+      <button class="btn btn-primary" onclick="saveCertEdit()">Salvar</button>
+    </div>
+  </div>`, 'view');
+  document.getElementById('ce-tipo').addEventListener('change', e => {
+    document.getElementById('ce-tipo-outro-wrap').style.display = e.target.value === 'outro' ? '' : 'none';
+  });
+}
+async function saveCertEdit() {
+  const tipoId = document.getElementById('ce-tipo').value;
+  const tipoDesc = tipoId === 'outro' ? document.getElementById('ce-tipo-outro').value.trim() : '';
+  const emissao = document.getElementById('ce-emissao').value;
+  const validade = document.getElementById('ce-validade').value;
+  const cert = { tipoId, tipoDesc, emissao, validade };
+  const forn = await buscarFornecedor(_certEditFornId);
+  if (!forn) return;
+  const certidoes = forn.certidoes || [];
+  if (_certEditIdx === -1) certidoes.push(cert); else certidoes[_certEditIdx] = cert;
+  forn.certidoes = certidoes;
+  try {
+    await salvarFornecedor(forn);
+  } catch (e) { toast(e.message, 'error'); return; }
+  _currentForn = await buscarFornecedor(forn.id);
+  await _auditEvento('FORNECEDOR_EDITADO', `Certidão registrada para ${forn.razao_social}`);
+  toast('Certidão salva!', 'success');
+  if (document.getElementById('view-fornecedores').classList.contains('active')) await renderFornecedores();
+  _renderFornCardCerts();
+}
+async function deleteCert(fornId, idx) {
+  const ok = await customConfirm('Excluir esta certidão?', { title: 'Excluir Certidão', okLabel: 'Excluir' });
+  if (!ok) return;
+  const forn = await buscarFornecedor(fornId);
+  if (!forn) return;
+  forn.certidoes = (forn.certidoes || []).filter((_, i) => i !== idx);
+  try {
+    await salvarFornecedor(forn);
+  } catch (e) { toast(e.message, 'error'); return; }
+  _currentForn = await buscarFornecedor(forn.id);
+  toast('Certidão removida.', 'success');
+  if (document.getElementById('view-fornecedores').classList.contains('active')) await renderFornecedores();
+  _renderFornCardCerts();
+}
+
+// ── Edição (campos essenciais — porte/natureza como texto livre, QSA
+// somente-leitura, populado pela consulta de CNPJ) ─────────────────────────
+function _renderFornCardEdit() {
+  const f = _currentForn;
+  _setFornCardBody(`<div class="forn-inline-edit-header" onclick="event.stopPropagation()">
+    <div style="font-size:.78rem;font-weight:600;color:var(--gray-700)">Editando: ${esc(f.razao_social)}</div>
+    <div class="forn-lookup" style="margin-top:8px;margin-bottom:0">
+      <label for="forn-edit-cnpj" style="font-size:.72rem;font-weight:700;text-transform:uppercase;letter-spacing:.4px;color:var(--gray-500);display:block;margin-bottom:6px">Reconsultar CNPJ (atualiza dados da Receita Federal)</label>
+      <div class="forn-input-row">
+        <input type="text" id="forn-edit-cnpj" value="${esc(f.cnpj)}" oninput="maskCnpj(this)" maxlength="18">
+        <button class="btn btn-outline btn-sm" onclick="_reconsultarForn()">🔄 Atualizar</button>
+      </div>
+    </div>
+  </div>
+  <div class="forn-inline-body" style="border-top:none" onclick="event.stopPropagation()">
+    <div class="info-field"><label for="fe-razao">Razão Social</label><input type="text" id="fe-razao" value="${esc(f.razao_social || '')}"></div>
+    <div class="info-field"><label for="fe-fantasia">Nome Fantasia</label><input type="text" id="fe-fantasia" value="${esc(f.nome_fantasia || '')}"></div>
+    <div class="info-field"><label for="fe-situacao">Situação Cadastral</label><input type="text" id="fe-situacao" value="${esc(f.situacao || '')}"></div>
+    <div class="info-field"><label for="fe-porte">Porte</label><input type="text" id="fe-porte" value="${esc(f.porte || '')}"></div>
+    <div class="info-field"><label for="fe-nat-jur">Natureza Jurídica</label><input type="text" id="fe-nat-jur" value="${esc(f.natureza_juridica || '')}"></div>
+    <div class="info-field"><label for="fe-telefone">Telefone</label><input type="text" id="fe-telefone" value="${esc(f.telefone || '')}"></div>
+    <div class="info-field"><label for="fe-telefone2">Telefone 2</label><input type="text" id="fe-telefone2" value="${esc(f.telefone2 || '')}"></div>
+    <div class="info-field"><label for="fe-email">E-mail</label><input type="email" id="fe-email" value="${esc(f.email || '')}"></div>
+    <div class="info-field"><label for="fe-obs">Observações</label><textarea id="fe-obs">${esc(f.obs || '')}</textarea></div>
+    <div style="display:flex;justify-content:space-between;gap:8px;margin-top:14px;padding-top:12px;border-top:1px solid var(--gray-200)">
+      <button class="btn btn-danger btn-outline" onclick="_deleteForn('${f.id}','${esc(f.razao_social || '').replace(/'/g,"\\'")}')">Excluir Fornecedor</button>
+      <div style="display:flex;gap:8px">
+        <button class="btn btn-outline" onclick="_renderFornCardView()">Cancelar</button>
+        <button class="btn btn-primary" onclick="_saveFornEdit()">Salvar alterações</button>
+      </div>
+    </div>
+  </div>`, 'edit');
+}
+async function _reconsultarForn() {
+  const f = _currentForn;
+  const digits = cleanCnpj(document.getElementById('forn-edit-cnpj').value);
+  if (digits.length !== 14 || !validarCnpj(digits)) { toast('CNPJ inválido.', 'error'); return; }
+  if (_cnpjQueryInProgress) return;
+  _cnpjQueryInProgress = true;
+  toast('Consultando Receita Federal…', '');
+  try {
+    const { data: d, fonte } = await fetchCnpjData(digits);
+    Object.assign(f, d, { consultadoEm: new Date().toISOString() });
+    toast(`Dados atualizados via ${fonte}!`, 'success');
+    _renderFornCardEdit();
+  } catch (e) {
+    toast(e.message || 'Erro ao consultar CNPJ.', 'error');
+  } finally {
+    _cnpjQueryInProgress = false;
+  }
+}
+async function _saveFornEdit() {
+  const f = _currentForn;
+  f.razao_social = document.getElementById('fe-razao').value.trim();
+  f.nome_fantasia = document.getElementById('fe-fantasia').value.trim();
+  f.situacao = document.getElementById('fe-situacao').value.trim();
+  f.porte = document.getElementById('fe-porte').value.trim();
+  f.natureza_juridica = document.getElementById('fe-nat-jur').value.trim();
+  f.telefone = document.getElementById('fe-telefone').value.trim();
+  f.telefone2 = document.getElementById('fe-telefone2').value.trim();
+  f.email = document.getElementById('fe-email').value.trim();
+  f.obs = document.getElementById('fe-obs').value.trim();
+  if (!f.razao_social) { toast('Razão social é obrigatória.', 'error'); return; }
+  try {
+    await salvarFornecedor(f);
+  } catch (e) {
+    if (e.conflict) { toast(e.message, 'error'); _currentForn = await buscarFornecedor(f.id); _renderFornCardView(); return; }
+    toast(e.message, 'error'); return;
+  }
+  await _auditEvento('FORNECEDOR_EDITADO', `Fornecedor "${f.razao_social}" editado`);
+  toast('Fornecedor atualizado!', 'success');
+  _currentForn = await buscarFornecedor(f.id);
+  await renderFornecedores();
+  _renderFornCardView();
+}
+async function _deleteForn(id, nome) {
+  const ok = await customConfirm(
+    `Excluir o fornecedor "${nome}"? Ele ficará na Lixeira por 30 dias antes da exclusão definitiva.`,
+    { title: 'Excluir Fornecedor', icon: '⚠️', okLabel: 'Excluir', okClass: 'btn-danger' }
+  );
+  if (!ok) return;
+  const r = await API.del(`/api/fornecedores/${id}`);
+  if (!r?.ok) { toast('Erro ao excluir fornecedor.', 'error'); return; }
+  await _auditEvento('FORNECEDOR_EXCLUIDO', `Fornecedor "${nome}" excluído`);
+  toast('Fornecedor excluído.', 'success');
+  _collapseFornCard(id);
+  renderFornecedores();
+}
+
+// ── Novo fornecedor (modal standalone — SGEA não tem processo/etapa) ──────
+let _fornModalData = null;
+function openFornModal() {
+  _fornModalData = null;
+  document.getElementById('forn-modal-cnpj').value = '';
+  document.getElementById('forn-modal-card').innerHTML = '';
+  document.getElementById('forn-modal-save-btn').disabled = true;
+  document.getElementById('forn-modal-overlay').classList.remove('hidden');
+  document.getElementById('forn-modal-cnpj').focus();
+}
+function closeFornModal() {
+  document.getElementById('forn-modal-overlay').classList.add('hidden');
+  _fornModalData = null;
+}
+async function buscarCnpjModal() {
+  const input = document.getElementById('forn-modal-cnpj');
+  const digits = cleanCnpj(input.value);
+  if (digits.length !== 14) { toast('CNPJ deve ter 14 dígitos.', 'error'); return; }
+  if (!validarCnpj(digits)) { toast('CNPJ inválido — verifique os dígitos verificadores.', 'error'); return; }
+  if (_cnpjQueryInProgress) { toast('Aguarde a consulta anterior terminar.', ''); return; }
+  _cnpjQueryInProgress = true;
+  toast('Consultando Receita Federal…', '');
+  try {
+    const { data: d, fonte } = await fetchCnpjData(digits);
+    _fornModalData = { id: digits, cnpj: formatCnpj(digits), cnpj_digits: digits, ...d, consultadoEm: new Date().toISOString() };
+    const f = _fornModalData;
+    const sitCls = cnpjSitClass(f.situacao);
+    document.getElementById('forn-modal-card').innerHTML = `
+      <div class="forn-card" style="margin-top:10px">
+        <div class="forn-card-header">
+          <div>
+            <div class="forn-razao">${esc(f.razao_social)}</div>
+            ${f.nome_fantasia ? `<div class="forn-fantasia">${esc(f.nome_fantasia)}</div>` : ''}
+            <div class="forn-cnpj-row"><span class="forn-cnpj-txt">${esc(f.cnpj)}</span></div>
+          </div>
+          <span class="forn-sit ${sitCls}">${esc(f.situacao || '—')}</span>
+        </div>
+        <div class="forn-details">
+          ${f.endereco ? `<div class="forn-detail-row" style="font-size:.73rem;color:var(--gray-600)">📍 ${esc(f.endereco)}</div>` : ''}
+          ${f.abertura ? `<div class="forn-detail-row" style="font-size:.73rem;color:var(--gray-600)">📅 Abertura: ${esc(f.abertura)}</div>` : ''}
+        </div>
+      </div>`;
+    document.getElementById('forn-modal-save-btn').disabled = false;
+    toast(`Fornecedor encontrado via ${fonte}!`, 'success');
+  } catch (e) {
+    toast(e.message || 'Erro ao consultar CNPJ.', 'error');
+    document.getElementById('forn-modal-save-btn').disabled = true;
+  } finally {
+    _cnpjQueryInProgress = false;
+  }
+}
+async function saveFornModal() {
+  if (!_fornModalData) return;
+  try {
+    await criarFornecedor(_fornModalData);
+  } catch (e) { toast(e.message, 'error'); return; }
+  await _auditEvento('FORNECEDOR_CRIADO', `Fornecedor "${_fornModalData.razao_social}" cadastrado`);
+  closeFornModal();
+  toast('Fornecedor cadastrado!', 'success');
+  await renderFornecedores();
+}
+
+// ── Importar fornecedores de um backup (SGCA/SGCD) ────────────────────────
+function abrirImportarFornecedoresModal() {
+  document.getElementById('forn-import-file').value = '';
+  document.getElementById('forn-import-overlay').classList.remove('hidden');
+}
+function fecharImportarFornecedoresModal() {
+  document.getElementById('forn-import-overlay').classList.add('hidden');
+}
+async function importarFornecedoresArquivo() {
+  const file = document.getElementById('forn-import-file').files[0];
+  if (!file) { toast('Selecione um arquivo.', 'error'); return; }
+  let bk;
+  try { bk = JSON.parse(await file.text()); }
+  catch { toast('Arquivo inválido — selecione um backup JSON do SGCA/SGCD.', 'error'); return; }
+  const forns = Array.isArray(bk.fornecedores) ? bk.fornecedores : [];
+  if (!forns.length) { toast('Nenhum fornecedor encontrado no arquivo.', 'error'); return; }
+  const ok = await customConfirm(
+    `O arquivo tem ${forns.length} fornecedor(es). Fornecedores com o mesmo CNPJ serão atualizados (preservando certidões/sanções já cadastradas aqui); os demais serão adicionados. Nada é apagado.`,
+    { title: 'Importar Fornecedores', icon: '🏢', okLabel: 'Importar', okClass: 'btn-primary' }
+  );
+  if (!ok) return;
+  toast('Importando fornecedores…', '');
+  const r = await API.post('/api/fornecedores/import', { fornecedores: forns });
+  const d = await API.json(r);
+  if (!r?.ok) { toast('Erro ao importar: ' + (d?.error || 'falha no servidor'), 'error'); return; }
+  fecharImportarFornecedoresModal();
+  await _auditEvento('FORNECEDOR_IMPORTADO', `${d.novos} novo(s), ${d.atualizados} atualizado(s)${d.ignorados ? `, ${d.ignorados} ignorado(s)` : ''}`);
+  toast(`Importação concluída: ${d.novos} novo(s), ${d.atualizados} atualizado(s)${d.ignorados ? `, ${d.ignorados} ignorado(s)` : ''}.`, 'success');
+  if (document.getElementById('view-fornecedores').classList.contains('active')) await renderFornecedores();
+}
+
+// ── Consulta CEIS/CNEP (Portal da Transparência) ──────────────────────────
+async function consultarCeisCnep(fornId, cnpjDigits) {
+  const el = document.getElementById(`forn-ceis-cnep-${fornId}`);
+  if (!el) return;
+  el.innerHTML = '<span style="color:var(--gray-400)">Consultando…</span>';
+  const r = await API.get(`/api/ceis-cnep?cnpj=${cnpjDigits}`);
+  const d = await API.json(r);
+  if (!r?.ok) {
+    el.innerHTML = `<span style="color:var(--danger)">⚠️ ${esc(d?.error || 'Erro ao consultar CEIS/CNEP.')}</span>`;
+    return;
+  }
+  const total = (d.ceis || []).length + (d.cnep || []).length;
+  if (total === 0) {
+    el.innerHTML = `<span style="color:var(--success)">✅ Nenhuma sanção encontrada no CEIS/CNEP${d.erro ? ' (consulta parcial: ' + esc(d.erro) + ')' : ''}.</span>`;
+    return;
+  }
+  const linha = (tipo, s) => `<div style="padding:3px 0;border-bottom:1px solid var(--gray-100)">⚠️ <strong>${tipo}</strong> — ${esc(s.tipoSancao?.descricaoResumida || s.tipoSancao?.descricao || 'Sanção registrada')}${s.dataFimSancao ? ' — até ' + fmtDate(s.dataFimSancao) : ''}</div>`;
+  el.innerHTML =
+    `<div style="color:var(--danger);font-weight:600;margin-bottom:2px">⚠️ ${total} sanção(ões) encontrada(s) no CEIS/CNEP:</div>` +
+    (d.ceis || []).map(s => linha('CEIS', s)).join('') +
+    (d.cnep || []).map(s => linha('CNEP', s)).join('');
+}
+
+// ── Sanções / Penalidades (Art. 156, Lei 14.133/2021) ─────────────────────
+// Sanções manuais ficam no JSON do fornecedor (data.sancoes), salvas via PUT
+// do objeto inteiro — complementam a consulta automática CEIS/CNEP.
+const SANCAO_TIPOS = [
+  { id: 'advertencia', label: 'Advertência' },
+  { id: 'multa', label: 'Multa' },
+  { id: 'suspensao', label: 'Suspensão Temporária' },
+  { id: 'impedimento', label: 'Impedimento de Licitar (Art. 156, III)' },
+  { id: 'inidoneidade', label: 'Declaração de Inidoneidade (Art. 156, IV)' },
+];
+function sancaoTipoLabel(s) { return SANCAO_TIPOS.find(t => t.id === s.tipo)?.label || s.tipo; }
+function sancaoStatus(s) {
+  if (!s.prazoFim) return 'ativa';
+  const hoje = new Date(); hoje.setHours(0, 0, 0, 0);
+  return new Date(s.prazoFim + 'T00:00:00') < hoje ? 'encerrada' : 'ativa';
+}
+
+function _renderFornCardSancoes() {
+  _fornTab = 'sancoes';
+  const f = _currentForn;
+  const sancoes = f.sancoes || [];
+  const itemsHtml = sancoes.length ? sancoes.map((s, i) => {
+    const st = sancaoStatus(s);
+    const cls = st === 'ativa' ? 'expired' : 'none';
+    return `<div class="forn-cert-item ${cls}">
+      <div style="flex:1;min-width:0">
+        <div class="forn-cert-tipo">${esc(sancaoTipoLabel(s))}</div>
+        <div class="forn-cert-dates">Aplicada em: ${fmtDate(s.dataAplicacao)}${s.prazoFim ? ' · Até: ' + fmtDate(s.prazoFim) : ''}
+          ${s.fundamentacao ? `<br><span style="font-style:italic">${esc(s.fundamentacao)}</span>` : ''}</div>
+        <span class="forn-cert-badge ${cls}">${st === 'ativa' ? 'Vigente' : 'Encerrada'}</span>
+      </div>
+      <div class="forn-cert-actions">
+        <button class="btn btn-outline btn-sm" style="padding:2px 8px;font-size:.65rem" onclick="openSancaoEdit('${f.id}',${i})">✏</button>
+        <button class="btn btn-danger btn-sm" style="padding:2px 8px;font-size:.65rem" onclick="deleteSancao('${f.id}',${i})">✕</button>
+      </div>
+    </div>`;
+  }).join('') : '<p style="color:var(--gray-500);font-size:.8rem;text-align:center;padding:20px 0">Nenhuma sanção registrada.</p>';
+  _setFornCardBody(`<div class="forn-inline-body" onclick="event.stopPropagation()">
+    ${_fornTabsHtml('sancoes')}
+    <div class="forn-cert-list">${itemsHtml}</div>
+    <div style="display:flex;gap:8px;margin-top:8px">
+      <button class="btn btn-outline" style="flex:1" onclick="openSancaoEdit('${f.id}', -1)">+ Registrar Sanção</button>
+      <button class="btn btn-outline" onclick="gerarRelatorioSancoesForn('${f.id}')" title="Gerar relatório de sanções">📄 Relatório</button>
+    </div>
+    <div style="display:flex;justify-content:flex-end;gap:8px;margin-top:12px;padding-top:10px;border-top:1px solid var(--gray-200)">
+      <button class="btn btn-outline" onclick="_collapseFornCard('${f.id}')">Fechar</button>
+      <button class="btn btn-primary" onclick="_renderFornCardEdit()">✏ Editar</button>
+    </div>
+  </div>`, 'view');
+}
+
+let _sancaoEditFornId = null, _sancaoEditIdx = null;
+function openSancaoEdit(fornId, idx) {
+  _sancaoEditFornId = fornId;
+  _sancaoEditIdx = idx;
+  const s = idx >= 0 ? (_currentForn?.sancoes || [])[idx] : null;
+  const titulo = idx === -1 ? 'Registrar Sanção' : 'Editar Sanção';
+  _setFornCardBody(`<div class="forn-inline-body" onclick="event.stopPropagation()">
+    <div style="font-size:.85rem;font-weight:700;color:var(--gray-700);margin-bottom:12px;padding-bottom:8px;border-bottom:1px solid var(--gray-200)">${titulo}</div>
+    <div class="info-field"><label for="sa-tipo">Tipo</label>
+      <select id="sa-tipo">${SANCAO_TIPOS.map(t => `<option value="${t.id}" ${s?.tipo === t.id ? 'selected' : ''}>${esc(t.label)}</option>`).join('')}</select>
+    </div>
+    <div style="display:grid;grid-template-columns:1fr 1fr;gap:10px">
+      <div class="info-field" style="margin:0"><label for="sa-data">Data de Aplicação</label><input type="date" id="sa-data" value="${s?.dataAplicacao || ''}"></div>
+      <div class="info-field" style="margin:0"><label for="sa-prazo">Prazo Final (se houver)</label><input type="date" id="sa-prazo" value="${s?.prazoFim || ''}"></div>
+    </div>
+    <div class="info-field"><label for="sa-fundamentacao">Fundamentação / Processo</label>
+      <input type="text" id="sa-fundamentacao" placeholder="ex: Processo 123/2026 — Art. 156, II" value="${esc(s?.fundamentacao || '')}"></div>
+    <div class="info-field"><label for="sa-obs">Observações</label><textarea id="sa-obs">${esc(s?.obs || '')}</textarea></div>
+    <div style="display:flex;justify-content:flex-end;gap:8px;margin-top:14px;padding-top:12px;border-top:1px solid var(--gray-200)">
+      <button class="btn btn-outline" onclick="_renderFornCardSancoes()">Cancelar</button>
+      <button class="btn btn-primary" onclick="saveSancaoEdit()">Salvar Sanção</button>
+    </div>
+  </div>`, 'view');
+}
+async function saveSancaoEdit() {
+  const tipo = document.getElementById('sa-tipo').value;
+  const dataAplicacao = document.getElementById('sa-data').value;
+  const prazoFim = document.getElementById('sa-prazo').value;
+  const fundamentacao = document.getElementById('sa-fundamentacao').value.trim();
+  const obs = document.getElementById('sa-obs').value.trim();
+  if (!dataAplicacao) { toast('Informe a data de aplicação.', 'error'); return; }
+  const sancao = { tipo, dataAplicacao, prazoFim, fundamentacao, obs };
+  const forn = await buscarFornecedor(_sancaoEditFornId);
+  if (!forn) return;
+  const sancoes = forn.sancoes || [];
+  if (_sancaoEditIdx === -1) sancoes.push(sancao); else sancoes[_sancaoEditIdx] = sancao;
+  forn.sancoes = sancoes;
+  try {
+    await salvarFornecedor(forn);
+  } catch (e) { toast(e.message, 'error'); return; }
+  _currentForn = await buscarFornecedor(forn.id);
+  await _auditEvento('FORNECEDOR_EDITADO', `Sanção registrada para ${forn.razao_social}`);
+  toast('Sanção salva!', 'success');
+  if (document.getElementById('view-fornecedores').classList.contains('active')) await renderFornecedores();
+  _renderFornCardSancoes();
+}
+async function deleteSancao(fornId, idx) {
+  const ok = await customConfirm('Esta ação não pode ser desfeita.', { title: 'Excluir sanção?', okLabel: 'Excluir' });
+  if (!ok) return;
+  const forn = await buscarFornecedor(fornId);
+  if (!forn) return;
+  forn.sancoes = (forn.sancoes || []).filter((_, i) => i !== idx);
+  try {
+    await salvarFornecedor(forn);
+  } catch (e) { toast(e.message, 'error'); return; }
+  _currentForn = await buscarFornecedor(forn.id);
+  toast('Sanção removida.', 'success');
+  if (document.getElementById('view-fornecedores').classList.contains('active')) await renderFornecedores();
+  _renderFornCardSancoes();
+}
+
+// ── Infra de documento com QR (só para os relatórios de Sanções — paridade
+// visual total com SGCD/SGCA, decisão do usuário; os outros 7 relatórios do
+// SGEA seguem sem QR, por serem gerenciais, não formais) ──────────────────
+const _DOC_CSS = `
+  * { box-sizing: border-box; margin: 0; padding: 0; }
+  body { font-family: 'Times New Roman', Times, serif; font-size: 11pt; color: #000; background: #fff; padding: 2cm 2.5cm; }
+  .header { text-align: center; margin-bottom: 20pt; border-bottom: 2px solid #000; padding-bottom: 12pt; }
+  .header img { height: 70pt; width: auto; margin-bottom: 6pt; }
+  .header h1 { font-size: 13pt; font-weight: 700; text-transform: uppercase; }
+  .doc-title { text-align: center; margin: 14pt 0 10pt; }
+  .doc-title h3 { font-size: 13pt; font-weight: 700; text-transform: uppercase; }
+  .doc-title .sub { font-size: 10pt; color: #444; margin-top: 4pt; }
+  .meta { font-size: 9pt; color: #555; margin-bottom: 10pt; text-align: center; }
+  table { width: 100%; border-collapse: collapse; margin-top: 8pt; font-size: 9pt; table-layout: fixed; }
+  th { background: #1a3a6b; color: #fff; padding: 5pt 7pt; text-align: left; vertical-align: middle; font-weight: 700; font-size: 9pt; }
+  td { padding: 4pt 7pt; vertical-align: middle; font-size: 8.5pt; border-bottom: 1px solid #e8e8e8; word-wrap: break-word; overflow-wrap: break-word; }
+  .btn-print { position: fixed; top: 20px; right: 20px; background: #1a3a6b; color: #fff; border: none; border-radius: 6px; padding: 10px 18px; cursor: pointer; font-size: 11pt; }
+  @media print { .btn-print { display: none; } }
+  @page { @bottom-right { content: "Folha " counter(page); font-size: 8pt; color: #888; } }
+`;
+
+function _qrFooterReport(label, org) {
+  const dtFmt = new Date().toLocaleDateString('pt-BR', { day: '2-digit', month: '2-digit', year: 'numeric' })
+    + ' ' + new Date().toLocaleTimeString('pt-BR', { hour: '2-digit', minute: '2-digit' });
+  const cod = (() => {
+    const str = [org.orgao, label, Date.now()].join('|');
+    let h = 0;
+    for (let i = 0; i < str.length; i++) { h = Math.imul(31, h) + str.charCodeAt(i) | 0; }
+    const hex = (h >>> 0).toString(16).toUpperCase().padStart(8, '0');
+    return hex.slice(0, 4) + '-' + hex.slice(4);
+  })();
+  const qrText = `SGEA/${SGEA_VERSION}/${org.orgao || ''}/${cod}`;
+  const svg = _QR.svg(qrText, 3);
+  const svgB64 = svg ? 'data:image/svg+xml;base64,' + btoa(unescape(encodeURIComponent(svg))) : null;
+  return `
+<div style="margin-top:28pt;border-top:1px solid #ccc;padding-top:8pt;display:flex;align-items:center;gap:16pt">
+  ${svgB64 ? `<img src="${svgB64}" width="64" height="64" alt="QR" style="flex-shrink:0;border:1px solid #eee">` : ''}
+  <div style="font-size:7.5pt;color:#666;line-height:1.6">
+    Documento gerado pelo <strong>SGEA</strong> — Sistema de Gestão de Estoque do Almoxarifado &nbsp;·&nbsp; v${SGEA_VERSION}<br>
+    ${dtFmt} &nbsp;·&nbsp; Código de autenticidade: <strong>${cod}</strong>
+  </div>
+</div>`;
+}
+
+function _abrirDocumentoQR(org, titulo, subtitulo, corpoHtml, rotuloAuditoria) {
+  const html = `<!DOCTYPE html><html lang="pt-BR"><head><meta charset="UTF-8">
+<title>${titulo} — SGEA</title>
+<style>${_DOC_CSS}</style></head><body>
+<button class="btn-print" onclick="window.print()">🖨 Imprimir / Salvar PDF</button>
+<div class="header">
+  ${org.brasao ? `<img src="${org.brasao}" alt="Brasão">` : ''}
+  <h1>${esc(org.orgao)}</h1>
+  <h2>${esc(org.municipio)}</h2>
+</div>
+<div class="doc-title"><h3>${titulo}</h3>${subtitulo ? `<div class="sub">${subtitulo}</div>` : ''}</div>
+${corpoHtml}
+${_qrFooterReport(titulo, org)}
+</body></html>`;
+  const win = window.open('', '_blank', 'width=900,height=720');
+  if (!win) { toast('Popup bloqueado pelo navegador. Permita popups para este site.', 'error'); return; }
+  win.document.write(html);
+  win.document.close();
+  _auditEvento('DOCUMENTO_GERADO', rotuloAuditoria);
+}
+
+async function gerarRelatorioSancoesForn(fornId) {
+  const f = await buscarFornecedor(fornId);
+  if (!f) return;
+  const org = await _orgBrasao();
+  const dtGer = new Date().toLocaleDateString('pt-BR') + ' às ' + new Date().toLocaleTimeString('pt-BR', { hour: '2-digit', minute: '2-digit' });
+  const sancoes = (f.sancoes || []).slice().sort((a, b) => (a.dataAplicacao || '').localeCompare(b.dataAplicacao || ''));
+  const tbody = sancoes.length ? sancoes.map(s => {
+    const st = sancaoStatus(s);
+    return `<tr>
+      <td>${esc(sancaoTipoLabel(s))}</td>
+      <td>${fmtDate(s.dataAplicacao)}</td>
+      <td>${s.prazoFim ? fmtDate(s.prazoFim) : '—'}</td>
+      <td>${st === 'ativa' ? 'Vigente' : 'Encerrada'}</td>
+      <td>${esc(s.fundamentacao || '—')}</td>
+    </tr>`;
+  }).join('') : `<tr><td colspan="5" style="text-align:center;padding:20pt;color:#888">Nenhuma sanção registrada para este fornecedor.</td></tr>`;
+  const corpo = `
+    <div class="meta">Gerado em: ${dtGer} · Total: ${sancoes.length} sanção${sancoes.length !== 1 ? 'ões' : ''}</div>
+    <table>
+      <colgroup><col style="width:26%"><col style="width:16%"><col style="width:16%"><col style="width:14%"><col style="width:28%"></colgroup>
+      <thead><tr><th>Tipo</th><th>Aplicada em</th><th>Prazo Final</th><th>Situação</th><th>Fundamentação</th></tr></thead>
+      <tbody>${tbody}</tbody>
+    </table>`;
+  _abrirDocumentoQR(org, 'Relatório de Sanções e Penalidades', esc(f.razao_social || '') + (f.cnpj ? ' — CNPJ: ' + esc(f.cnpj) : ''), corpo, `Relatório de Sanções — ${f.razao_social || f.id}`);
+}
+
+async function gerarRelatorioSancoesGlobal() {
+  const todos = await listarFornecedores();
+  const org = await _orgBrasao();
+  const dtGer = new Date().toLocaleDateString('pt-BR') + ' às ' + new Date().toLocaleTimeString('pt-BR', { hour: '2-digit', minute: '2-digit' });
+  const linhas = [];
+  for (const f of todos) {
+    for (const s of (f.sancoes || [])) linhas.push({ forn: f.razao_social || f.nome_fantasia || '(sem nome)', s });
+  }
+  linhas.sort((a, b) => (a.s.dataAplicacao || '').localeCompare(b.s.dataAplicacao || ''));
+  const tbody = linhas.length ? linhas.map(({ forn, s }) => {
+    const st = sancaoStatus(s);
+    return `<tr>
+      <td>${esc(forn)}</td>
+      <td>${esc(sancaoTipoLabel(s))}</td>
+      <td>${fmtDate(s.dataAplicacao)}</td>
+      <td>${s.prazoFim ? fmtDate(s.prazoFim) : '—'}</td>
+      <td>${st === 'ativa' ? 'Vigente' : 'Encerrada'}</td>
+      <td>${esc(s.fundamentacao || '—')}</td>
+    </tr>`;
+  }).join('') : `<tr><td colspan="6" style="text-align:center;padding:20pt;color:#888">Nenhuma sanção registrada.</td></tr>`;
+  const corpo = `
+    <div class="meta">Gerado em: ${dtGer} · Total: ${linhas.length} sanção${linhas.length !== 1 ? 'ões' : ''}</div>
+    <table>
+      <colgroup><col style="width:22%"><col style="width:22%"><col style="width:13%"><col style="width:13%"><col style="width:10%"><col style="width:20%"></colgroup>
+      <thead><tr><th>Fornecedor</th><th>Tipo</th><th>Aplicada em</th><th>Prazo Final</th><th>Situação</th><th>Fundamentação</th></tr></thead>
+      <tbody>${tbody}</tbody>
+    </table>`;
+  _abrirDocumentoQR(org, 'Relatório Global de Sanções e Penalidades', 'Todos os fornecedores cadastrados', corpo, 'Relatório Global de Sanções');
 }
 
 // ══════════════════════════════════════════════════════════════
@@ -2113,6 +3096,7 @@ async function saveSettings() {
     cnpj_orgao: document.getElementById('cfg-cnpj-orgao').value.trim(),
     aut_nome: document.getElementById('cfg-aut-nome').value.trim(),
     aut_cargo: document.getElementById('cfg-aut-cargo').value.trim(),
+    portal_transparencia_key: document.getElementById('cfg-portal-transparencia-key').value.trim(),
   };
   const results = await Promise.all([
     API.put('/api/settings/org', org),
@@ -2140,6 +3124,7 @@ async function carregarConfigGeral() {
   document.getElementById('cfg-cnpj-orgao').value = d?.cnpj_orgao || '';
   document.getElementById('cfg-aut-nome').value = d?.aut_nome || '';
   document.getElementById('cfg-aut-cargo').value = d?.aut_cargo || '';
+  document.getElementById('cfg-portal-transparencia-key').value = d?.portal_transparencia_key || '';
   const brasao = localStorage.getItem('sgea-brasao-dataurl');
   const img = document.getElementById('cfg-brasao-preview');
   const rmBtn = document.getElementById('btn-remove-brasao');
@@ -2305,6 +3290,193 @@ function _rodapeRelatorioSGEA() {
   return `<div style="margin-top:28pt;border-top:1px solid #ccc;padding-top:8pt;font-size:7.5pt;color:#666;text-align:center">`
     + `Documento gerado pelo <strong>SGEA</strong> — Sistema de Gestão de Estoque do Almoxarifado &nbsp;·&nbsp; ${esc(dt)} &nbsp;·&nbsp; por ${esc(_apiUser?.nome || '—')}</div>`;
 }
+
+// ══════════════════════════════════════════════════════════════
+// QR CODE GENERATOR — puro JS, sem dependência (copiado do SGCD/SGCA)
+// Byte mode · ECC nível M · versões 1-10 (até 216 bytes) — usado só pelos
+// relatórios de Sanções (única dupla de documentos do SGEA com QR).
+// ══════════════════════════════════════════════════════════════
+const _QR = (function () {
+  'use strict';
+  const EXP = new Uint8Array(512), LOG = new Uint8Array(256);
+  (function () {
+    for (let i = 0, x = 1; i < 255; i++) {
+      EXP[i] = EXP[i + 255] = x; LOG[x] = i;
+      x = x < 128 ? x << 1 : (x << 1) ^ 0x11d;
+    }
+  })();
+  const gm = (a, b) => a && b ? EXP[LOG[a] + LOG[b]] : 0;
+
+  function rsPoly(n) {
+    let g = [1];
+    for (let i = 0; i < n; i++) {
+      const h = new Uint8Array(g.length + 1);
+      for (let j = 0; j < g.length; j++) { h[j] ^= g[j]; h[j+1] ^= gm(g[j], EXP[i]); }
+      g = h;
+    }
+    return g;
+  }
+  function rsRem(data, gen) {
+    const r = new Uint8Array(gen.length - 1);
+    for (const b of data) {
+      const c = b ^ r[0];
+      r.copyWithin(0, 1); r[r.length - 1] = 0;
+      if (c) for (let j = 0; j < r.length; j++) r[j] ^= gm(gen[j + 1], c);
+    }
+    return r;
+  }
+
+  const TB = [0,
+    [10,1,16,0,0],[16,1,28,0,0],[26,1,44,0,0],[18,2,32,0,0],
+    [24,2,43,0,0],[16,4,27,0,0],[18,4,31,0,0],[22,2,38,2,39],
+    [22,3,36,2,37],[26,4,43,1,44],
+  ];
+  const AP = [0,[],[6,18],[6,22],[6,26],[6,30],[6,34],
+    [6,22,38],[6,24,42],[6,26,46],[6,28,50]];
+
+  const MF = [
+    (r,c)=>(r+c)%2===0,(r,c)=>r%2===0,(r,c)=>c%3===0,(r,c)=>(r+c)%3===0,
+    (r,c)=>(Math.floor(r/2)+Math.floor(c/3))%2===0,(r,c)=>r*c%2+r*c%3===0,
+    (r,c)=>(r*c%2+r*c%3)%2===0,(r,c)=>((r+c)%2+r*c%3)%2===0,
+  ];
+
+  function grid(n) { return Array.from({length:n},()=>new Int8Array(n).fill(-1)); }
+
+  function finder(g, r0, c0) {
+    for (let r=-1;r<=7;r++) for (let c=-1;c<=7;c++) {
+      const rr=r0+r,cc=c0+c;
+      if (rr<0||cc<0||rr>=g.length||cc>=g.length) continue;
+      if (r>=0&&r<=6&&c>=0&&c<=6)
+        g[rr][cc]=(r===0||r===6||c===0||c===6||(r>=2&&r<=4&&c>=2&&c<=4))?1:0;
+      else g[rr][cc]=0;
+    }
+  }
+  function align(g,r,c) {
+    for (let dr=-2;dr<=2;dr++) for (let dc=-2;dc<=2;dc++)
+      g[r+dr][c+dc]=(Math.abs(dr)===2||Math.abs(dc)===2||(dr===0&&dc===0))?1:0;
+  }
+  function reserveFmt(g) {
+    const n=g.length;
+    for (let i=0;i<=8;i++) {
+      if (g[8][i]<0) g[8][i]=0; if (g[i][8]<0) g[i][8]=0;
+      if (i<8&&g[8][n-1-i]<0) g[8][n-1-i]=0;
+      if (i<8&&g[n-1-i][8]<0) g[n-1-i][8]=0;
+    }
+    g[n-8][8]=1;
+  }
+  function writeFmt(g,mask) {
+    const n=g.length;
+    let d=(0b00<<3)|mask, rem=d<<10;
+    for (let i=14;i>=10;i--) if ((rem>>i)&1) rem^=(0x537<<(i-10));
+    const f=((d<<10)|(rem&0x3FF))^0b101010000010010;
+    const s1=[[8,0],[8,1],[8,2],[8,3],[8,4],[8,5],[8,7],[8,8],[7,8],[5,8],[4,8],[3,8],[2,8],[1,8],[0,8]];
+    const s2=[[n-1,8],[n-2,8],[n-3,8],[n-4,8],[n-5,8],[n-6,8],[n-7,8],[8,n-8],[8,n-7],[8,n-6],[8,n-5],[8,n-4],[8,n-3],[8,n-2],[8,n-1]];
+    for (let i=0;i<15;i++) { const b=(f>>i)&1; g[s1[i][0]][s1[i][1]]=b; g[s2[i][0]][s2[i][1]]=b; }
+  }
+  function placeData(g,bytes) {
+    const n=g.length; let bi=0,up=true;
+    for (let col=n-1;col>=1;col-=2) {
+      if (col===6) col--;
+      for (let dy=0;dy<n;dy++) {
+        const row=up?n-1-dy:dy;
+        for (const c of [col,col-1]) {
+          if (g[row][c]>=0) continue;
+          const byi=bi>>3,bii=7-(bi&7);
+          g[row][c]=bi<bytes.length*8?(bytes[byi]>>bii)&1:0;
+          bi++;
+        }
+      }
+      up=!up;
+    }
+  }
+  function pen(g) {
+    const n=g.length; let p=0;
+    for (let r=0;r<n;r++) for (let t=0;t<2;t++) {
+      let run=1,prev=t?g[0][r]:g[r][0];
+      for (let i=1;i<n;i++) {
+        const v=t?g[i][r]:g[r][i];
+        if (v===prev){if(++run===5)p+=3;else if(run>5)p++;}else{run=1;prev=v;}
+      }
+    }
+    for (let r=0;r<n-1;r++) for (let c=0;c<n-1;c++)
+      if (g[r][c]===g[r+1][c]&&g[r][c]===g[r][c+1]&&g[r][c]===g[r+1][c+1]) p+=3;
+    let dk=0; for (let r=0;r<n;r++) for (let c=0;c<n;c++) dk+=g[r][c];
+    const pct=dk*100/(n*n);
+    p+=Math.min(Math.abs(Math.floor(pct/5)*5-50),Math.abs(Math.ceil(pct/5)*5-50))/5*10;
+    return p;
+  }
+
+  function encode(text) {
+    const bytes=new TextEncoder().encode(text);
+    const len=bytes.length;
+    let ver=1;
+    while (ver<=10) {
+      const [,g1b,g1dc,g2b,g2dc]=TB[ver];
+      const ccb=ver<=9?8:16;
+      if ((g1b*g1dc+g2b*g2dc)*8>=4+ccb+len*8) break;
+      ver++;
+    }
+    if (ver>10) throw new Error('too long');
+    const [ec,g1b,g1dc,g2b,g2dc]=TB[ver];
+    const totalDC=g1b*g1dc+g2b*g2dc;
+    const n=ver*4+17;
+    const bits=[];
+    const push=(v,l)=>{for(let i=l-1;i>=0;i--)bits.push((v>>i)&1);};
+    push(0b0100,4); push(bytes.length,ver<=9?8:16);
+    for (const b of bytes) push(b,8);
+    const cap=totalDC*8;
+    for (let i=0;i<4&&bits.length<cap;i++) bits.push(0);
+    while (bits.length%8) bits.push(0);
+    const pads=[0xEC,0x11]; let pi=0;
+    while (bits.length<cap) push(pads[pi++%2],8);
+    const cw=[];
+    for (let i=0;i<bits.length;i+=8){let b=0;for(let j=0;j<8;j++)b=(b<<1)|bits[i+j];cw.push(b);}
+    const blks=[],ecbs=[]; let pos=0;
+    for (let i=0;i<g1b+g2b;i++) {
+      const dc=i<g1b?g1dc:g2dc;
+      const blk=cw.slice(pos,pos+dc); pos+=dc;
+      blks.push(blk); ecbs.push([...rsRem(blk,rsPoly(ec))]);
+    }
+    const fin=[]; const mdc=Math.max(g1dc,g2dc||0);
+    for (let i=0;i<mdc;i++) for (const b of blks) if (i<b.length) fin.push(b[i]);
+    for (let i=0;i<ec;i++) for (const b of ecbs) fin.push(b[i]);
+    const g=grid(n);
+    finder(g,0,0); finder(g,0,n-7); finder(g,n-7,0);
+    for (let i=8;i<n-8;i++) g[6][i]=g[i][6]=i%2===0?1:0;
+    if (ver>=2) {
+      const ap=AP[ver];
+      for (const r of ap) for (const c of ap) if (g[r][c]<0) align(g,r,c);
+    }
+    reserveFmt(g);
+    const fg=g.map(r=>Int8Array.from(r));
+    placeData(g,fin);
+    let bm=0,bp=Infinity,bg=null;
+    for (let m=0;m<8;m++) {
+      const h=g.map(r=>Int8Array.from(r));
+      const fn=MF[m];
+      for (let r=0;r<n;r++) for (let c=0;c<n;c++) if (fg[r][c]<0&&fn(r,c)) h[r][c]^=1;
+      writeFmt(h,m);
+      const pp=pen(h);
+      if (pp<bp){bp=pp;bm=m;bg=h;}
+    }
+    return bg;
+  }
+
+  function toSVG(g, px) {
+    const n=g.length, q=px*4, sz=n*px+q*2;
+    const r=[];
+    for (let row=0;row<n;row++) for (let col=0;col<n;col++)
+      if (g[row][col]===1) r.push(`<rect x="${q+col*px}" y="${q+row*px}" width="${px}" height="${px}"/>`);
+    return `<svg xmlns="http://www.w3.org/2000/svg" width="${sz}" height="${sz}" viewBox="0 0 ${sz} ${sz}" shape-rendering="crispEdges"><rect width="${sz}" height="${sz}" fill="#fff"/><g fill="#000">${r.join('')}</g></svg>`;
+  }
+
+  return {
+    svg(text, px=3) {
+      try { return toSVG(encode(text), px); }
+      catch(e) { console.warn('QR:', e.message); return null; }
+    }
+  };
+})();
 
 // CSS compartilhado pelos dois relatórios impressos (Integridade e Auditoria).
 // A regra .meta só é usada pelo de Auditoria; é inofensiva no de Integridade.
@@ -2738,7 +3910,7 @@ const _AUDIT_TIPOS = [
   'ENTRADA_REGISTRADA', 'ENTRADA_EXCLUIDA', 'ENTRADA_RESTAURADA',
   'SAIDA_REGISTRADA', 'SAIDA_EXCLUIDA', 'SAIDA_RESTAURADA',
   'CENTRO_CUSTO_CRIADO', 'CENTRO_CUSTO_EDITADO', 'CENTRO_CUSTO_EXCLUIDO',
-  'FORNECEDOR_CRIADO', 'FORNECEDOR_EDITADO', 'FORNECEDOR_EXCLUIDO',
+  'FORNECEDOR_CRIADO', 'FORNECEDOR_EDITADO', 'FORNECEDOR_EXCLUIDO', 'FORNECEDOR_RESTAURADO', 'FORNECEDOR_IMPORTADO',
   'FUNCIONARIO_CRIADO', 'FUNCIONARIO_EDITADO', 'FUNCIONARIO_EXCLUIDO',
   'FROTA_CRIADO', 'FROTA_EDITADO', 'FROTA_EXCLUIDO',
   'PEDIDO_CRIADO', 'PEDIDO_EDITADO', 'PEDIDO_EXCLUIDO', 'PEDIDO_ITEM_ANULADO', 'PEDIDO_CANCELADO',
@@ -2755,6 +3927,7 @@ const _AUDIT_EVENT_LABELS = {
   SAIDA_REGISTRADA: 'Saída registrada', SAIDA_EXCLUIDA: 'Saída excluída', SAIDA_RESTAURADA: 'Saída restaurada',
   CENTRO_CUSTO_CRIADO: 'Centro de custo criado', CENTRO_CUSTO_EDITADO: 'Centro de custo editado', CENTRO_CUSTO_EXCLUIDO: 'Centro de custo excluído',
   FORNECEDOR_CRIADO: 'Fornecedor criado', FORNECEDOR_EDITADO: 'Fornecedor editado', FORNECEDOR_EXCLUIDO: 'Fornecedor excluído',
+  FORNECEDOR_RESTAURADO: 'Fornecedor restaurado', FORNECEDOR_IMPORTADO: 'Fornecedores importados',
   FUNCIONARIO_CRIADO: 'Funcionário criado', FUNCIONARIO_EDITADO: 'Funcionário editado', FUNCIONARIO_EXCLUIDO: 'Funcionário excluído',
   FROTA_CRIADO: 'Veículo criado', FROTA_EDITADO: 'Veículo editado', FROTA_EXCLUIDO: 'Veículo excluído',
   PEDIDO_CRIADO: 'Pedido criado', PEDIDO_EDITADO: 'Pedido editado', PEDIDO_EXCLUIDO: 'Pedido excluído',
@@ -2768,7 +3941,7 @@ const _AUDIT_EVENT_LABELS = {
 const _AUDIT_EVENT_META = (() => {
   const m = {};
   const set = (tipos, cor) => tipos.forEach(t => { m[t] = cor; });
-  set(['PRODUTO_CRIADO', 'ENTRADA_REGISTRADA', 'SAIDA_REGISTRADA', 'CENTRO_CUSTO_CRIADO', 'FORNECEDOR_CRIADO', 'FUNCIONARIO_CRIADO', 'FROTA_CRIADO', 'PEDIDO_CRIADO', 'USUARIO_CRIADO', 'ENTRADA_RESTAURADA', 'SAIDA_RESTAURADA'], '#0F6E56'); // verde — criação/restauração
+  set(['PRODUTO_CRIADO', 'ENTRADA_REGISTRADA', 'SAIDA_REGISTRADA', 'CENTRO_CUSTO_CRIADO', 'FORNECEDOR_CRIADO', 'FUNCIONARIO_CRIADO', 'FROTA_CRIADO', 'PEDIDO_CRIADO', 'USUARIO_CRIADO', 'ENTRADA_RESTAURADA', 'SAIDA_RESTAURADA', 'FORNECEDOR_RESTAURADO', 'FORNECEDOR_IMPORTADO'], '#0F6E56'); // verde — criação/restauração
   set(['PRODUTO_EDITADO', 'CENTRO_CUSTO_EDITADO', 'FORNECEDOR_EDITADO', 'FUNCIONARIO_EDITADO', 'FROTA_EDITADO', 'PEDIDO_EDITADO', 'USUARIO_EDITADO'], '#185FA5'); // azul — edição
   set(['PRODUTO_EXCLUIDO', 'ENTRADA_EXCLUIDA', 'SAIDA_EXCLUIDA', 'CENTRO_CUSTO_EXCLUIDO', 'FORNECEDOR_EXCLUIDO', 'FUNCIONARIO_EXCLUIDO', 'FROTA_EXCLUIDO', 'PEDIDO_EXCLUIDO', 'USUARIO_EXCLUIDO', 'FACTORY_RESET'], '#A32D2D'); // vermelho — exclusão/reset
   set(['PEDIDO_ITEM_ANULADO', 'PEDIDO_CANCELADO', 'RESTAURAR_BACKUP', 'RESTAURAR_DB'], '#854F0B'); // âmbar — anulação/restauração sensível
@@ -3053,12 +4226,13 @@ function showLixeira() {
 }
 
 async function renderLixeira() {
-  const [entradas, saidas] = await Promise.all([
-    _fetchList('entradas?trash=1'), _fetchList('saidas?trash=1'),
+  const [entradas, saidas, fornecedores] = await Promise.all([
+    _fetchList('entradas?trash=1'), _fetchList('saidas?trash=1'), listarFornecedores(true),
   ]);
   const items = [
     ...entradas.map(e => ({ tipo: 'Entrada', api: 'entradas', id: e.id, nome: `Entrada de ${fmtDate(e.data_entrega)}${e.fornecedor_nome ? ' — ' + e.fornecedor_nome : ''}`, deletedAt: e.deleted_at })),
     ...saidas.map(s => ({ tipo: 'Saída', api: 'saidas', id: s.id, nome: `Saída de ${fmtDate(s.data)}${s.solicitante_nome ? ' — ' + s.solicitante_nome : ''}`, deletedAt: s.deleted_at })),
+    ...fornecedores.map(f => ({ tipo: 'Fornecedor', api: 'fornecedores', id: f.id, nome: f.razao_social || f.id, deletedAt: f.deletedAt })),
   ].sort((a, b) => (b.deletedAt || '').localeCompare(a.deletedAt || ''));
 
   const el = document.getElementById('lixeira-list');
@@ -3078,12 +4252,14 @@ async function renderLixeira() {
   </table></div>`;
 }
 
+const _RESTAURADA_TIPO = { entradas: 'ENTRADA_RESTAURADA', saidas: 'SAIDA_RESTAURADA', fornecedores: 'FORNECEDOR_RESTAURADO' };
 async function _restaurarLixeira(api, id, tipo) {
   const r = await API.put(`/api/${api}/${id}/restore`);
   const d = await API.json(r);
   if (!r || !r.ok) { toast(d?.error || 'Não foi possível restaurar.', 'error'); return; }
-  await _auditEvento(`${api === 'entradas' ? 'ENTRADA' : 'SAIDA'}_RESTAURADA`, `${tipo} restaurada da lixeira`, id);
-  toast(`${tipo} restaurada.`, 'success');
+  const fem = api !== 'fornecedores';
+  await _auditEvento(_RESTAURADA_TIPO[api], `${tipo} restaurad${fem ? 'a' : 'o'} da lixeira`, id);
+  toast(`${tipo} restaurad${fem ? 'a' : 'o'}.`, 'success');
   renderLixeira();
 }
 
