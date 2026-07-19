@@ -274,6 +274,97 @@ async function _exportarXlsx(nomeArquivo, cabecalho, linhas) {
   return _salvarArquivoComo(blob, nomeArquivo, 'application/vnd.openxmlformats-officedocument.spreadsheetml.sheet');
 }
 
+// ── Editor de texto rico (contenteditable) para corpo de e-mail ────────────
+// Comandos genéricos parametrizados pelo id do editor. Monte a toolbar com
+// _rteMount (preenche <div class="rte-toolbar" data-editor="ID"></div>) e envie
+// o HTML sempre passando por _sanitizeEmailHtml (barreira contra XSS).
+function _rteEsc(s) { return String(s ?? '').replace(/&/g, '&amp;').replace(/</g, '&lt;').replace(/>/g, '&gt;'); }
+function _rteExec(editorId, cmd, val) {
+  document.getElementById(editorId)?.focus();
+  document.execCommand(cmd, false, val);
+}
+function _rtePtToSize(pt) {
+  // execCommand fontSize aceita 1-7; mapeamos pt -> tamanho aproximado
+  const map = { '9': 1, '10': 2, '11': 2, '12': 3, '14': 4, '16': 5, '18': 6, '24': 7 };
+  return map[String(pt)] || 3;
+}
+function _rteInsertLink(editorId) {
+  const url = prompt('URL do link:');
+  if (!url) return;
+  const text = prompt('Texto do link (deixe em branco para usar a URL):') || url;
+  const safe = /^https?:\/\//i.test(url) ? url.replace(/"/g, '&quot;') : '#';
+  document.getElementById(editorId)?.focus();
+  document.execCommand('insertHTML', false, `<a href="${safe}" target="_blank">${_rteEsc(text)}</a>`);
+}
+function _rteGetHtml(editorId) { const d = document.getElementById(editorId); return d ? d.innerHTML : ''; }
+function _rteGetText(editorId) { const d = document.getElementById(editorId); return d ? d.innerText : ''; }
+function _rteSetContent(editorId, text) {
+  const d = document.getElementById(editorId);
+  if (!d) return;
+  // Cada linha vira um <div>; vazias viram <div><br></div> (padrão do contenteditable)
+  d.innerHTML = String(text ?? '').split('\n').map(l => l === '' ? '<div><br></div>' : `<div>${_rteEsc(l)}</div>`).join('');
+}
+// HTML da toolbar para um editor (todos os botões apontam para os comandos genéricos acima).
+function _rteToolbarHtml(editorId) {
+  const b = (cmd, title, label) => `<button type="button" class="_etb" onclick="_rteExec('${editorId}','${cmd}')" title="${title}">${label}</button>`;
+  const opt = (v, sel) => `<option value="${v}"${sel ? ' selected' : ''}>${v}</option>`;
+  return `<div class="_etb-toolbar">
+    ${b('bold', 'Negrito (Ctrl+B)', '<b>B</b>')}${b('italic', 'Itálico (Ctrl+I)', '<i>I</i>')}${b('underline', 'Sublinhado (Ctrl+U)', '<u>U</u>')}
+    <span class="_etb-sep"></span>
+    ${b('justifyLeft', 'Alinhar à esquerda', '&#8676;')}${b('justifyCenter', 'Centralizar', '&#8801;')}${b('justifyRight', 'Alinhar à direita', '&#8677;')}${b('justifyFull', 'Justificar', '&#8723;')}
+    <span class="_etb-sep"></span>
+    <select class="_etb-sel" style="width:120px" onchange="_rteExec('${editorId}','fontName',this.value);this.blur()" title="Fonte">
+      ${opt('Arial')}${opt('Calibri')}${opt('Georgia')}${opt('Times New Roman')}${opt('Verdana', true)}
+    </select>
+    <select class="_etb-sel" style="width:62px" onchange="_rteExec('${editorId}','fontSize',_rtePtToSize(this.value));this.blur()" title="Tamanho">
+      <option value="9">9pt</option><option value="10">10pt</option><option value="11">11pt</option><option value="12" selected>12pt</option><option value="14">14pt</option><option value="16">16pt</option><option value="18">18pt</option>
+    </select>
+    <span class="_etb-sep"></span>
+    ${b('insertUnorderedList', 'Lista com marcadores', '&#8226;&#8226;')}${b('insertOrderedList', 'Lista numerada', '1.')}${b('indent', 'Aumentar recuo', '&#8677;&#8677;')}${b('outdent', 'Diminuir recuo', '&#8676;&#8676;')}
+    <span class="_etb-sep"></span>
+    <button type="button" class="_etb" onclick="_rteInsertLink('${editorId}')" title="Inserir link">&#128279;</button>
+    ${b('removeFormat', 'Remover formatação', '&#10007;')}
+    <span class="_etb-sep"></span>
+    ${b('undo', 'Desfazer (Ctrl+Z)', '&#8634;')}${b('redo', 'Refazer (Ctrl+Y)', '&#8635;')}
+  </div>`;
+}
+// Preenche cada placeholder <div class="rte-toolbar" data-editor="ID"></div> em root (default: document).
+function _rteMount(root) {
+  (root || document).querySelectorAll('.rte-toolbar[data-editor]').forEach(ph => { ph.innerHTML = _rteToolbarHtml(ph.dataset.editor); });
+}
+// Remove tags/atributos perigosos do HTML gerado pelo contenteditable (barreira XSS ao enviar).
+function _sanitizeEmailHtml(html) {
+  if (!html) return '';
+  const ALLOWED_TAGS = new Set([
+    'p', 'br', 'div', 'span', 'b', 'strong', 'i', 'em', 'u', 's', 'strike',
+    'ul', 'ol', 'li', 'h1', 'h2', 'h3', 'h4', 'blockquote', 'pre', 'code',
+    'table', 'thead', 'tbody', 'tr', 'th', 'td', 'a', 'img',
+    'font', 'hr', 'sub', 'sup',
+  ]);
+  const ALLOWED_ATTRS = new Set([
+    'style', 'href', 'src', 'alt', 'width', 'height', 'align', 'valign',
+    'border', 'cellpadding', 'cellspacing', 'colspan', 'rowspan', 'target',
+    'color', 'size', 'face',
+  ]);
+  const DANGEROUS_PROTOCOLS = /^(javascript|vbscript|data(?!:image\/(png|jpeg|gif|webp|svg)))/i;
+  const doc = new DOMParser().parseFromString(html, 'text/html');
+  function clean(node) {
+    if (node.nodeType === Node.TEXT_NODE) return;
+    if (node.nodeType === Node.COMMENT_NODE) { node.remove(); return; }
+    if (node.nodeType !== Node.ELEMENT_NODE) { node.remove(); return; }
+    const tag = node.tagName.toLowerCase();
+    if (!ALLOWED_TAGS.has(tag)) { node.replaceWith(document.createTextNode(node.textContent)); return; }
+    for (const attr of [...node.attributes]) {
+      if (!ALLOWED_ATTRS.has(attr.name.toLowerCase())) node.removeAttribute(attr.name);
+      else if ((attr.name === 'href' || attr.name === 'src') && DANGEROUS_PROTOCOLS.test(attr.value.trim())) node.removeAttribute(attr.name);
+    }
+    for (const attr of [...node.attributes]) { if (/^on/i.test(attr.name)) node.removeAttribute(attr.name); }
+    for (const child of [...node.childNodes]) clean(child);
+  }
+  for (const child of [...doc.body.childNodes]) clean(child);
+  return doc.body.innerHTML;
+}
+
 // ── Tela de login: mostrar/ocultar senha + aviso de Caps Lock ──────────────
 function _pinToggleOlho() {
   const inp = document.getElementById('pin-input');

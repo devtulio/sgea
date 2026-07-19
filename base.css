@@ -321,3 +321,12 @@ body.dark .pin-org-nome, body.dark .pin-footer-access-title { color: #ddd; }
 body.dark #notif-panel, body.dark .gsearch-box { background: #2a2a2a; border-color: #383838; }
 body.dark .notif-item, body.dark .gsearch-item, body.dark .gsearch-input-wrap { border-color: #383838; }
 body.dark .notif-item:hover, body.dark .gsearch-item:hover { background: #2a2a2a; }
+
+/* ── Editor de texto rico (contenteditable) — toolbar + área de edição ────── */
+._etb-toolbar { display: flex; flex-wrap: wrap; gap: 2px; padding: 5px 6px; background: var(--gray-100); border: 1px solid var(--gray-200); border-bottom: none; border-radius: 6px 6px 0 0; }
+._etb { background: var(--gray-50); border: 1px solid var(--gray-200); border-radius: 4px; padding: 2px 7px; cursor: pointer; font-size: .8rem; line-height: 1.6; color: var(--gray-700); transition: background .12s; }
+._etb:hover { background: var(--gray-200); }
+._etb-sep { display: inline-block; width: 1px; background: var(--gray-300); margin: 2px 3px; align-self: stretch; }
+._etb-sel { background: var(--gray-50); border: 1px solid var(--gray-200); border-radius: 4px; padding: 3px 4px; font-size: .78rem; cursor: pointer; color: var(--gray-700); height: auto; line-height: 1.4; }
+.rte-editor { min-height: 220px; max-height: 380px; overflow-y: auto; border: 1px solid var(--gray-200); border-radius: 0 0 6px 6px; padding: 12px 14px; background: var(--bg-card); font-family: Verdana, sans-serif; font-size: 13px; line-height: 1.7; text-align: justify; outline: none; }
+.rte-editor:focus { border-color: var(--brand); box-shadow: 0 0 0 2px color-mix(in srgb, var(--brand) 15%, transparent); }
