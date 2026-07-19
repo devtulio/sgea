@@ -5,6 +5,15 @@
 
 ---
 
+## [0.16.0] — 2026-07-19
+
+### Adicionado
+- **Auditoria registra geração de relatórios.** Ao gerar a Trilha de Auditoria ou o relatório de Backup e Integridade, um evento `DOCUMENTO_GERADO` ("Relatório gerado", badge navy) passa a ser gravado na auditoria — fechando a lacuna de rastreabilidade que existia frente aos sistemas irmãos.
+- **Numeração de páginas nos relatórios impressos.** Os dois relatórios ganham "Folha N" no rodapé de cada página impressa (`@page counter`), útil para relatórios de várias páginas.
+
+### Alterado
+- **CSS dos relatórios impressos consolidado** numa const única (`_RELATORIO_CSS`), antes duplicada quase idêntica nos dois geradores. Sem mudança visual (a margem do título foi unificada em 10pt).
+
 ## [0.15.2] — 2026-07-18
 
 ### Alterado

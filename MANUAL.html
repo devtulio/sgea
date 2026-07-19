@@ -3,7 +3,7 @@
 <head>
 <meta charset="UTF-8">
 <meta name="viewport" content="width=device-width, initial-scale=1.0">
-<title>Manual Operacional — SGEA v0.13.7</title>
+<title>Manual Operacional — SGEA v0.16.0</title>
 <style>
   * { box-sizing: border-box; margin: 0; padding: 0; }
   body { font-family: 'Times New Roman', Times, serif; font-size: 12pt; color: #000; background: #f5f5f5; }
@@ -63,7 +63,7 @@
     <div class="cover-title">Manual Operacional</div>
     <div class="cover-subtitle">SGEA — Sistema de Gestão de Estoque do Almoxarifado</div>
     <div class="cover-system">Entradas, Saídas, Lotes/Validade e cadastros de apoio</div>
-    <div class="cover-version">Versão v0.13.7</div>
+    <div class="cover-version">Versão v0.16.0</div>
     <br>
     <div style="font-size:11pt; color:#555; line-height:1.8;">
       Aplicação web multiusuário para o Almoxarifado<br>
@@ -183,6 +183,10 @@
   <h2 id="sec13">13. Histórico de Versões</h2>
   <table>
     <tr><th>Versão</th><th>Data</th><th>Resumo</th></tr>
+    <tr><td>0.16.0</td><td>19/07/2026</td><td><strong>Auditoria registra a geração de relatórios</strong> (Trilha de Auditoria e Backup e Integridade): a ação "Relatório gerado" passa a aparecer na trilha, fechando a lacuna frente aos sistemas irmãos. Os dois relatórios impressos ganham <strong>numeração de páginas</strong> ("Folha N") no rodapé de cada página.</td></tr>
+    <tr><td>0.15.2</td><td>18/07/2026</td><td>Rodapé nos relatórios impressos ("Documento gerado pelo SGEA · data · por usuário"), alinhado ao padrão dos sistemas irmãos.</td></tr>
+    <tr><td>0.15.1</td><td>18/07/2026</td><td>Helpers de exportação (<code>_salvarArquivoComo</code>, <code>toCSV</code>) consolidados no <code>base.js</code> compartilhado; sem mudança de comportamento.</td></tr>
+    <tr><td>0.15.0</td><td>18/07/2026</td><td>Diálogo "Salvar como" ao exportar arquivos (CSV de auditoria, pendências da Reconciliação, backup pré-reset) — abre o explorador nativo para escolher a pasta, com fallback para download tradicional.</td></tr>
     <tr><td>0.14.0</td><td>18/07/2026</td><td>Nova tela <strong>Reconciliação com o Fiorilli</strong>: importa o CSV de Posição do Estoque, cruza por código Fiorilli (confere / diverge / só-Fiorilli / só-SGEA / unidade), converte para a unidade de consumo, avisa quando o extrato não é do dia e exporta pendências. Somente leitura.</td></tr>
     <tr><td>0.13.6</td><td>18/07/2026</td><td>Parsing de valores (moeda) mais robusto — aceita o formato brasileiro com separador de milhar (1.234,56) sem virar nulo.</td></tr>
     <tr><td>0.13.5</td><td>18/07/2026</td><td>Corrigida a bolinha de cor em Configurações → "Cor de destaque" (a classe não tinha dimensões e não aparecia); agora segue o padrão de círculo dos sistemas irmãos.</td></tr>

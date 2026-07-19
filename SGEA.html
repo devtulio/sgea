@@ -809,7 +809,7 @@
 // ══════════════════════════════════════════════════════════════
 // API / SESSÃO
 // ══════════════════════════════════════════════════════════════
-const SGEA_VERSION = '0.15.2';
+const SGEA_VERSION = '0.16.0';
 document.title = `SGEA v${SGEA_VERSION}`;
 
 let _apiToken = localStorage.getItem('sgea-token') || null;
@@ -2176,6 +2176,24 @@ function _rodapeRelatorioSGEA() {
     + `Documento gerado pelo <strong>SGEA</strong> — Sistema de Gestão de Estoque do Almoxarifado &nbsp;·&nbsp; ${esc(dt)} &nbsp;·&nbsp; por ${esc(_apiUser?.nome || '—')}</div>`;
 }
 
+// CSS compartilhado pelos dois relatórios impressos (Integridade e Auditoria).
+// A regra .meta só é usada pelo de Auditoria; é inofensiva no de Integridade.
+const _RELATORIO_CSS = `
+  body { font-family: 'Times New Roman', Times, serif; font-size: 11pt; color: #000; background: #fff; padding: 2cm 2.5cm; }
+  .header { text-align: center; margin-bottom: 20pt; border-bottom: 2px solid #000; padding-bottom: 12pt; }
+  .header img { height: 70pt; width: auto; margin-bottom: 6pt; }
+  .header h1 { font-size: 13pt; font-weight: 700; text-transform: uppercase; }
+  .doc-title { text-align: center; margin: 14pt 0 10pt; }
+  .doc-title h3 { font-size: 13pt; font-weight: 700; text-transform: uppercase; }
+  .meta { font-size: 9pt; color: #555; text-align: center; margin-bottom: 10pt; }
+  table { width: 100%; border-collapse: collapse; margin-top: 8pt; font-size: 9pt; }
+  th { background: #1a3a6b; color: #fff; padding: 5pt 7pt; text-align: center; vertical-align: middle; font-weight: 700; }
+  td { padding: 4pt 7pt; vertical-align: middle; font-size: 8.5pt; border-bottom: 1px solid #e0e0e0; }
+  tr:nth-child(even) td { background: #f7f7f7; }
+  .btn-print { position: fixed; top: 20px; right: 20px; background: #1a3a6b; color: #fff; border: none; border-radius: 6px; padding: 10px 18px; cursor: pointer; font-size: 11pt; }
+  @media print { .btn-print { display: none; } }
+  @page { @bottom-right { content: "Folha " counter(page); font-size: 8pt; color: #888; } }`;
+
 async function gerarRelatorioIntegridade() {
   const [r, rSet, rBrasao] = await Promise.all([
     API.get('/api/relatorio/integridade'), API.get('/api/settings'), API.get('/api/settings/brasao'),
@@ -2207,19 +2225,7 @@ async function gerarRelatorioIntegridade() {
 
   const html = `<!DOCTYPE html><html lang="pt-BR"><head><meta charset="UTF-8">
 <title>Relatório de Backup e Integridade — SGEA</title>
-<style>
-  body { font-family: 'Times New Roman', Times, serif; font-size: 11pt; color: #000; background: #fff; padding: 2cm 2.5cm; }
-  .header { text-align: center; margin-bottom: 20pt; border-bottom: 2px solid #000; padding-bottom: 12pt; }
-  .header img { height: 70pt; width: auto; margin-bottom: 6pt; }
-  .header h1 { font-size: 13pt; font-weight: 700; text-transform: uppercase; }
-  .doc-title { text-align: center; margin: 14pt 0 10pt; }
-  .doc-title h3 { font-size: 13pt; font-weight: 700; text-transform: uppercase; }
-  table { width: 100%; border-collapse: collapse; margin-top: 8pt; font-size: 9pt; }
-  th { background: #1a3a6b; color: #fff; padding: 5pt 7pt; text-align: center; vertical-align: middle; font-weight: 700; }
-  td { padding: 4pt 7pt; vertical-align: middle; font-size: 8.5pt; border-bottom: 1px solid #e0e0e0; }
-  tr:nth-child(even) td { background: #f7f7f7; }
-  .btn-print { position: fixed; top: 20px; right: 20px; background: #1a3a6b; color: #fff; border: none; border-radius: 6px; padding: 10px 18px; cursor: pointer; font-size: 11pt; }
-  @media print { .btn-print { display: none; } }
+<style>${_RELATORIO_CSS}
 </style></head><body>
 <button class="btn-print" onclick="window.print()">🖨 Imprimir / Salvar PDF</button>
 <div class="header">
@@ -2254,6 +2260,7 @@ ${_rodapeRelatorioSGEA()}
   if (!win) { toast('Popup bloqueado pelo navegador. Permita popups para este site.', 'error'); return; }
   win.document.write(html);
   win.document.close();
+  _auditEvento('DOCUMENTO_GERADO', 'Relatório de Backup e Integridade');
 }
 
 // ── Comunicação (SMTP) ──────────────────────────────────────────
@@ -2411,6 +2418,7 @@ const _AUDIT_TIPOS = [
   'FROTA_CRIADO', 'FROTA_EDITADO', 'FROTA_EXCLUIDO',
   'PEDIDO_CRIADO', 'PEDIDO_EDITADO', 'PEDIDO_EXCLUIDO', 'PEDIDO_ITEM_ANULADO', 'PEDIDO_CANCELADO',
   'USUARIO_CRIADO', 'USUARIO_EDITADO', 'USUARIO_EXCLUIDO',
+  'DOCUMENTO_GERADO',
 ];
 
 // Auditoria — label legível + cor do badge por tipo (paridade com SGCD/SGCA).
@@ -2428,6 +2436,7 @@ const _AUDIT_EVENT_LABELS = {
   PEDIDO_ITEM_ANULADO: 'Saldo de item anulado', PEDIDO_CANCELADO: 'Pedido cancelado',
   USUARIO_CRIADO: 'Usuário criado', USUARIO_EDITADO: 'Usuário editado', USUARIO_EXCLUIDO: 'Usuário excluído',
   RESTAURAR_BACKUP: 'Backup restaurado (JSON)', RESTAURAR_DB: 'Banco restaurado (.db)', FACTORY_RESET: 'Reset de fábrica',
+  DOCUMENTO_GERADO: 'Relatório gerado',
 };
 
 // Cor do badge (fundo sólido, texto branco) por família de ação.
@@ -2438,6 +2447,7 @@ const _AUDIT_EVENT_META = (() => {
   set(['PRODUTO_EDITADO', 'CENTRO_CUSTO_EDITADO', 'FORNECEDOR_EDITADO', 'FUNCIONARIO_EDITADO', 'FROTA_EDITADO', 'PEDIDO_EDITADO', 'USUARIO_EDITADO'], '#185FA5'); // azul — edição
   set(['PRODUTO_EXCLUIDO', 'ENTRADA_EXCLUIDA', 'SAIDA_EXCLUIDA', 'CENTRO_CUSTO_EXCLUIDO', 'FORNECEDOR_EXCLUIDO', 'FUNCIONARIO_EXCLUIDO', 'FROTA_EXCLUIDO', 'PEDIDO_EXCLUIDO', 'USUARIO_EXCLUIDO', 'FACTORY_RESET'], '#A32D2D'); // vermelho — exclusão/reset
   set(['PEDIDO_ITEM_ANULADO', 'PEDIDO_CANCELADO', 'RESTAURAR_BACKUP', 'RESTAURAR_DB'], '#854F0B'); // âmbar — anulação/restauração sensível
+  set(['DOCUMENTO_GERADO'], '#1a3a6b'); // navy — geração de relatório
   return m;
 })();
 
@@ -2685,20 +2695,7 @@ async function gerarRelatorioAuditoria() {
 
   const html = `<!DOCTYPE html><html lang="pt-BR"><head><meta charset="UTF-8">
 <title>Relatório de Auditoria — SGEA</title>
-<style>
-  body { font-family: 'Times New Roman', Times, serif; font-size: 11pt; color: #000; background: #fff; padding: 2cm 2.5cm; }
-  .header { text-align: center; margin-bottom: 20pt; border-bottom: 2px solid #000; padding-bottom: 12pt; }
-  .header img { height: 70pt; width: auto; margin-bottom: 6pt; }
-  .header h1 { font-size: 13pt; font-weight: 700; text-transform: uppercase; }
-  .doc-title { text-align: center; margin: 14pt 0 6pt; }
-  .doc-title h3 { font-size: 13pt; font-weight: 700; text-transform: uppercase; }
-  .meta { font-size: 9pt; color: #555; text-align: center; margin-bottom: 10pt; }
-  table { width: 100%; border-collapse: collapse; margin-top: 8pt; font-size: 9pt; }
-  th { background: #1a3a6b; color: #fff; padding: 5pt 7pt; text-align: center; vertical-align: middle; font-weight: 700; }
-  td { padding: 4pt 7pt; vertical-align: middle; font-size: 8.5pt; border-bottom: 1px solid #e0e0e0; }
-  tr:nth-child(even) td { background: #f7f7f7; }
-  .btn-print { position: fixed; top: 20px; right: 20px; background: #1a3a6b; color: #fff; border: none; border-radius: 6px; padding: 10px 18px; cursor: pointer; font-size: 11pt; }
-  @media print { .btn-print { display: none; } }
+<style>${_RELATORIO_CSS}
 </style></head><body>
 <button class="btn-print" onclick="window.print()">🖨 Imprimir / Salvar PDF</button>
 <div class="header">
@@ -2719,6 +2716,7 @@ ${_rodapeRelatorioSGEA()}
   if (!win) { toast('Popup bloqueado pelo navegador. Permita popups para este site.', 'error'); return; }
   win.document.write(html);
   win.document.close();
+  _auditEvento('DOCUMENTO_GERADO', 'Relatório de Trilha de Auditoria');
 }
 
 // ══════════════════════════════════════════════════════════════
