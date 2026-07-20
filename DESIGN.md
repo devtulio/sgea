@@ -15,6 +15,7 @@ description: >
 
 colors:
   brand: "#1a3a6b"
+  brand-text: "var(--brand) no claro; color-mix(in srgb, var(--brand) 40%, #b7c9de) no dark — use para TEXTO na cor da marca (nunca var(--brand) direto em texto: ilegível no modo escuro)"
   brand-light: "#e8eef7"
   brand-dark: "#102855"
   accent: "#1a3a6b"
@@ -106,6 +107,8 @@ valores precisam ser copiados literalmente, nunca recriados "parecidos".
 - **Modal** (`.overlay` / `.modal`) — header colado no topo em `--accent`, borda inferior 3px `--brand`, footer sticky.
 - **Botões** — `.btn-primary` (`--brand`, hover `--brand-dark`), `.btn-outline`, `.btn-ghost`, `.btn-danger`/`.btn-success`.
 - **Badges/toast/busca global (Ctrl+K)** — ver `base.css` linhas 201–240.
+- **Tabela de listagem** (`.list-table-wrap` > `.list-table`) — thead cinza uppercase, zebra, hover `--brand-light`; colunas numéricas com `.col-num`, ações com `.col-actions`.
+- **Stat-card de dashboard** — acento por **borda esquerda 4px** colorida (nunca anel completo nem borda no topo).
 
 ## Regras de uso
 

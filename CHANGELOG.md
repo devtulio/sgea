@@ -5,6 +5,15 @@
 
 ---
 
+## [0.21.0] — 2026-07-20
+
+### Alterado
+- **Legibilidade do modo escuro**: novo token `--brand-text` — textos na cor da marca (números, links, metadados de cards) agora clareiam automaticamente no tema escuro (antes: navy sobre fundo escuro, quase ilegível). Aplicado via troca global `color: var(--brand)` → `var(--brand-text)`.
+- **Componentes canônicos novos no `base.css`** (auditoria de design 2026-07-20): tabela de listagem (`.list-table`, com cabeçalho, zebra e hover) e variantes de badge (`badge-ok/warn/danger/neutral`). `DESIGN.md` atualizado (token, tabela e regra do acento esquerdo nos stat-cards).
+- **Tabelas de listagem ganharam o estilo canônico** — Estoque, Alertas de Validade, Pedidos e demais listas usavam `.list-table` sem CSS (tabela crua do navegador, colunas coladas); agora têm cabeçalho, zebra, espaçamento e hover. Os badges de urgência dos Alertas (vencido/vencendo), que existiam no código mas renderizavam como texto puro, passaram a aparecer.
+- **Login em paridade com os irmãos**: placeholders nos campos, rótulo "Senha de acesso" e ícone no botão "Entrar no sistema".
+- Cosmético: linha do órgão na sidebar oculta até ser configurado (antes "—"); troca de senha com placeholders e botão "Salvar nova senha" (era "Alterar Senha").
+
 ## [0.20.0] — 2026-07-19
 
 ### Adicionado
