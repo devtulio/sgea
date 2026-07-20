@@ -43,13 +43,13 @@
   @media print {
     body { background: #fff; }
     .btn-print { display: none; }
-    .page { margin: 0; padding: 0; box-shadow: none; width: 100%; }
+    .page { margin: 0; padding: 0; box-shadow: none; width: 100%; min-height: 0; }
     .cover { page-break-after: always; }
     .toc-page { page-break-after: always; }
     h2 { page-break-before: always; }
-    h2:first-of-type { page-break-before: avoid; }
+    h2, h3, h4 { page-break-after: avoid; }
     .nota, .aviso, .dica { page-break-inside: avoid; }
-    @page { margin: 20mm 20mm 25mm; size: A4; }
+    @page { size: A4; }
   }
 </style>
 </head>
