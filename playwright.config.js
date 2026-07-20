@@ -12,10 +12,10 @@ const port = 3052;
 
 export default defineConfig({
   testDir: './tests/e2e',
-  timeout: 30_000,
+  timeout: 60_000,  // 60s: runners Windows do CI ocasionalmente lentos (goto+fill consumiam os 30s)
   // Assertions que dependem de um round-trip ao servidor Python ocasionalmente
   // passam de 5s (default) sob carga nos runners Windows do GitHub. 10s dá folga
-  // sem mascarar travamento real (o timeout do teste inteiro continua 30s).
+  // sem mascarar travamento real (o timeout do teste inteiro continua limitado acima).
   expect: { timeout: 10_000 },
   fullyParallel: false, // um único servidor/banco compartilhado entre os specs
   workers: 1,
