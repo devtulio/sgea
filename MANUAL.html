@@ -49,7 +49,23 @@
     h2 { page-break-before: always; }
     h2, h3, h4 { page-break-after: avoid; }
     .nota, .aviso, .dica { page-break-inside: avoid; }
-    @page { size: A4; }
+    @page {
+      size: A4;
+      margin: 20mm 20mm 25mm;
+      @top-center {
+        content: "SGEA v0.20.0 — Manual Operacional";
+        font-family: 'Times New Roman', serif;
+        font-size: 9pt;
+        color: #666;
+      }
+      @bottom-center {
+        content: "Página " counter(page) " de " counter(pages);
+        font-family: 'Times New Roman', serif;
+        font-size: 9pt;
+        color: #666;
+      }
+    }
+    @page :first { @top-center { content: none; } }
   }
 </style>
 </head>
