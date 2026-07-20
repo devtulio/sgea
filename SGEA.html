@@ -1066,7 +1066,7 @@
 // ══════════════════════════════════════════════════════════════
 // API / SESSÃO
 // ══════════════════════════════════════════════════════════════
-const SGEA_VERSION = '0.21.0';
+const SGEA_VERSION = '0.21.1';
 document.title = `SGEA v${SGEA_VERSION}`;
 
 let _apiToken = localStorage.getItem('sgea-token') || null;
@@ -2578,7 +2578,7 @@ const _DOC_CSS = `
   table { width: 100%; border-collapse: collapse; margin-top: 8pt; font-size: 9pt; table-layout: fixed; }
   th { background: #1a3a6b; color: #fff; padding: 5pt 7pt; text-align: left; vertical-align: middle; font-weight: 700; font-size: 9pt; }
   td { padding: 4pt 7pt; vertical-align: middle; font-size: 8.5pt; border-bottom: 1px solid #e8e8e8; word-wrap: break-word; overflow-wrap: break-word; }
-  .btn-print { position: fixed; top: 20px; right: 20px; background: #1a3a6b; color: #fff; border: none; border-radius: 6px; padding: 10px 18px; cursor: pointer; font-size: 11pt; }
+  .btn-print { display: block; margin: 0 auto 20pt; background: #1a3a6b; color: #fff; border: none; border-radius: 6px; padding: 10px 18px; cursor: pointer; font-size: 11pt; }
   @media print { .btn-print { display: none; } }
   @page { @bottom-right { content: "Folha " counter(page); font-size: 8pt; color: #888; } }
 `;
@@ -3768,7 +3768,7 @@ const _RELATORIO_CSS = `
   th { background: #1a3a6b; color: #fff; padding: 5pt 7pt; text-align: center; vertical-align: middle; font-weight: 700; }
   td { padding: 4pt 7pt; vertical-align: middle; font-size: 8.5pt; border-bottom: 1px solid #e0e0e0; }
   tr:nth-child(even) td { background: #f7f7f7; }
-  .btn-print { position: fixed; top: 20px; right: 20px; background: #1a3a6b; color: #fff; border: none; border-radius: 6px; padding: 10px 18px; cursor: pointer; font-size: 11pt; }
+  .btn-print { display: block; margin: 0 auto 20pt; background: #1a3a6b; color: #fff; border: none; border-radius: 6px; padding: 10px 18px; cursor: pointer; font-size: 11pt; }
   @media print { .btn-print { display: none; } }
   @page { @bottom-right { content: "Folha " counter(page); font-size: 8pt; color: #888; } }`;
 

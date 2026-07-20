@@ -15,6 +15,7 @@ description: >
 
 colors:
   brand: "#1a3a6b"
+  violet: "#7c3aed"   # acento oficial p/ análise/jurídico (ex.: botão Conformidade do SGCD)
   brand-text: "var(--brand) no claro; color-mix(in srgb, var(--brand) 40%, #b7c9de) no dark — use para TEXTO na cor da marca (nunca var(--brand) direto em texto: ilegível no modo escuro)"
   brand-light: "#e8eef7"
   brand-dark: "#102855"
@@ -109,6 +110,12 @@ valores precisam ser copiados literalmente, nunca recriados "parecidos".
 - **Badges/toast/busca global (Ctrl+K)** — ver `base.css` linhas 201–240.
 - **Tabela de listagem** (`.list-table-wrap` > `.list-table`) — thead cinza uppercase, zebra, hover `--brand-light`; colunas numéricas com `.col-num`, ações com `.col-actions`.
 - **Stat-card de dashboard** — acento por **borda esquerda 4px** colorida (nunca anel completo nem borda no topo).
+
+## Divergências deliberadas e regras de fronteira
+
+- **Paletas categóricas de dados** (cores de séries de gráfico, cores por tipo de documento no SGDP, cores de evento na auditoria) **não são tokens de UI** — podem usar hex próprios, contanto que fiquem agrupadas numa const/objeto nomeado. Componentes de interface (botões, badges, bordas) usam tokens.
+- **Brasão nos documentos gerados: NUNCA default embutido.** Produto é genérico (MIT, repos públicos); o brasão do órgão é sempre upload em Configurações. Sem brasão configurado, o documento sai sem imagem (só o nome do órgão). Botão "Imprimir / Salvar PDF" centralizado no topo.
+- **SGDP mantém idioma próprio de formulário** (rótulos sentence-case, linhas de 2 colunas `.form-row`) — divergência aceita em 2026-07-20, coerente com a identidade do sistema (âmbar no login, modais próprios). Regra: telas novas do SGDP seguem o idioma do SGDP; nos outros 3, o idioma canônico é `.info-field` empilhado com rótulo maiúsculo. Não misturar os dois no mesmo sistema.
 
 ## Regras de uso
 

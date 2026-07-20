@@ -5,6 +5,11 @@
 
 ---
 
+## [0.21.1] — 2026-07-20
+
+### Alterado
+- **Lote 4 da auditoria de design**: botão "🖨 Imprimir / Salvar PDF" dos documentos gerados agora **centralizado no topo** (era fixo no canto direito), como nos irmãos. Token `--violet` e regras novas no `base.css`/`DESIGN.md` compartilhados.
+
 ## [0.21.0] — 2026-07-20
 
 ### Alterado

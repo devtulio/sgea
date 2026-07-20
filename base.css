@@ -22,6 +22,7 @@
 :root {
   --brand:        #4b5563;
   --brand-text:   var(--brand);   /* cor da marca quando usada como TEXTO — clareada no dark */
+  --violet:       #7c3aed;        /* acento oficial p/ análise/jurídico (ex.: Conformidade) */
   --brand-light:  #f3f4f6;
   --brand-dark:   #374151;
   --accent:       #4b5563;
