@@ -27,8 +27,6 @@
   /* Dark mode alinhado ao padrão neutro canônico do base.css (#1a1a1a fundo,
      #2a2a2a cards). Fundo/texto do body e tokens --gray-* vêm do base.css. */
   body.dark .modal, body.dark .list-table { background: #2a2a2a; }
-  body.dark .cfg-tab { color: #999; }
-  body.dark .cfg-tab:hover { color: #fff; }
 
   #app.layout-expanded { padding-right: 24px; }
   #app:not(.layout-expanded) #view-dashboard,
@@ -659,17 +657,22 @@
     <div class="cfg-panel" id="cfg-panel-comunicacao">
       <fieldset class="cfg-fieldset">
         <legend>Servidor SMTP</legend>
-        <div class="form-grid">
-          <div class="info-field"><label for="cfg-smtp-host">Servidor SMTP</label><input type="text" id="cfg-smtp-host" placeholder="smtp.exemplo.com"></div>
-          <div class="info-field"><label for="cfg-smtp-port">Porta</label><input type="number" id="cfg-smtp-port" placeholder="587"></div>
-          <div class="info-field checkbox"><input type="checkbox" id="cfg-smtp-tls" checked><label for="cfg-smtp-tls" style="margin:0;text-transform:none;font-weight:500">STARTTLS (porta 587)</label></div>
-          <div class="info-field checkbox"><input type="checkbox" id="cfg-smtp-ssl"><label for="cfg-smtp-ssl" style="margin:0;text-transform:none;font-weight:500">SSL direto (porta 465)</label></div>
-          <div class="info-field checkbox span-2"><input type="checkbox" id="cfg-smtp-ignore-ssl"><label for="cfg-smtp-ignore-ssl" style="margin:0;text-transform:none;font-weight:500">Ignorar verificação de certificado SSL</label></div>
-          <div class="info-field"><label for="cfg-smtp-user">Usuário</label><input type="text" id="cfg-smtp-user" autocomplete="off" placeholder="usuario@exemplo.com"></div>
-          <div class="info-field"><label for="cfg-smtp-pass">Senha</label><input type="password" id="cfg-smtp-pass" autocomplete="new-password" placeholder="(deixe em branco para manter)"></div>
-          <div class="info-field"><label for="cfg-smtp-from-name">Nome do Remetente</label><input type="text" id="cfg-smtp-from-name" placeholder="Almoxarifado"></div>
-          <div class="info-field"><label for="cfg-smtp-to">Destinatário Interno</label><input type="email" id="cfg-smtp-to" placeholder="almoxarifado@prefeitura.gov.br"></div>
+        <div class="info-field"><label for="cfg-smtp-host">Servidor SMTP (host)</label><input type="text" id="cfg-smtp-host" placeholder="smtp.exemplo.com"></div>
+        <div class="info-field"><label for="cfg-smtp-port">Porta</label><input type="number" id="cfg-smtp-port" placeholder="587" style="max-width:120px"></div>
+        <div style="display:flex;gap:20px;margin:8px 0">
+          <label style="display:flex;align-items:center;gap:6px;font-size:.82rem;cursor:pointer"><input type="checkbox" id="cfg-smtp-tls" checked style="width:15px;height:15px"> Usar STARTTLS (porta 587)</label>
+          <label style="display:flex;align-items:center;gap:6px;font-size:.82rem;cursor:pointer"><input type="checkbox" id="cfg-smtp-ssl" style="width:15px;height:15px"> Usar SSL direto (porta 465)</label>
         </div>
+        <div style="margin-top:6px;margin-bottom:10px">
+          <label style="display:flex;align-items:center;gap:6px;font-size:.82rem;cursor:pointer;color:var(--gray-500)">
+            <input type="checkbox" id="cfg-smtp-ignore-ssl" style="width:15px;height:15px">
+            Ignorar verificação de certificado SSL <span style="font-size:.75rem;color:var(--warning,#b45309)">(apenas para servidores internos / autoassinados)</span>
+          </label>
+        </div>
+        <div class="info-field"><label for="cfg-smtp-user">Usuário (e-mail de envio)</label><input type="text" id="cfg-smtp-user" autocomplete="off" placeholder="usuario@exemplo.com"></div>
+        <div class="info-field"><label for="cfg-smtp-pass">Senha</label><input type="password" id="cfg-smtp-pass" autocomplete="new-password" placeholder="(deixe em branco para manter)"></div>
+        <div class="info-field"><label for="cfg-smtp-from-name">Nome do Remetente</label><input type="text" id="cfg-smtp-from-name" placeholder="Almoxarifado"></div>
+        <div class="info-field"><label for="cfg-smtp-to">Destinatário Interno</label><input type="email" id="cfg-smtp-to" placeholder="almoxarifado@prefeitura.gov.br"></div>
         <div style="display:flex;align-items:center;gap:10px;flex-wrap:wrap;margin-top:6px">
           <button class="btn btn-outline btn-sm" onclick="testarSmtp()">Testar conexão</button>
           <span id="smtp-test-result" style="font-size:.82rem"></span>
@@ -705,11 +708,11 @@
       <div id="config-info" style="margin-bottom:16px;font-size:.85rem;color:var(--gray-600)"></div>
       <div id="backups-list"></div>
 
-      <div style="margin-top:28px;padding:16px;border:1px solid var(--danger);border-radius:var(--radius);background:var(--danger-light)">
-        <label style="display:block;font-size:.72rem;font-weight:700;text-transform:uppercase;letter-spacing:.4px;color:var(--danger);margin-bottom:8px">Zona de Perigo</label>
-        <p style="font-size:.82rem;color:var(--gray-700);margin-bottom:10px">Apaga produtos, lotes, entradas, saídas e todos os cadastros (centros de custo, fornecedores, funcionários, frota, pedidos). Usuários e configurações são mantidos. Um backup é baixado automaticamente antes.</p>
+      <fieldset style="border:1.5px solid var(--danger);border-radius:8px;padding:14px 16px;margin-top:8px">
+        <legend style="font-size:.72rem;font-weight:700;color:var(--danger);padding:0 6px;text-transform:uppercase;letter-spacing:.4px">Zona de Perigo</legend>
+        <p style="font-size:.72rem;color:var(--gray-500);margin-bottom:12px;line-height:1.5">Apaga produtos, lotes, entradas, saídas e todos os cadastros (centros de custo, fornecedores, funcionários, frota, pedidos). Usuários e configurações são mantidos. Um backup é baixado automaticamente antes.</p>
         <button class="btn btn-danger" onclick="factoryReset()">Reset de Fábrica</button>
-      </div>
+      </fieldset>
     </div>
     </div>
 
@@ -1066,7 +1069,7 @@
 // ══════════════════════════════════════════════════════════════
 // API / SESSÃO
 // ══════════════════════════════════════════════════════════════
-const SGEA_VERSION = '0.21.1';
+const SGEA_VERSION = '0.21.2';
 document.title = `SGEA v${SGEA_VERSION}`;
 
 let _apiToken = localStorage.getItem('sgea-token') || null;

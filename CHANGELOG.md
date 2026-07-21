@@ -5,6 +5,11 @@
 
 ---
 
+## [0.21.2] — 2026-07-20
+
+### Alterado
+- **Configurações em paridade visual com a família**: a aba **Comunicação** deixou de usar grade de 2 colunas — os campos do SMTP agora ficam empilhados em largura total, com o aviso âmbar "(apenas para servidores internos / autoassinados)" ao lado de "Ignorar verificação de certificado SSL", como no SGCD/SGCA/SGDP. A **Zona de Perigo** (aba Dados) passou de um bloco com fundo rosa para o mesmo cartão de borda vermelha (`fieldset`/`legend`) dos irmãos. Removidos overrides locais de `.cfg-tab` no modo escuro que divergiam do `base.css` compartilhado.
+
 ## [0.21.1] — 2026-07-20
 
 ### Alterado
