@@ -559,3 +559,29 @@ document.addEventListener('keydown', e => {
     e.target.click();
   }
 });
+
+// ── Aviso de servidor desatualizado (compartilhado pelos 4 sistemas) ──────────
+// Cada app chama checarVersaoServidor(APP_VERSION, 'Iniciar <App>.bat') no login.
+// Compara a versão do processo Python rodando (via /health) com a da página; se o
+// servidor for mais antigo (iniciado antes de uma atualização → rotas novas dão
+// 404 até reiniciar), mostra uma faixa no topo orientando a reiniciar.
+async function checarVersaoServidor(appVersion, batName) {
+  let sv;
+  try {
+    const r = await fetch('/health', { cache: 'no-store' });
+    sv = (await r.json())?.version;
+  } catch { return; }  // servidor inacessível: o resto do app já sinaliza
+  if (sv === appVersion) return;
+  const msg = sv
+    ? `Servidor em execução: v${sv} · esta página: v${appVersion}. Reinicie o servidor (${batName}) para carregar a versão nova — funções novas podem falhar até lá.`
+    : `O servidor em execução é uma versão antiga e não informa a versão. Reinicie o servidor (${batName}) — funções novas podem falhar até lá.`;
+  let bar = document.getElementById('server-version-warn');
+  if (!bar) {
+    bar = document.createElement('div');
+    bar.id = 'server-version-warn';
+    bar.style.cssText = 'position:fixed;top:0;left:0;right:0;z-index:9999;background:#b45309;color:#fff;padding:8px 44px 8px 16px;font-size:.85rem;line-height:1.4;text-align:center;box-shadow:0 2px 8px rgba(0,0,0,.35)';
+    bar.innerHTML = '<span id="server-version-warn-msg"></span><button onclick="this.parentElement.remove()" title="Dispensar" style="position:absolute;right:10px;top:6px;background:rgba(255,255,255,.2);border:none;color:#fff;border-radius:4px;padding:2px 9px;cursor:pointer">✕</button>';
+    document.body.appendChild(bar);
+  }
+  document.getElementById('server-version-warn-msg').textContent = '⚠ ' + msg;
+}

@@ -20,6 +20,7 @@ import secrets
 import smtplib
 import ssl
 import sqlite3
+import subprocess
 import time
 from email.mime.multipart import MIMEMultipart
 from email.mime.text import MIMEText
@@ -204,3 +205,27 @@ def add_audit(get_db, table, audit_id, ts, user_id, user_nome, tipo, detail, pro
                 VALUES (?,?,?,?,?,?,?,?)''',
             (audit_id, ts, user_id, user_nome, tipo, tipo, detail, process_id)
         )
+
+
+def backup_ts(filename):
+    """Timestamp ISO a partir do nome do backup no formato
+    DB_XXXX_BACKUP_YYYY-MM-DD_HH-MM-SS.db. O prefixo tem sempre 15 chars nos 4
+    sistemas (DB_ + código de 4 letras + _BACKUP_), então os offsets são fixos."""
+    d = filename[15:25]; t = filename[26:34].replace('-', ':')
+    return f'{d}T{t}'
+
+
+def pick_folder_dialog(description):
+    """Abre o FolderBrowserDialog do Windows (via PowerShell) e devolve o caminho
+    escolhido, ou '' se cancelado. `description` DEVE ser um literal de código —
+    é interpolado no comando PowerShell, então nunca passe entrada de usuário."""
+    ps_cmd = (
+        'Add-Type -AssemblyName System.Windows.Forms;'
+        '$d=New-Object System.Windows.Forms.FolderBrowserDialog;'
+        f'$d.Description="{description}";'
+        '$d.ShowNewFolderButton=$true;'
+        'if($d.ShowDialog()-eq"OK"){Write-Output $d.SelectedPath}'
+    )
+    r = subprocess.run(['powershell', '-Sta', '-WindowStyle', 'Hidden', '-Command', ps_cmd],
+                       capture_output=True, text=True, timeout=120)
+    return r.stdout.strip()

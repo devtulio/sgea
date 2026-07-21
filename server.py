@@ -2118,10 +2118,7 @@ class SGEAHandler(http.server.SimpleHTTPRequestHandler):
         files = sorted(
             (f for f in os.listdir(bdir) if f.startswith('DB_SGEA_BACKUP_') and f.endswith('.db')), reverse=True
         ) if os.path.isdir(bdir) else []
-        def _parse_ts(f):
-            d = f[15:25]; t = f[26:34].replace('-', ':')
-            return f'{d}T{t}'
-        items = [{'name': f, 'size': os.path.getsize(os.path.join(bdir, f)), 'ts': _parse_ts(f)} for f in files]
+        items = [{'name': f, 'size': os.path.getsize(os.path.join(bdir, f)), 'ts': sgx_base.backup_ts(f)} for f in files]
         with get_db() as conn:
             last_row = conn.execute("SELECT value FROM sys_settings WHERE key='auto_backup_last'").fetchone()
         self._json(200, {'items': items, 'path': bdir, 'cfg': cfg, 'last_backup': last_row['value'] if last_row else None})
@@ -2145,16 +2142,7 @@ class SGEAHandler(http.server.SimpleHTTPRequestHandler):
         global _watchdog_paused
         _watchdog_paused = True
         try:
-            ps_cmd = (
-                'Add-Type -AssemblyName System.Windows.Forms;'
-                '$d=New-Object System.Windows.Forms.FolderBrowserDialog;'
-                '$d.Description="Selecione a pasta de backup do SGEA";'
-                '$d.ShowNewFolderButton=$true;'
-                'if($d.ShowDialog()-eq"OK"){Write-Output $d.SelectedPath}'
-            )
-            r = subprocess.run(['powershell', '-Sta', '-WindowStyle', 'Hidden', '-Command', ps_cmd],
-                                capture_output=True, text=True, timeout=120)
-            path = r.stdout.strip()
+            path = sgx_base.pick_folder_dialog("Selecione a pasta de backup do SGEA")
             self._json(200, {'path': path or None})
         except Exception as e:
             self._json(500, {'error': str(e)})
