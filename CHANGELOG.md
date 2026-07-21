@@ -5,6 +5,11 @@
 
 ---
 
+## [0.22.0] — 2026-07-20
+
+### Adicionado
+- **"Meu E-mail" (SMTP por usuário)** na aba **Segurança** das Configurações, em paridade com SGCD/SGCA/SGDP: cada usuário pode cadastrar sua própria conta de envio (host, porta, STARTTLS/SSL, ignorar certificado, usuário, senha e nome do remetente), com os botões **"Salvar minha config"**, **"Copiar do sistema"** (traz host/porta/segurança da config do sistema, sem a senha) e **"Testar"**. Deixado em branco, herda o SMTP do sistema. A senha é gravada **apenas no servidor** (colunas `smtp_*` na tabela `usuarios`; endpoint `GET /api/usuarios/{id}/smtp` devolve tudo menos a senha) e nunca retorna ao navegador.
+
 ## [0.21.2] — 2026-07-20
 
 ### Alterado

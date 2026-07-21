@@ -1,6 +1,6 @@
 # SGEA — Sistema de Gestão de Estoque do Almoxarifado
 
-![Versão](https://img.shields.io/badge/versão-v0.21.2-blue) ![Tecnologia](https://img.shields.io/badge/tecnologia-Python%20%2B%20SQLite-orange) ![Licença](https://img.shields.io/badge/licença-MIT-green) ![Multiusuário](https://img.shields.io/badge/acesso-multiusuário-blueviolet)
+![Versão](https://img.shields.io/badge/versão-v0.22.0-blue) ![Tecnologia](https://img.shields.io/badge/tecnologia-Python%20%2B%20SQLite-orange) ![Licença](https://img.shields.io/badge/licença-MIT-green) ![Multiusuário](https://img.shields.io/badge/acesso-multiusuário-blueviolet)
 
 ## Descrição
 
@@ -29,7 +29,7 @@ Funciona em rede local: um único computador executa o servidor e todos os usuá
 - **Auditoria** — trilha de eventos de criação/edição/exclusão em todos os módulos, com tela de consulta filtrável (admin)
 - **Lixeira** — Entradas, Saídas e Fornecedores excluídos ficam disponíveis para restaurar por 30 dias
 - **Alerta diário por e-mail** (SMTP configurável) resumindo lotes vencidos ou vencendo nos próximos 7 dias
-- **Tela de Configurações em 7 abas** — Interface (tema, largura do conteúdo, fonte, cor de destaque), Organização (órgão/CNPJ/autoridade competente e brasão), Comunicação (SMTP), Dados (backup/restore, Zona de Perigo), Segurança (troca da própria senha), Diagnóstico (checagens de consistência) e Usuários (admin), com salvamento único e indicador de alterações não salvas — mesmo padrão visual dos sistemas irmãos
+- **Tela de Configurações em 7 abas** — Interface (tema, largura do conteúdo, fonte, cor de destaque), Organização (órgão/CNPJ/autoridade competente e brasão), Comunicação (SMTP), Dados (backup/restore, Zona de Perigo), Segurança (troca da própria senha e config pessoal de e-mail/SMTP), Diagnóstico (checagens de consistência) e Usuários (admin), com salvamento único e indicador de alterações não salvas — mesmo padrão visual dos sistemas irmãos
 - **Login no padrão visual dos sistemas irmãos** — cartão institucional, identificação do órgão, aviso de Caps Lock e último backup exibido antes de entrar
 - **Busca global (Ctrl+K)** — encontra produtos, fornecedores, funcionários, frota, centros de custo e pedidos por qualquer tela, com atalho de teclado
 - **Sino de notificações** — contagem de lotes vencidos/vencendo nos próximos 7 dias, com painel de acesso rápido

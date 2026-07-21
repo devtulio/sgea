@@ -724,6 +724,32 @@
         <div class="info-field"><label for="cfg-senha-confirma">Confirmar Nova Senha</label><input type="password" id="cfg-senha-confirma"></div>
         <button class="btn btn-primary" onclick="alterarMinhaSenha()">Salvar nova senha</button>
       </fieldset>
+
+      <fieldset class="cfg-fieldset">
+        <legend>Meu E-mail (SMTP)</legend>
+        <p class="cfg-help" style="margin-bottom:12px">Quando <strong>você</strong> envia notificações estando logado, o e-mail sai por esta conta. <strong>Deixe em branco para usar a config do sistema.</strong></p>
+        <div class="info-field"><label for="me-smtp-host">Servidor SMTP (host)</label><input type="text" id="me-smtp-host" placeholder="smtp.exemplo.com"></div>
+        <div class="info-field"><label for="me-smtp-port">Porta</label><input type="number" id="me-smtp-port" placeholder="587" style="max-width:120px"></div>
+        <div style="display:flex;gap:20px;margin:8px 0">
+          <label style="display:flex;align-items:center;gap:6px;font-size:.82rem;cursor:pointer"><input type="checkbox" id="me-smtp-tls" style="width:15px;height:15px"> Usar STARTTLS (porta 587)</label>
+          <label style="display:flex;align-items:center;gap:6px;font-size:.82rem;cursor:pointer"><input type="checkbox" id="me-smtp-ssl" style="width:15px;height:15px"> Usar SSL direto (porta 465)</label>
+        </div>
+        <div style="margin-top:6px;margin-bottom:10px">
+          <label style="display:flex;align-items:center;gap:6px;font-size:.82rem;cursor:pointer;color:var(--gray-500)">
+            <input type="checkbox" id="me-smtp-ignore-ssl" style="width:15px;height:15px">
+            Ignorar verificação de certificado SSL <span style="font-size:.75rem;color:var(--warning,#b45309)">(apenas para servidores internos / autoassinados)</span>
+          </label>
+        </div>
+        <div class="info-field"><label for="me-smtp-user">Usuário (seu e-mail de envio)</label><input type="email" id="me-smtp-user" autocomplete="off" placeholder="voce@exemplo.com"></div>
+        <div class="info-field"><label for="me-smtp-pass">Senha</label><input type="password" id="me-smtp-pass" autocomplete="new-password" placeholder="(em branco preserva a atual)"></div>
+        <div class="info-field"><label for="me-smtp-from-name">Nome do remetente</label><input type="text" id="me-smtp-from-name" placeholder="Seu nome"></div>
+        <div style="margin-top:8px;display:flex;align-items:center;gap:10px;flex-wrap:wrap">
+          <button class="btn btn-primary btn-sm" onclick="salvarMeuSmtp()">Salvar minha config</button>
+          <button class="btn btn-outline btn-sm" onclick="copiarSmtpDoSistema()" title="Copia host/porta/segurança do sistema; você informa seu usuário e senha">Copiar do sistema</button>
+          <button class="btn btn-outline btn-sm" onclick="testarMeuSmtp()">🔌 Testar</button>
+          <span id="me-smtp-status" style="font-size:.8rem"></span>
+        </div>
+      </fieldset>
     </div>
 
     <div class="cfg-panel" id="cfg-panel-diagnostico">
@@ -1069,7 +1095,7 @@
 // ══════════════════════════════════════════════════════════════
 // API / SESSÃO
 // ══════════════════════════════════════════════════════════════
-const SGEA_VERSION = '0.21.2';
+const SGEA_VERSION = '0.22.0';
 document.title = `SGEA v${SGEA_VERSION}`;
 
 let _apiToken = localStorage.getItem('sgea-token') || null;
@@ -3348,6 +3374,7 @@ function showConfiguracoes() {
   if (corRadio) corRadio.checked = true;
   carregarConfigGeral();
   if (_apiUser?.admin) { carregarSmtp(); carregarConfigBackup(); }
+  carregarMeuSmtp();  // "Meu E-mail" é de todos os usuários (aba Segurança)
   switchCfgTab('interface');
   _resetSettingsDirty();
 }
@@ -4088,6 +4115,83 @@ async function testarSmtp() {
   const d = await API.json(r);
   if (r && r.ok && d?.ok) { resEl.textContent = '✔ E-mail de teste enviado com sucesso.'; resEl.style.color = 'var(--success)'; }
   else { resEl.textContent = `✕ Falha: ${d?.error || 'erro desconhecido'}`; resEl.style.color = 'var(--danger)'; }
+}
+
+// ── Meu E-mail (SMTP por usuário) ─────────────────────────────────
+async function carregarMeuSmtp() {
+  const me = await API.json(await API.get(`/api/usuarios/${_apiUser?.id}/smtp`));
+  if (!me) return;
+  window._meSmtpSystem = me.system || {};
+  document.getElementById('me-smtp-host').value = me.smtp_host || '';
+  document.getElementById('me-smtp-port').value = me.smtp_port || '';
+  document.getElementById('me-smtp-tls').checked        = me.smtp_require_tls !== '0';
+  document.getElementById('me-smtp-ssl').checked        = me.smtp_secure === '1';
+  document.getElementById('me-smtp-ignore-ssl').checked = me.smtp_ignore_ssl === '1';
+  document.getElementById('me-smtp-user').value = me.smtp_user || '';
+  document.getElementById('me-smtp-from-name').value = me.smtp_from_name || '';
+  const mp = document.getElementById('me-smtp-pass');
+  mp.value = '';
+  mp.placeholder = me.smtp_pass_set ? '(senha salva — em branco preserva)' : '(em branco preserva a atual)';
+}
+
+async function salvarMeuSmtp() {
+  const st = document.getElementById('me-smtp-status');
+  const payload = {
+    smtp_host: document.getElementById('me-smtp-host').value.trim(),
+    smtp_port: document.getElementById('me-smtp-port').value.trim(),
+    smtp_require_tls: document.getElementById('me-smtp-tls').checked ? '1' : '0',
+    smtp_secure: document.getElementById('me-smtp-ssl').checked ? '1' : '0',
+    smtp_ignore_ssl: document.getElementById('me-smtp-ignore-ssl').checked ? '1' : '0',
+    smtp_user: document.getElementById('me-smtp-user').value.trim(),
+    smtp_from_name: document.getElementById('me-smtp-from-name').value.trim(),
+  };
+  const pass = document.getElementById('me-smtp-pass').value;
+  if (pass) payload.smtp_pass = pass;
+  const r = await API.put(`/api/usuarios/${_apiUser?.id}`, payload);
+  if (!r || !r.ok) { st.textContent = '✕ Erro ao salvar.'; st.style.color = 'var(--danger)'; return; }
+  document.getElementById('me-smtp-pass').value = '';
+  st.textContent = '✔ Config salva.'; st.style.color = 'var(--success)';
+  toast('Sua config de e-mail foi salva.', 'success');
+}
+
+function copiarSmtpDoSistema() {
+  const sys = window._meSmtpSystem || {};
+  document.getElementById('me-smtp-host').value = sys.smtp_host || '';
+  document.getElementById('me-smtp-port').value = sys.smtp_port || '';
+  document.getElementById('me-smtp-tls').checked        = sys.smtp_require_tls !== '0';
+  document.getElementById('me-smtp-ssl').checked        = sys.smtp_secure === '1';
+  document.getElementById('me-smtp-ignore-ssl').checked = sys.smtp_ignore_ssl === '1';
+  document.getElementById('me-smtp-from-name').value = sys.smtp_from_name || '';
+  // Usuário e senha ficam em branco de propósito: a conta de envio é a sua
+  const st = document.getElementById('me-smtp-status');
+  st.textContent = 'Copiado do sistema — informe seu usuário/senha e salve.'; st.style.color = 'var(--gray-500)';
+  document.getElementById('me-smtp-user').focus();
+}
+
+async function testarMeuSmtp() {
+  const st = document.getElementById('me-smtp-status');
+  const host = document.getElementById('me-smtp-host').value.trim();
+  const user = document.getElementById('me-smtp-user').value.trim();
+  const pass = document.getElementById('me-smtp-pass').value;
+  if (!host || !user) { st.textContent = '⚠ Preencha host e usuário para testar.'; st.style.color = 'var(--warning,#b45309)'; return; }
+  if (!pass) { st.textContent = '⚠ Informe a senha para testar (a salva não é reaproveitada).'; st.style.color = 'var(--warning,#b45309)'; return; }
+  st.textContent = 'Enviando...'; st.style.color = '';
+  const r = await API.post('/send-email', {
+    smtp: {
+      host, port: parseInt(document.getElementById('me-smtp-port').value) || 587,
+      secure: document.getElementById('me-smtp-ssl').checked,
+      requireTLS: document.getElementById('me-smtp-tls').checked,
+      ignoreSSL: document.getElementById('me-smtp-ignore-ssl').checked,
+      auth: { user, pass },
+    },
+    from: { name: document.getElementById('me-smtp-from-name').value.trim() || 'SGEA', email: user },
+    to: user,
+    subject: 'SGEA — Teste da minha config SMTP',
+    html: '<p>Se você recebeu este e-mail, a sua configuração SMTP pessoal no SGEA está funcionando.</p>',
+  });
+  const d = await API.json(r);
+  if (r && r.ok && d?.ok) { st.textContent = '✔ E-mail de teste enviado.'; st.style.color = 'var(--success)'; }
+  else { st.textContent = `✕ Falha: ${d?.error || 'erro desconhecido'}`; st.style.color = 'var(--danger)'; }
 }
 
 // ── Zona de Perigo ───────────────────────────────────────────────

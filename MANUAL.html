@@ -3,7 +3,7 @@
 <head>
 <meta charset="UTF-8">
 <meta name="viewport" content="width=device-width, initial-scale=1.0">
-<title>Manual Operacional — SGEA v0.21.2</title>
+<title>Manual Operacional — SGEA v0.22.0</title>
 <style>
   * { box-sizing: border-box; margin: 0; padding: 0; }
   body { font-family: 'Times New Roman', Times, serif; font-size: 12pt; color: #000; background: #f5f5f5; }
@@ -53,7 +53,7 @@
       size: A4;
       margin: 20mm 20mm 25mm;
       @top-center {
-        content: "SGEA v0.21.2 — Manual Operacional";
+        content: "SGEA v0.22.0 — Manual Operacional";
         font-family: 'Times New Roman', serif;
         font-size: 9pt;
         color: #666;
@@ -79,7 +79,7 @@
     <div class="cover-title">Manual Operacional</div>
     <div class="cover-subtitle">SGEA — Sistema de Gestão de Estoque do Almoxarifado</div>
     <div class="cover-system">Entradas, Saídas, Lotes/Validade e cadastros de apoio</div>
-    <div class="cover-version">Versão v0.21.2</div>
+    <div class="cover-version">Versão v0.22.0</div>
     <br>
     <div style="font-size:11pt; color:#555; line-height:1.8;">
       Aplicação web multiusuário para o Almoxarifado<br>
@@ -195,7 +195,7 @@
     <li><strong>Organização</strong> — nome do órgão, município, CNPJ do órgão e autoridade competente (nome e cargo); e o <strong>brasão do município</strong> (upload de imagem, até 3 MB), exibido na barra lateral e sincronizado entre navegadores</li>
     <li><strong>Comunicação</strong> <em>(somente administradores)</em> — configuração do servidor SMTP (host, porta, TLS/SSL, usuário, senha, remetente e destinatário interno) e botão "Testar conexão", que envia um e-mail de teste real</li>
     <li><strong>Dados</strong> <em>(somente administradores)</em> — pasta de backup customizável (diálogo nativo do Windows), backup manual, restauração a partir de um backup JSON ou de um banco `.db`, alternância de backup automático e quantidade de backups mantidos; e a <strong>Zona de Perigo</strong>, que apaga produtos, lotes, entradas, saídas e todos os cadastros — mantendo usuários e configurações — através de um fluxo de três confirmações (diálogo, digitar a frase "APAGAR TUDO" e uma contagem regressiva de 5 segundos), baixando um backup de segurança automaticamente antes de executar</li>
-    <li><strong>Segurança</strong> — permite a qualquer usuário trocar a própria senha a qualquer momento (informando a senha atual), sem precisar esperar um novo primeiro-acesso</li>
+    <li><strong>Segurança</strong> — permite a qualquer usuário trocar a própria senha a qualquer momento (informando a senha atual), sem precisar esperar um novo primeiro-acesso; e a config de <strong>Meu E-mail (SMTP)</strong> pessoal — cada usuário pode cadastrar sua própria conta de envio (host, porta, TLS/SSL, usuário, senha e remetente), com os botões "Copiar do sistema" (traz host/porta/segurança da config do sistema) e "Testar". Deixado em branco, herda o SMTP do sistema. A senha fica <strong>apenas no servidor</strong></li>
     <li><strong>Diagnóstico</strong> <em>(somente administradores)</em> — roda checagens de consistência entre estoque, lotes, entradas e saídas (ex.: saldo de lote maior que o recebido, código Fiorilli duplicado, produto sem centro de custo), agrupadas por severidade</li>
     <li><strong>Usuários</strong> <em>(somente administradores)</em> — criação de novos acessos, marcação/desmarcação do privilégio de administrador e redefinição de senha de outros usuários. Um usuário não pode excluir a própria conta</li>
   </ul>
@@ -224,6 +224,7 @@
   <h2 id="sec15">15. Histórico de Versões</h2>
   <table>
     <tr><th>Versão</th><th>Data</th><th>Resumo</th></tr>
+    <tr><td>0.22.0</td><td>20/07/2026</td><td>Config de <strong>"Meu E-mail" (SMTP por usuário)</strong> na aba Segurança, em paridade com SGCD/SGCA/SGDP: cada usuário cadastra sua própria conta de envio (com "Copiar do sistema" e "Testar"); em branco, herda o SMTP do sistema. Senha guardada só no servidor.</td></tr>
     <tr><td>0.21.2</td><td>20/07/2026</td><td>Tela de Configurações em paridade visual com a família: campos de Comunicação empilhados (era grade de 2 colunas) com o aviso do certificado autoassinado, e "Zona de Perigo" com o mesmo cartão de borda vermelha dos irmãos.</td></tr>
     <tr><td>0.21.1</td><td>20/07/2026</td><td>Botão "Imprimir / Salvar PDF" dos documentos centralizado no topo, como nos sistemas irmãos.</td></tr>
     <tr><td>0.21.0</td><td>20/07/2026</td><td>Auditoria de design: tabelas de listagem com estilo canônico da família (cabeçalho, zebra, hover) — antes cruas; badges de urgência visíveis nos Alertas de Validade; login com placeholders/ícone em paridade com os irmãos; textos da marca legíveis no modo escuro.</td></tr>

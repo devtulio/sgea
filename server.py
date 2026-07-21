@@ -1,4 +1,4 @@
-# SGEA v0.21.2 — Servidor local: SQLite, autenticação, REST API, controle de estoque por lote (FEFO), backup automático
+# SGEA v0.22.0 — Servidor local: SQLite, autenticação, REST API, controle de estoque por lote (FEFO), backup automático
 import http.server
 import socketserver
 import os
@@ -252,6 +252,9 @@ def init_db():
         if 'email' not in cols_usu: conn.execute("ALTER TABLE usuarios ADD COLUMN email TEXT DEFAULT ''")
         if 'cargo' not in cols_usu: conn.execute("ALTER TABLE usuarios ADD COLUMN cargo TEXT DEFAULT ''")
         if 'matricula' not in cols_usu: conn.execute("ALTER TABLE usuarios ADD COLUMN matricula TEXT DEFAULT ''")
+        # Config SMTP por usuário (vazio = herda a do sistema em sys_settings) — paridade com SGCD/SGCA/SGDP
+        for _sc in _USER_SMTP_COLS:
+            if _sc not in cols_usu: conn.execute(f"ALTER TABLE usuarios ADD COLUMN {_sc} TEXT DEFAULT ''")
 
         cols_forn = [r[1] for r in conn.execute('PRAGMA table_info(fornecedores)').fetchall()]
         if 'data' not in cols_forn:
@@ -684,6 +687,9 @@ CRUD_TABLES = {
         'required': ['numero'], 'order': 'numero ASC', 'search_fields': ['numero', 'placa', 'modelo'],
     },
 }
+_USER_SMTP_COLS = ('smtp_host', 'smtp_port', 'smtp_secure', 'smtp_require_tls',
+                   'smtp_ignore_ssl', 'smtp_user', 'smtp_pass', 'smtp_from_name')
+
 CRUD_ROUTES = {  # segmento da URL -> tabela
     'centros-custo': 'centros_custo',
     'funcionarios': 'funcionarios', 'frota': 'frota',
@@ -912,6 +918,21 @@ class SGEAHandler(http.server.SimpleHTTPRequestHandler):
                 rows = conn.execute('SELECT id,username,nome,admin,ativo,cpf,email,cargo,matricula,criado_em FROM usuarios').fetchall()
             self._json(200, [dict(r) for r in rows])
 
+        elif re.fullmatch(r'/api/usuarios/\d+/smtp', p):
+            # Config SMTP de um usuário (sem a senha): o próprio usuário ou admin
+            uid = int(p.split('/')[3])
+            if uid != s['user_id'] and not s['admin']:
+                self._json(403, {'error': 'Acesso restrito'}); return
+            with get_db() as conn:
+                row = conn.execute(f"SELECT {', '.join(_USER_SMTP_COLS)} FROM usuarios WHERE id=?", (uid,)).fetchone()
+                if not row: self._json(404, {'error': 'Usuário não encontrado'}); return
+                sysc = {r['key']: r['value'] for r in conn.execute("SELECT key,value FROM sys_settings WHERE key LIKE 'smtp_%'").fetchall()}
+            out = {c: (row[c] or '') for c in _USER_SMTP_COLS if c != 'smtp_pass'}
+            out['smtp_pass_set'] = bool((row['smtp_pass'] or '').strip())
+            # defaults do sistema para o "Copiar do sistema" (sem a senha)
+            out['system'] = {c: sysc.get(c, '') for c in ('smtp_host', 'smtp_port', 'smtp_secure', 'smtp_require_tls', 'smtp_ignore_ssl', 'smtp_from_name')}
+            self._json(200, out)
+
         elif p == '/api/relatorio/integridade':
             if not s['admin']: self._json(403, {'error': 'Acesso restrito'}); return
             self._relatorio_integridade()
@@ -1068,7 +1089,8 @@ class SGEAHandler(http.server.SimpleHTTPRequestHandler):
             if not s['admin']:
                 if uid != s['user_id']:
                     self._json(403, {'error': 'Acesso restrito'}); return
-                data = {k: data[k] for k in ('password', 'old_password') if k in data}
+                # não-admin: só a própria senha e a própria config SMTP
+                data = {k: data[k] for k in ('password', 'old_password', *_USER_SMTP_COLS) if k in data}
             self._update_user(uid, data)
         else:
             for seg, table in CRUD_ROUTES.items():
@@ -1204,6 +1226,12 @@ class SGEAHandler(http.server.SimpleHTTPRequestHandler):
             if 'email' in data: fields.append('email=?'); params.append((data['email'] or '').strip())
             if 'cargo' in data: fields.append('cargo=?'); params.append((data['cargo'] or '').strip())
             if 'matricula' in data: fields.append('matricula=?'); params.append((data['matricula'] or '').strip())
+            # Config SMTP do usuário — smtp_pass em branco preserva a senha salva
+            for col in _USER_SMTP_COLS:
+                if col == 'smtp_pass':
+                    if data.get('smtp_pass'): fields.append('smtp_pass=?'); params.append(data['smtp_pass'])
+                elif col in data:
+                    fields.append(f'{col}=?'); params.append(str(data[col] or '').strip())
             if data.get('password'):
                 if len(data['password']) < 6:
                     self._json(400, {'error': 'Senha mínima: 6 caracteres'}); return
