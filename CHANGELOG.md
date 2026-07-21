@@ -5,6 +5,11 @@
 
 ---
 
+## [0.23.1] — 2026-07-20
+
+### Adicionado
+- **Aviso de servidor desatualizado.** O `/health` do servidor passou a informar a versão em execução, e o app compara com a versão do `SGEA.html` carregado ao entrar. Se o servidor Python em execução for mais antigo que a página (processo iniciado antes de uma atualização, situação em que rotas novas dão "Rota não encontrada" até reiniciar), uma faixa de alerta no topo orienta a reiniciar pelo `Iniciar SGEA.bat`. `SERVER_VERSION` no `server.py` deve acompanhar o `SGEA_VERSION` a cada release.
+
 ## [0.23.0] — 2026-07-20
 
 ### Adicionado

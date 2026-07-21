@@ -1134,7 +1134,7 @@
 // ══════════════════════════════════════════════════════════════
 // API / SESSÃO
 // ══════════════════════════════════════════════════════════════
-const SGEA_VERSION = '0.23.0';
+const SGEA_VERSION = '0.23.1';
 document.title = `SGEA v${SGEA_VERSION}`;
 
 let _apiToken = localStorage.getItem('sgea-token') || null;
@@ -1245,11 +1245,35 @@ async function _onLoginSuccess() {
   // seria silenciosamente sobrescrita quando essa promise resolvesse mais tarde.
   showDashboard();
   atualizarNotifCount();
+  _checarVersaoServidor();
   const r = await API.get('/api/settings/brasao');
   const d = await API.json(r);
   if (d?.brasao_dataurl) localStorage.setItem('sgea-brasao-dataurl', d.brasao_dataurl);
   else localStorage.removeItem('sgea-brasao-dataurl');
   _aplicarBrasaoSidebar();
+}
+
+// Alerta quando o servidor Python em execução está mais antigo que este SGEA.html
+// (processo iniciado antes de uma atualização → rotas novas dão 404 até reiniciar).
+async function _checarVersaoServidor() {
+  let sv;
+  try {
+    const r = await fetch('/health', { cache: 'no-store' });
+    sv = (await r.json())?.version;
+  } catch { return; }  // servidor inacessível: o resto do app já sinaliza
+  if (sv === SGEA_VERSION) return;
+  const msg = sv
+    ? `Servidor em execução: v${sv} · esta página: v${SGEA_VERSION}. Reinicie o servidor (Iniciar SGEA.bat) para carregar a versão nova — funções novas podem falhar até lá.`
+    : `O servidor em execução é uma versão antiga (anterior à v0.23.1) e não informa a versão. Reinicie o servidor (Iniciar SGEA.bat) — funções novas podem falhar até lá.`;
+  let bar = document.getElementById('server-version-warn');
+  if (!bar) {
+    bar = document.createElement('div');
+    bar.id = 'server-version-warn';
+    bar.style.cssText = 'position:fixed;top:0;left:0;right:0;z-index:9999;background:#b45309;color:#fff;padding:8px 44px 8px 16px;font-size:.85rem;line-height:1.4;text-align:center;box-shadow:0 2px 8px rgba(0,0,0,.35)';
+    bar.innerHTML = '<span id="server-version-warn-msg"></span><button onclick="this.parentElement.remove()" title="Dispensar" style="position:absolute;right:10px;top:6px;background:rgba(255,255,255,.2);border:none;color:#fff;border-radius:4px;padding:2px 9px;cursor:pointer">✕</button>';
+    document.body.appendChild(bar);
+  }
+  document.getElementById('server-version-warn-msg').textContent = '⚠ ' + msg;
 }
 
 // Fundo animado da tela de login (rede de partículas com interação de mouse)

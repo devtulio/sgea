@@ -1,4 +1,4 @@
-# SGEA v0.23.0 — Servidor local: SQLite, autenticação, REST API, controle de estoque por lote (FEFO), backup automático
+# SGEA v0.23.1 — Servidor local: SQLite, autenticação, REST API, controle de estoque por lote (FEFO), backup automático
 import http.server
 import socketserver
 import os
@@ -32,6 +32,11 @@ for _stream in (sys.stdout, sys.stderr):
             _stream.reconfigure(encoding='utf-8', errors='replace')
         except Exception:
             pass
+
+# Versão do servidor — DEVE acompanhar o SGEA_VERSION do SGEA.html a cada release.
+# Exposta em /health para o frontend detectar quando o processo em execução está
+# desatualizado (HTML novo servido, mas server.py antigo ainda rodando em memória).
+SERVER_VERSION = '0.23.1'
 
 PORT        = int(os.environ.get('SGEA_PORT', 3003))
 _BASE       = os.path.dirname(os.path.abspath(__file__))
@@ -794,7 +799,7 @@ class SGEAHandler(http.server.SimpleHTTPRequestHandler):
         qs = parse_qs(parsed.query)
 
         if p == '/health':
-            self._json(200, {'ok': True})
+            self._json(200, {'ok': True, 'version': SERVER_VERSION})
         elif p == '/api/public/org-info':
             with get_db() as conn:
                 row = conn.execute("SELECT value FROM sys_settings WHERE key='orgao'").fetchone()
