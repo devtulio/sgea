@@ -53,4 +53,8 @@ pause
 exit /b 1
 
 :run
+rem Encerra um servidor anterior preso na porta (ex.: reinicio apos atualizar sem
+rem fechar o antigo) para que o processo novo assuma a porta e carregue o codigo novo.
+rem Filtra por LISTENING para matar so o servidor, nunca uma conexao de cliente.
+for /f "tokens=5" %%P in ('netstat -ano ^| findstr LISTENING ^| findstr ":3003 "') do taskkill /F /PID %%P >nul 2>&1
 start "SGEA - Servidor local" "%PYEXE%" "%~dp0server.py"
