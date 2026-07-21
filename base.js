@@ -580,7 +580,7 @@ async function checarVersaoServidor(appVersion, batName) {
     bar = document.createElement('div');
     bar.id = 'server-version-warn';
     bar.style.cssText = 'position:fixed;top:0;left:0;right:0;z-index:9999;background:#b45309;color:#fff;padding:8px 44px 8px 16px;font-size:.85rem;line-height:1.4;text-align:center;box-shadow:0 2px 8px rgba(0,0,0,.35)';
-    bar.innerHTML = '<span id="server-version-warn-msg"></span><button onclick="this.parentElement.remove()" title="Dispensar" style="position:absolute;right:10px;top:6px;background:rgba(255,255,255,.2);border:none;color:#fff;border-radius:4px;padding:2px 9px;cursor:pointer">✕</button>';
+    bar.innerHTML = '<span id="server-version-warn-msg"></span><button onclick="this.parentElement.remove()" title="Dispensar" aria-label="Dispensar aviso" style="position:absolute;right:8px;top:5px;background:rgba(0,0,0,.28);border:none;color:#fff;border-radius:4px;padding:4px 10px;font-size:13px;cursor:pointer">✕</button>';
     document.body.appendChild(bar);
   }
   document.getElementById('server-version-warn-msg').textContent = '⚠ ' + msg;
