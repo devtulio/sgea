@@ -504,6 +504,44 @@
     </div>
   </div>
 
+  <!-- ── Funcionários: importar via CSV (folha do Fiorilli) ── -->
+  <div class="overlay hidden" id="modal-func-csv" role="dialog" aria-modal="true" aria-labelledby="modal-func-csv-titulo">
+    <div class="modal" style="max-width:760px;width:96vw">
+      <div class="modal-header">
+        <h2 id="modal-func-csv-titulo">Importar Funcionários (folha do Fiorilli)</h2>
+        <button class="btn btn-ghost btn-icon" onclick="fecharImportFuncionarios()">✕</button>
+      </div>
+      <div class="modal-body">
+        <div id="func-csv-upload">
+          <div style="background:var(--gray-50);border:1px solid var(--gray-200);border-radius:8px;padding:12px 16px;margin-bottom:14px;font-size:.8rem;color:var(--gray-600)">
+            <div style="font-weight:600;margin-bottom:6px;color:var(--gray-700)">Como funciona</div>
+            Selecione o CSV da folha exportada do Fiorilli (colunas Nome, Unidade, Cargo, Natureza Cargo,
+            Forma de Provimento Cargo, Matrícula, Data/Ato de Admissão). O importador:<br>
+            • ignora as colunas de salário (proventos/descontos/líquido);<br>
+            • deduplica <strong>por matrícula</strong>, descartando as linhas repetidas de 13º/rescisão;<br>
+            • atualiza quem já existe (mesma matrícula) e insere quem é novo — reimportar não duplica.
+          </div>
+          <div style="border:2px dashed var(--gray-300);border-radius:8px;padding:32px;text-align:center;cursor:pointer" onclick="document.getElementById('func-csv-input').click()" role="button" tabindex="0">
+            <div style="font-size:2rem;margin-bottom:8px">📂</div>
+            <div style="font-size:.85rem;color:var(--gray-600)">Clique para selecionar o arquivo CSV</div>
+            <input type="file" id="func-csv-input" accept=".csv,text/csv" style="display:none" onchange="carregarFuncCsv(this)">
+          </div>
+        </div>
+        <div id="func-csv-preview" style="display:none">
+          <div id="func-csv-cards" style="display:flex;gap:10px;flex-wrap:wrap;margin-bottom:12px"></div>
+          <div style="max-height:300px;overflow-y:auto">
+            <table class="csv-preview-table" id="func-csv-table"></table>
+          </div>
+        </div>
+        <div id="func-csv-done" style="display:none;text-align:center;padding:24px;font-size:.9rem;color:var(--gray-700)"></div>
+      </div>
+      <div class="modal-footer">
+        <button class="btn btn-ghost" onclick="fecharImportFuncionarios()">Fechar</button>
+        <button class="btn btn-primary" id="func-csv-btn-aplicar" style="display:none" onclick="aplicarImportFuncionarios()">Importar</button>
+      </div>
+    </div>
+  </div>
+
   <!-- ── CRUD genérico (Centros de Custo, Funcionários, Frota, Pedidos) ── -->
   <div id="view-crud" class="view">
     <div class="dash-top">
@@ -513,6 +551,7 @@
           <span>🔎</span>
           <input type="text" id="crud-search" placeholder="Buscar..." oninput="_debouncedRenderCrud()" aria-label="Buscar">
         </div>
+        <button class="btn btn-outline" id="crud-btn-import-func" onclick="abrirImportFuncionarios()" style="display:none" title="Importar funcionários da folha do Fiorilli (CSV)">Importar CSV</button>
         <button class="btn btn-primary" id="crud-btn-novo" onclick="openCrudModal()">+ Novo</button>
       </div>
     </div>
@@ -1095,7 +1134,7 @@
 // ══════════════════════════════════════════════════════════════
 // API / SESSÃO
 // ══════════════════════════════════════════════════════════════
-const SGEA_VERSION = '0.22.1';
+const SGEA_VERSION = '0.23.0';
 document.title = `SGEA v${SGEA_VERSION}`;
 
 let _apiToken = localStorage.getItem('sgea-token') || null;
@@ -1470,9 +1509,13 @@ const CRUD_MODULES = {
       { key: 'cargo', label: 'Cargo' },
       { key: 'unidade', label: 'Unidade/Setor' },
       { key: 'matricula', label: 'Matrícula' },
+      { key: 'natureza', label: 'Natureza do Cargo', placeholder: 'ex.: 1 - Efetivo' },
+      { key: 'forma_provimento', label: 'Forma de Provimento', placeholder: 'ex.: CONCURSO PUBLICO' },
+      { key: 'data_admissao', label: 'Data de Admissão', placeholder: 'dd/mm/aaaa' },
+      { key: 'ato_admissao', label: 'Ato de Admissão' },
       { key: 'ativo', label: 'Ativo', type: 'checkbox', default: true },
     ],
-    columns: [{ h: 'Nome', k: 'nome' }, { h: 'Cargo', k: 'cargo' }, { h: 'Unidade', k: 'unidade' }, { h: 'Status', k: 'ativo', badge: true }],
+    columns: [{ h: 'Nome', k: 'nome' }, { h: 'Cargo', k: 'cargo' }, { h: 'Unidade', k: 'unidade' }, { h: 'Matrícula', k: 'matricula' }, { h: 'Status', k: 'ativo', badge: true }],
   },
   'frota': {
     titulo: 'Frota', navId: 'nav-frota',
@@ -1501,6 +1544,9 @@ function showCrud(modKey) {
   document.getElementById('crud-titulo').textContent = cfg.titulo;
   document.getElementById('crud-btn-novo').textContent = '+ Novo';
   document.getElementById('crud-search').value = '';
+  // Import de funcionários (folha do Fiorilli) só faz sentido nesse módulo e para admin
+  document.getElementById('crud-btn-import-func').style.display =
+    (modKey === 'funcionarios' && _apiUser?.admin) ? '' : 'none';
   renderCrud();
 }
 
@@ -1605,6 +1651,104 @@ async function deleteCrudItem(id) {
   await _auditEvento(`${_CRUD_AUDIT_PREFIX[_crudAtual]}_EXCLUIDO`, `${CRUD_MODULES[_crudAtual].titulo.replace(/s$/, '')} "${item ? _crudNome(item) : id}" excluído`, id);
   toast('Excluído.', 'success');
   renderCrud();
+}
+
+// ── Importar funcionários da folha do Fiorilli (CSV) ───────────
+let _funcCsvRows = [];
+function abrirImportFuncionarios() {
+  _funcCsvRows = [];
+  document.getElementById('func-csv-upload').style.display = '';
+  document.getElementById('func-csv-preview').style.display = 'none';
+  document.getElementById('func-csv-done').style.display = 'none';
+  document.getElementById('func-csv-btn-aplicar').style.display = 'none';
+  document.getElementById('func-csv-input').value = '';
+  document.getElementById('modal-func-csv').classList.remove('hidden');
+}
+function fecharImportFuncionarios() {
+  document.getElementById('modal-func-csv').classList.add('hidden');
+  if (_crudAtual === 'funcionarios') renderCrud();
+}
+// normaliza cabeçalho: minúsculo, sem acento, sem aspas
+function _fnorm(s) {
+  return (s || '').normalize('NFD').replace(/[̀-ͯ]/g, '').toLowerCase().trim().replace(/['"]/g, '');
+}
+// parser CSV que respeita aspas e escape "" -> "
+function _parseCsvLine(l, sep) {
+  const out = []; let cur = '', q = false;
+  for (let i = 0; i < l.length; i++) {
+    const ch = l[i];
+    if (q) {
+      if (ch === '"') { if (l[i + 1] === '"') { cur += '"'; i++; } else q = false; }
+      else cur += ch;
+    } else if (ch === '"') q = true;
+    else if (ch === sep) { out.push(cur); cur = ''; }
+    else cur += ch;
+  }
+  out.push(cur);
+  return out.map(v => v.trim());
+}
+async function carregarFuncCsv(input) {
+  const file = input.files[0];
+  if (!file) return;
+  const buf = await file.arrayBuffer();
+  let text;
+  try { text = new TextDecoder('utf-8', { fatal: true }).decode(buf); }
+  catch { text = new TextDecoder('iso-8859-1').decode(buf); }  // folha do Fiorilli é latin-1
+  const linhas = text.split(/\r?\n/).filter(l => l.trim());
+  if (linhas.length < 2) { toast('CSV vazio ou sem dados.', 'error'); return; }
+  const sep = linhas[0].includes(';') ? ';' : ',';
+  const headers = _parseCsvLine(linhas[0], sep).map(_fnorm);
+  const idx = n => headers.indexOf(n);
+  const iNome = idx('nome'), iUnid = idx('unidade'), iCargo = idx('cargo'),
+    iNat = idx('natureza cargo'), iForma = idx('forma de provimento cargo'),
+    iMat = idx('matricula'), iData = idx('data admissao'), iAto = idx('ato admissao');
+  if (iNome < 0 || iMat < 0) { toast('Cabeçalho não reconhecido — faltam colunas Nome/Matrícula.', 'error'); return; }
+  const vistos = new Set();
+  const rows = [];
+  let dups = 0, semNome = 0;
+  const get = (v, i) => i >= 0 ? (v[i] || '').trim() : '';
+  for (let n = 1; n < linhas.length; n++) {
+    const v = _parseCsvLine(linhas[n], sep);
+    const nome = get(v, iNome);
+    if (!nome) { semNome++; continue; }
+    const mat = get(v, iMat);
+    const chave = mat || `nome:${nome.toUpperCase()}`;
+    if (vistos.has(chave)) { dups++; continue; }  // 13º/rescisão repetidos da mesma pessoa
+    vistos.add(chave);
+    rows.push({
+      nome, matricula: mat, cargo: get(v, iCargo), unidade: get(v, iUnid),
+      natureza: get(v, iNat), forma_provimento: get(v, iForma),
+      data_admissao: get(v, iData), ato_admissao: get(v, iAto),
+    });
+  }
+  _funcCsvRows = rows;
+  if (!rows.length) { toast('Nenhum funcionário válido no arquivo.', 'error'); return; }
+  const card = (n, lbl) => `<div style="flex:1;min-width:130px;background:var(--gray-50);border:1px solid var(--gray-200);border-radius:8px;padding:10px 14px"><div style="font-size:1.4rem;font-weight:700">${n}</div><div style="font-size:.72rem;color:var(--gray-600)">${lbl}</div></div>`;
+  document.getElementById('func-csv-cards').innerHTML =
+    card(rows.length, 'funcionários únicos') + card(dups, 'repetidos descartados (13º/rescisão)') + card(semNome, 'linhas sem nome ignoradas');
+  document.getElementById('func-csv-table').innerHTML =
+    `<thead><tr><th>Nome</th><th>Matrícula</th><th>Cargo</th><th>Unidade</th></tr></thead><tbody>${
+      rows.slice(0, 10).map(r => `<tr><td>${esc(r.nome)}</td><td>${esc(r.matricula)}</td><td>${esc(r.cargo)}</td><td>${esc(r.unidade)}</td></tr>`).join('')
+    }${rows.length > 10 ? `<tr><td colspan="4" style="color:var(--gray-500);font-style:italic">… mais ${rows.length - 10} funcionário(s)</td></tr>` : ''}</tbody>`;
+  document.getElementById('func-csv-upload').style.display = 'none';
+  document.getElementById('func-csv-preview').style.display = '';
+  document.getElementById('func-csv-btn-aplicar').style.display = '';
+}
+async function aplicarImportFuncionarios() {
+  if (!_funcCsvRows.length) return;
+  const btn = document.getElementById('func-csv-btn-aplicar');
+  btn.disabled = true; btn.textContent = 'Importando…';
+  const r = await API.post('/api/funcionarios/import', { funcionarios: _funcCsvRows });
+  const d = await API.json(r);
+  btn.disabled = false; btn.textContent = 'Importar';
+  if (!r || !r.ok) { toast(d?.error || 'Falha ao importar.', 'error'); return; }
+  await _auditEvento('FUNCIONARIO_IMPORTADO', `Importação da folha do Fiorilli: ${d.inseridos} inserido(s), ${d.atualizados} atualizado(s)`, null);
+  document.getElementById('func-csv-preview').style.display = 'none';
+  btn.style.display = 'none';
+  const done = document.getElementById('func-csv-done');
+  done.style.display = '';
+  done.innerHTML = `<div style="font-size:2rem;margin-bottom:8px">✅</div><strong>${d.inseridos}</strong> inserido(s) e <strong>${d.atualizados}</strong> atualizado(s).${d.ignorados ? `<br><span style="color:var(--gray-500)">${d.ignorados} linha(s) sem nome ignorada(s).</span>` : ''}`;
+  toast('Funcionários importados.', 'success');
 }
 
 // ══════════════════════════════════════════════════════════════

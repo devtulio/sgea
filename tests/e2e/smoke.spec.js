@@ -56,3 +56,57 @@ test('login, entrada em caixa, saída fracionada e alerta de validade', async ({
   await expect(page.locator('#alertas-list')).toContainText('Água Sanitária 2L');
   await expect(page.locator('#alertas-list')).toContainText('L1');
 });
+
+// Importador de funcionários (folha do Fiorilli): fixture em latin-1 com uma linha
+// de 13º repetida (mesma matrícula) e colunas de salário; confere dedup por matrícula,
+// mapeamento dos campos novos e o upsert idempotente.
+test('importa funcionários da folha do Fiorilli (dedup + campos novos)', async ({ page }) => {
+  // Login resiliente: o banco é compartilhado entre os testes, a senha do admin
+  // pode já ter sido trocada pelo teste anterior.
+  await page.goto('/SGEA.html');
+  await page.fill('#pin-username', 'admin');
+  await page.fill('#pin-input', 'admin123');
+  await page.click('#login-form button[type=submit]');
+  await page.waitForTimeout(800);
+  if (await page.locator('#overlay-force-pwd').isVisible()) {
+    await page.fill('#ts-nova', 'novaSenhaE2E123');
+    await page.fill('#ts-confirma', 'novaSenhaE2E123');
+    await page.click('#overlay-force-pwd button:has-text("Salvar e continuar")');
+  } else if (await page.locator('#overlay-pin').isVisible()) {
+    await page.fill('#pin-input', 'novaSenhaE2E123');
+    await page.click('#login-form button[type=submit]');
+  }
+  await expect(page.locator('#overlay-pin')).toBeHidden();
+
+  // Fixture no formato da folha, com acentos (latin-1) e uma linha de 13º repetida
+  const csv = [
+    'Referência;Nome;Unidade;Proventos;Descontos;Líquido;Cargo;Natureza Cargo;Forma de Provimento Cargo;Matrícula;Data Admissão;Ato Admissão',
+    'Folha Mensal - Junho;FULANO DE TAL;ALMOXARIFADO;5000,00;500,00;4500,00;ALMOXARIFE;1 - Efetivo;CONCURSO PUBLICO;100;01/01/2020;A1',
+    'Fechamento 13º Salário - Junho;FULANO DE TAL;ALMOXARIFADO;2500,00;250,00;2250,00;ALMOXARIFE;1 - Efetivo;CONCURSO PUBLICO;100;01/01/2020;A1',
+    'Folha Mensal - Junho;BELTRANO SILVA;SAÚDE;3000,00;300,00;2700,00;MOTORISTA;3 - Temporário;TEMPO DETERMINADO;200;15/06/2023;',
+  ].join('\r\n');
+
+  await page.click('#nav-funcionarios');
+  await page.click('#crud-btn-import-func');
+  await page.setInputFiles('#func-csv-input', { name: 'folha.csv', mimeType: 'text/csv', buffer: Buffer.from(csv, 'latin1') });
+
+  const cards = page.locator('#func-csv-cards');
+  await expect(cards).toContainText('2'); // 2 únicos
+  await expect(cards).toContainText('repetidos descartados'); // o 13º repetido saiu
+  await page.click('#func-csv-btn-aplicar');
+  await expect(page.locator('#func-csv-done')).toContainText('2');
+  await page.click('#modal-func-csv .modal-footer .btn-ghost');
+
+  // Campos novos gravados e visíveis na lista
+  await expect(page.locator('#crud-list')).toContainText('FULANO DE TAL');
+  await expect(page.locator('#crud-list')).toContainText('100');
+
+  const utilizada = await page.evaluate(async () => {
+    const d = await API.json(await API.get('/api/funcionarios?per=100'));
+    const f = (d.items || d).find(i => i.matricula === '100');
+    return { natureza: f.natureza, forma: f.forma_provimento, data: f.data_admissao };
+  });
+  expect(utilizada.natureza).toBe('1 - Efetivo');
+  expect(utilizada.forma).toBe('CONCURSO PUBLICO');
+  expect(utilizada.data).toBe('01/01/2020');
+});

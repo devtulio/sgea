@@ -1,4 +1,4 @@
-# SGEA v0.22.1 — Servidor local: SQLite, autenticação, REST API, controle de estoque por lote (FEFO), backup automático
+# SGEA v0.23.0 — Servidor local: SQLite, autenticação, REST API, controle de estoque por lote (FEFO), backup automático
 import http.server
 import socketserver
 import os
@@ -255,6 +255,12 @@ def init_db():
         # Config SMTP por usuário (vazio = herda a do sistema em sys_settings) — paridade com SGCD/SGCA/SGDP
         for _sc in _USER_SMTP_COLS:
             if _sc not in cols_usu: conn.execute(f"ALTER TABLE usuarios ADD COLUMN {_sc} TEXT DEFAULT ''")
+
+        # Dados extras do funcionário vindos da folha do Fiorilli (natureza/forma de
+        # provimento do cargo, data e ato de admissão) — usados no cadastro e no import.
+        cols_func = [r[1] for r in conn.execute('PRAGMA table_info(funcionarios)').fetchall()]
+        for _fc in ('natureza', 'forma_provimento', 'data_admissao', 'ato_admissao'):
+            if _fc not in cols_func: conn.execute(f"ALTER TABLE funcionarios ADD COLUMN {_fc} TEXT DEFAULT ''")
 
         cols_forn = [r[1] for r in conn.execute('PRAGMA table_info(fornecedores)').fetchall()]
         if 'data' not in cols_forn:
@@ -679,8 +685,11 @@ CRUD_TABLES = {
         'required': ['nome'], 'order': 'nome ASC', 'search_fields': ['nome', 'codigo'],
     },
     'funcionarios': {
-        'id_type': 'int', 'fields': ['nome', 'cargo', 'unidade', 'matricula', 'ativo'],
-        'required': ['nome'], 'order': 'nome ASC', 'search_fields': ['nome', 'cargo', 'unidade'],
+        'id_type': 'int',
+        'fields': ['nome', 'cargo', 'unidade', 'matricula', 'natureza', 'forma_provimento',
+                   'data_admissao', 'ato_admissao', 'ativo'],
+        'required': ['nome'], 'order': 'nome ASC',
+        'search_fields': ['nome', 'cargo', 'unidade', 'matricula'],
     },
     'frota': {
         'id_type': 'int', 'fields': ['numero', 'placa', 'marca', 'modelo', 'combustivel', 'centro_custo_id', 'ativo'],
@@ -1006,6 +1015,9 @@ class SGEAHandler(http.server.SimpleHTTPRequestHandler):
         elif p == '/api/fornecedores/import':
             if not s['admin']: self._json(403, {'error': 'Acesso restrito'}); return
             self._import_fornecedores(data)
+        elif p == '/api/funcionarios/import':
+            if not s['admin']: self._json(403, {'error': 'Acesso restrito'}); return
+            self._import_funcionarios(data)
         elif p == '/api/pedidos':
             self._create_pedido(data)
         elif p == '/api/entradas':
@@ -1244,6 +1256,35 @@ class SGEAHandler(http.server.SimpleHTTPRequestHandler):
             if fields:
                 conn.execute(f'UPDATE usuarios SET {",".join(fields)} WHERE id=?', params + [uid])
         self._json(200, {'ok': True})
+
+    def _import_funcionarios(self, data):
+        """Importa funcionários de uma lista já parseada no cliente (ex.: folha do
+        Fiorilli). Upsert por matrícula (idempotente): matrícula já existente é
+        atualizada, nova é inserida. Linhas sem nome são ignoradas."""
+        lista = data.get('funcionarios') or []
+        cols = ('nome', 'cargo', 'unidade', 'matricula', 'natureza',
+                'forma_provimento', 'data_admissao', 'ato_admissao')
+        inseridos = atualizados = ignorados = 0
+        with get_db() as conn:
+            for f in lista:
+                vals = {c: str(f.get(c) or '').strip() for c in cols}
+                if not vals['nome']:
+                    ignorados += 1; continue
+                mat = vals['matricula']
+                existing = conn.execute(
+                    "SELECT id FROM funcionarios WHERE matricula=? AND matricula<>''",
+                    (mat,)).fetchone() if mat else None
+                if existing:
+                    conn.execute(
+                        f"UPDATE funcionarios SET {','.join(f'{c}=?' for c in cols)},updated_at=? WHERE id=?",
+                        [vals[c] for c in cols] + [_now(), existing['id']])
+                    atualizados += 1
+                else:
+                    conn.execute(
+                        f"INSERT INTO funcionarios ({','.join(cols)}) VALUES ({','.join('?' * len(cols))})",
+                        [vals[c] for c in cols])
+                    inseridos += 1
+        self._json(200, {'inseridos': inseridos, 'atualizados': atualizados, 'ignorados': ignorados})
 
     def _save_settings(self, data):
         # ponytail: string vazia nunca sobrescreve um valor já salvo — evita que um

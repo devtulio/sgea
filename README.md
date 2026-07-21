@@ -1,6 +1,6 @@
 # SGEA — Sistema de Gestão de Estoque do Almoxarifado
 
-![Versão](https://img.shields.io/badge/versão-v0.22.1-blue) ![Tecnologia](https://img.shields.io/badge/tecnologia-Python%20%2B%20SQLite-orange) ![Licença](https://img.shields.io/badge/licença-MIT-green) ![Multiusuário](https://img.shields.io/badge/acesso-multiusuário-blueviolet)
+![Versão](https://img.shields.io/badge/versão-v0.23.0-blue) ![Tecnologia](https://img.shields.io/badge/tecnologia-Python%20%2B%20SQLite-orange) ![Licença](https://img.shields.io/badge/licença-MIT-green) ![Multiusuário](https://img.shields.io/badge/acesso-multiusuário-blueviolet)
 
 ## Descrição
 
@@ -23,7 +23,8 @@ Funciona em rede local: um único computador executa o servidor e todos os usuá
 - **Entrada com ou sem pedido** — vínculo opcional a um Pedido (nº + código de licitação); sem pedido, a entrada é tratada como compra direta (só NF, fornecedor e produto)
 - **Reversão segura** — excluir uma saída devolve exatamente as quantidades aos lotes de origem; excluir uma entrada é bloqueado se algum de seus lotes já foi parcialmente consumido
 - **Fornecedores** — cadastro rico: consulta automática de CNPJ (ReceitaWS/BrasilAPI) com endereço, CNAE e quadro societário; consulta de sanções federais (CEIS/CNEP); certidões e sanções manuais (Art. 156, Lei 14.133/2021) com relatórios imprimíveis (com QR de autenticidade); importação a partir de um backup do SGCA/SGDP; exclusão reversível pela Lixeira
-- **Cadastros de apoio** — Centros de Custo, Funcionários (solicitantes de saída) e Frota (veículos, para correlacionar saídas de combustível/peças)
+- **Cadastros de apoio** — Centros de Custo, Funcionários (solicitantes de saída; com cargo, unidade, matrícula, natureza/forma de provimento e data/ato de admissão) e Frota (veículos, para correlacionar saídas de combustível/peças)
+- **Importação de funcionários pela folha do Fiorilli** — botão que lê o CSV da folha de pagamento e cadastra todos os servidores de uma vez, detectando o encoding, ignorando salários, deduplicando por matrícula e fazendo upsert (reimportar atualiza, não duplica)
 - **Autenticação multiusuário** com hashing PBKDF2-HMAC-SHA256 e gestão de usuários pelo admin
 - **Reconciliação com o Fiorilli** — importa o relatório de Posição do Estoque do Fiorilli (CSV Dados) e compara item a item por `codigo_fiorilli`, classificando em confere / diverge / só-Fiorilli / só-SGEA / unidade incompatível; converte as quantidades do Fiorilli para a unidade de consumo do SGEA e é **somente leitura** (o Fiorilli continua o razão oficial). Exporta as pendências em CSV
 - **Auditoria** — trilha de eventos de criação/edição/exclusão em todos os módulos, com tela de consulta filtrável (admin)

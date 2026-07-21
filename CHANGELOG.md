@@ -5,6 +5,12 @@
 
 ---
 
+## [0.23.0] — 2026-07-20
+
+### Adicionado
+- **Importação de funcionários pela folha do Fiorilli (CSV).** Novo botão **Importar CSV** na tela de Funcionários (admin) que lê o CSV da folha de pagamento exportado do Fiorilli e cadastra todos os servidores de uma vez. O importador detecta o encoding (UTF-8 ou latin-1), ignora as colunas de salário, **deduplica por matrícula** (descartando as linhas repetidas de 13º/rescisão) e faz **upsert** — reimportar atualiza quem já existe pela matrícula, sem duplicar. Uma prévia mostra quantos funcionários únicos, quantos repetidos foram descartados e quantas linhas sem nome foram ignoradas antes de confirmar.
+- **Novos campos no cadastro de Funcionário**: Natureza do Cargo, Forma de Provimento, Data de Admissão e Ato de Admissão (preenchidos automaticamente pela importação e editáveis no cadastro). A matrícula passou a aparecer também na listagem.
+
 ## [0.22.1] — 2026-07-20
 
 ### Corrigido
