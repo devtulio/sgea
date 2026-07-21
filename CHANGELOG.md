@@ -5,6 +5,14 @@
 
 ---
 
+## [0.23.2] — 2026-07-21
+
+### Corrigido
+- **Acessibilidade (WCAG 1.4.3)**: o contraste do botão "Dispensar" da faixa de aviso de servidor desatualizado subiu de ~3,5:1 para 8,1:1, com `aria-label` e alvo de toque maior.
+
+### Interno
+- Três funções que estavam copiadas idênticas nos 4 sistemas (`checarVersaoServidor` no `base.js`; `backup_ts` e `pick_folder_dialog` no `sgx_base.py`) foram consolidadas no esqueleto compartilhado (fonte única via `sync.py`), sem mudança de comportamento. O `Iniciar SGEA.bat` passou a encerrar um servidor preso na porta antes de subir o novo.
+
 ## [0.23.1] — 2026-07-20
 
 ### Adicionado
