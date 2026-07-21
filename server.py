@@ -1,4 +1,4 @@
-# SGEA v0.22.0 — Servidor local: SQLite, autenticação, REST API, controle de estoque por lote (FEFO), backup automático
+# SGEA v0.22.1 — Servidor local: SQLite, autenticação, REST API, controle de estoque por lote (FEFO), backup automático
 import http.server
 import socketserver
 import os
@@ -2177,8 +2177,13 @@ class SGEAHandler(http.server.SimpleHTTPRequestHandler):
         ) if os.path.isdir(bdir) else []
 
         with get_db() as conn:
-            cadastros_apoio = sum(conn.execute(f'SELECT COUNT(*) FROM {t} WHERE ativo=1').fetchone()[0]
-                                   for t in ('centros_custo', 'fornecedores', 'funcionarios', 'frota'))
+            # fornecedores foi reescrito para o schema rico (id/data JSON) e usa
+            # deleted_at em vez de ativo — contado à parte pra não quebrar o relatório.
+            cadastros_apoio = (
+                sum(conn.execute(f'SELECT COUNT(*) FROM {t} WHERE ativo=1').fetchone()[0]
+                    for t in ('centros_custo', 'funcionarios', 'frota'))
+                + conn.execute('SELECT COUNT(*) FROM fornecedores WHERE deleted_at IS NULL').fetchone()[0]
+            )
             contagens = {
                 'produtos_ativos': conn.execute('SELECT COUNT(*) FROM produtos WHERE ativo=1').fetchone()[0],
                 'entradas_ativas': conn.execute('SELECT COUNT(*) FROM entradas WHERE deleted_at IS NULL').fetchone()[0],

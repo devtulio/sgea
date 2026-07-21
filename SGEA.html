@@ -1095,7 +1095,7 @@
 // ══════════════════════════════════════════════════════════════
 // API / SESSÃO
 // ══════════════════════════════════════════════════════════════
-const SGEA_VERSION = '0.22.0';
+const SGEA_VERSION = '0.22.1';
 document.title = `SGEA v${SGEA_VERSION}`;
 
 let _apiToken = localStorage.getItem('sgea-token') || null;
@@ -3806,7 +3806,7 @@ async function gerarRelatorioIntegridade() {
   const [r, rSet, rBrasao] = await Promise.all([
     API.get('/api/relatorio/integridade'), API.get('/api/settings'), API.get('/api/settings/brasao'),
   ]);
-  if (!r.ok) { toast('Erro ao gerar relatório (acesso restrito a administradores).', 'error'); return; }
+  if (!r.ok) { toast((await API.json(r))?.error || 'Erro ao gerar relatório.', 'error'); return; }
   const d = await API.json(r);
   const settings = (await API.json(rSet)) || {};
   const brasao = (await API.json(rBrasao))?.brasao_dataurl || '';

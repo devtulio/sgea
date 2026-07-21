@@ -5,6 +5,11 @@
 
 ---
 
+## [0.22.1] — 2026-07-20
+
+### Corrigido
+- **Relatório de Backup e Integridade voltou a funcionar para administradores.** A contagem de cadastros de apoio ainda consultava `fornecedores WHERE ativo=1`, mas a tabela `fornecedores` foi reescrita para o schema rico e passou a usar `deleted_at` (não tem mais coluna `ativo`) — a consulta quebrava com erro 500. O frontend, por sua vez, mostrava "acesso restrito a administradores" para **qualquer** falha, mascarando o erro real. Agora o fornecedores é contado por `deleted_at IS NULL` e a mensagem de erro reflete o motivo real devolvido pelo servidor.
+
 ## [0.22.0] — 2026-07-20
 
 ### Adicionado
