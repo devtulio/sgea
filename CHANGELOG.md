@@ -5,6 +5,12 @@
 
 ---
 
+## [0.23.4] — 2026-07-22
+
+### Adicionado
+- **Natureza do Cargo** e **Forma de Provimento**, no cadastro de Funcionário, viraram **listas de seleção** (dropdown) com as opções reais da folha do Fiorilli (Efetivo, Comissão, Temporário, Emprego Público, Função de Confiança, Conselheiro; Concurso Público, Eleição/Indicação, Livre Provimento, Tempo Determinado) — antes eram texto livre, sujeito a erro de digitação. Um valor importado que não esteja na lista é **preservado** ao editar.
+- **Ordenação por coluna** nas listas de cadastros de apoio (Funcionários, Centros de Custo, Frota): clicar no título da coluna ordena; clicar de novo inverte. Indicador ▲/▼ e `aria-sort` (operável por teclado).
+
 ## [0.23.3] — 2026-07-22
 
 ### Alterado

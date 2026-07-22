@@ -1158,7 +1158,7 @@
 // ══════════════════════════════════════════════════════════════
 // API / SESSÃO
 // ══════════════════════════════════════════════════════════════
-const SGEA_VERSION = '0.23.3';
+const SGEA_VERSION = '0.23.4';
 document.title = `SGEA v${SGEA_VERSION}`;
 
 let _apiToken = localStorage.getItem('sgea-token') || null;
@@ -1534,8 +1534,8 @@ const CRUD_MODULES = {
       { key: 'cargo', label: 'Cargo' },
       { key: 'unidade', label: 'Unidade/Setor' },
       { key: 'matricula', label: 'Matrícula' },
-      { key: 'natureza', label: 'Natureza do Cargo', placeholder: 'ex.: 1 - Efetivo' },
-      { key: 'forma_provimento', label: 'Forma de Provimento', placeholder: 'ex.: CONCURSO PUBLICO' },
+      { key: 'natureza', label: 'Natureza do Cargo', type: 'select', options: ['1 - Efetivo', '2 - Comissão', '3 - Temporário', '4 - Emprego Público', '5 - Função de Confiança', '7 - Conselheiro'] },
+      { key: 'forma_provimento', label: 'Forma de Provimento', type: 'select', options: ['CONCURSO PUBLICO', 'ELEICAO/INDICACAO', 'LIVRE PROVIMENTO', 'TEMPO DETERMINADO'] },
       { key: 'data_admissao', label: 'Data de Admissão', placeholder: 'dd/mm/aaaa' },
       { key: 'ato_admissao', label: 'Ato de Admissão' },
       { key: 'ativo', label: 'Ativo', type: 'checkbox', default: true },
@@ -1561,9 +1561,11 @@ const CRUD_MODULES = {
 };
 let _crudAtual = null;
 let _crudCache = [];
+let _crudSort = { idx: null, dir: 1 };
 
 function showCrud(modKey) {
   _crudAtual = modKey;
+  _crudSort = { idx: null, dir: 1 };  // ordenação é por módulo
   const cfg = CRUD_MODULES[modKey];
   _showView('view-crud', cfg.navId);
   document.getElementById('crud-titulo').textContent = cfg.titulo;
@@ -1590,8 +1592,18 @@ async function renderCrud() {
   const el = document.getElementById('crud-list');
   if (!filtrados.length) { el.innerHTML = '<div class="empty">Nenhum registro encontrado.</div>'; return; }
   const cols = cfg.columns;
+  if (_crudSort.idx != null && cols[_crudSort.idx]) {
+    const col = cols[_crudSort.idx];
+    const val = i => (col.kfn ? col.kfn(i) : (i[col.k] ?? '')) ?? '';
+    filtrados.sort((a, b) => _crudSort.dir * String(val(a)).localeCompare(String(val(b)), 'pt', { numeric: true, sensitivity: 'base' }));
+  }
   el.innerHTML = `<div class="list-table-wrap"><table class="list-table">
-    <thead><tr>${cols.map(c => `<th>${esc(c.h)}</th>`).join('')}<th class="col-actions">Ações</th></tr></thead>
+    <thead><tr>${cols.map((c, idx) => {
+      const active = _crudSort.idx === idx;
+      const arrow = active ? (_crudSort.dir === 1 ? ' ▲' : ' ▼') : '';
+      const aria = active ? (_crudSort.dir === 1 ? 'ascending' : 'descending') : 'none';
+      return `<th onclick="_sortCrud(${idx})" role="button" tabindex="0" aria-sort="${aria}" title="Ordenar por ${esc(c.h)}" style="cursor:pointer;user-select:none;white-space:nowrap">${esc(c.h)}<span style="opacity:.65">${arrow}</span></th>`;
+    }).join('')}<th class="col-actions">Ações</th></tr></thead>
     <tbody>${filtrados.map(i => `<tr>
       ${cols.map(c => `<td>${_crudCell(c, i)}</td>`).join('')}
       <td class="col-actions">
@@ -1600,6 +1612,11 @@ async function renderCrud() {
       </td>
     </tr>`).join('')}</tbody>
   </table></div>`;
+}
+function _sortCrud(idx) {
+  if (_crudSort.idx === idx) _crudSort.dir *= -1;
+  else { _crudSort.idx = idx; _crudSort.dir = 1; }
+  renderCrud();
 }
 const _debouncedRenderCrud = _debounce(renderCrud, 250);
 
@@ -1626,8 +1643,10 @@ async function openCrudModal(id) {
       const optHtml = opts.map(o => `<option value="${o.id}" ${String(val) === String(o.id) ? 'selected' : ''}>${esc(o[f.optLabel])}</option>`).join('');
       parts.push(`<div class="info-field ${span}"><label for="cf-${f.key}">${esc(f.label)}</label><select id="cf-${f.key}"><option value="">—</option>${optHtml}</select></div>`);
     } else if (f.type === 'select' && f.options) {
-      const optHtml = f.options.map(o => `<option value="${o}" ${val === o ? 'selected' : ''}>${esc(o)}</option>`).join('');
-      parts.push(`<div class="info-field ${span}"><label for="cf-${f.key}">${esc(f.label)}</label><select id="cf-${f.key}">${optHtml}</select></div>`);
+      const opts = [...f.options];
+      if (val && !opts.includes(val)) opts.unshift(val);  // preserva valor importado fora da lista
+      const optHtml = opts.map(o => `<option value="${esc(o)}" ${val === o ? 'selected' : ''}>${esc(o)}</option>`).join('');
+      parts.push(`<div class="info-field ${span}"><label for="cf-${f.key}">${esc(f.label)}</label><select id="cf-${f.key}"><option value=""${val ? '' : ' selected'}>—</option>${optHtml}</select></div>`);
     } else {
       parts.push(`<div class="info-field ${span}"><label for="cf-${f.key}">${esc(f.label)}${f.required ? ' *' : ''}</label><input type="${f.type || 'text'}" id="cf-${f.key}" value="${esc(val ?? '')}" placeholder="${esc(f.placeholder || '')}"></div>`);
     }

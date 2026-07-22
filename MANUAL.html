@@ -3,7 +3,7 @@
 <head>
 <meta charset="UTF-8">
 <meta name="viewport" content="width=device-width, initial-scale=1.0">
-<title>Manual Operacional — SGEA v0.23.3</title>
+<title>Manual Operacional — SGEA v0.23.4</title>
 <style>
   * { box-sizing: border-box; margin: 0; padding: 0; }
   body { font-family: 'Times New Roman', Times, serif; font-size: 12pt; color: #000; background: #f5f5f5; }
@@ -53,7 +53,7 @@
       size: A4;
       margin: 20mm 20mm 25mm;
       @top-center {
-        content: "SGEA v0.23.3 — Manual Operacional";
+        content: "SGEA v0.23.4 — Manual Operacional";
         font-family: 'Times New Roman', serif;
         font-size: 9pt;
         color: #666;
@@ -79,7 +79,7 @@
     <div class="cover-title">Manual Operacional</div>
     <div class="cover-subtitle">SGEA — Sistema de Gestão de Estoque do Almoxarifado</div>
     <div class="cover-system">Entradas, Saídas, Lotes/Validade e cadastros de apoio</div>
-    <div class="cover-version">Versão v0.23.3</div>
+    <div class="cover-version">Versão v0.23.4</div>
     <br>
     <div style="font-size:11pt; color:#555; line-height:1.8;">
       Aplicação web multiusuário para o Almoxarifado<br>
@@ -173,7 +173,7 @@
   <p>Esta tela lista todos os lotes com saldo que estão vencidos ou vencendo dentro de uma janela configurável (30, 60 ou 90 dias), mostrando o produto, o lote, a data de validade, o saldo restante e o centro de custo de origem do produto. Use-a periodicamente para priorizar o consumo de itens perto do vencimento.</p>
 
   <h2 id="sec9">9. Cadastros de Apoio</h2>
-  <p>As telas de <strong>Centros de Custo</strong>, <strong>Funcionários</strong> e <strong>Frota</strong> seguem o mesmo padrão de lista + formulário. <strong>Funcionários</strong> são usados como solicitantes de saída — qualquer servidor pode retirar material do almoxarifado. Cada funcionário guarda nome, cargo, unidade/setor, matrícula, natureza do cargo, forma de provimento, e data e ato de admissão. <strong>Frota</strong> cadastra os veículos do município (número, placa, marca/modelo) para permitir vincular uma saída de combustível ou peça a um veículo específico.</p>
+  <p>As telas de <strong>Centros de Custo</strong>, <strong>Funcionários</strong> e <strong>Frota</strong> seguem o mesmo padrão de lista + formulário. <strong>Funcionários</strong> são usados como solicitantes de saída — qualquer servidor pode retirar material do almoxarifado. Cada funcionário guarda nome, cargo, unidade/setor, matrícula, natureza do cargo, forma de provimento, e data e ato de admissão — a <strong>Natureza do Cargo</strong> e a <strong>Forma de Provimento</strong> são escolhidas em listas de seleção com as opções da folha do Fiorilli (Efetivo, Comissão, Temporário etc.), evitando erro de digitação. <strong>Frota</strong> cadastra os veículos do município (número, placa, marca/modelo) para permitir vincular uma saída de combustível ou peça a um veículo específico. Em qualquer das três listas, <strong>clicar no título de uma coluna ordena por ela</strong> (clicar de novo inverte a ordem).</p>
   <p>Para não cadastrar os servidores um a um, a tela de Funcionários tem o botão <strong>Importar CSV</strong> (visível para administradores): ele lê o CSV da <strong>folha de pagamento exportada do Fiorilli</strong> e cadastra todos de uma vez. O importador detecta automaticamente o encoding do arquivo, ignora as colunas de salário, e <strong>deduplica por matrícula</strong> — quando o mesmo servidor aparece em mais de uma linha (folha mensal + 13º salário, por exemplo), só a primeira é usada. Uma prévia mostra quantos funcionários únicos foram encontrados, quantas linhas repetidas foram descartadas e quantas ficaram sem nome, antes de confirmar. A importação é <strong>idempotente</strong>: reimportar a folha do mês seguinte atualiza os dados de quem já está cadastrado (casando pela matrícula) e insere apenas os novos, sem duplicar.</p>
   <p><strong>Fornecedores</strong> tem cadastro próprio, mais completo — ver seção seguinte.</p>
   <p><strong>Pedidos</strong> vão além do cadastro simples: cada pedido (número + código de licitação) agrupa <strong>vários produtos</strong>, cada um com a quantidade pedida. Ao registrar uma Entrada vinculada a um pedido, o sistema abate automaticamente a quantidade recebida dos itens correspondentes — a quantidade recebida nunca é digitada nem armazenada à parte, é sempre calculada a partir das entradas reais. Assim cada item mostra seu <strong>saldo em aberto</strong> e um <strong>status</strong> (aberto, parcial, atendido) e o pedido mostra um status agregado. É possível <strong>cancelar</strong> um pedido inteiro ou <strong>anular o saldo</strong> de um item específico (quando o restante não vai mais ser entregue), sem afetar o que já foi recebido.</p>
@@ -225,6 +225,7 @@
   <h2 id="sec15">15. Histórico de Versões</h2>
   <table>
     <tr><th>Versão</th><th>Data</th><th>Resumo</th></tr>
+    <tr><td>0.23.4</td><td>22/07/2026</td><td>Cadastro de Funcionário: <strong>Natureza do Cargo</strong> e <strong>Forma de Provimento</strong> viraram listas de seleção (opções da folha do Fiorilli). <strong>Ordenação por coluna</strong> nas listas de cadastros de apoio — clicar no título ordena, clicar de novo inverte.</td></tr>
     <tr><td>0.23.3</td><td>22/07/2026</td><td>Aba <strong>Dados</strong> em paridade visual com a família (seção "Backup de Dados" coesa, backup manual em 2 colunas); botão <strong>Exportar backup (JSON)</strong> novo; inputs de backup arredondados (classe <code>.input</code> definida no <code>base.css</code>).</td></tr>
     <tr><td>0.23.2</td><td>21/07/2026</td><td>Acessibilidade: contraste do botão "Dispensar" da faixa de servidor desatualizado elevado (3,5 → 8,1:1) + <code>aria-label</code>. Consolidação interna de código no esqueleto compartilhado (sem mudança de comportamento).</td></tr>
     <tr><td>0.23.1</td><td>20/07/2026</td><td>Aviso de <strong>servidor desatualizado</strong>: o app detecta quando o servidor Python em execução é mais antigo que a página carregada (rotas novas dão "Rota não encontrada" até reiniciar) e mostra uma faixa orientando a reiniciar pelo <code>Iniciar SGEA.bat</code>.</td></tr>
