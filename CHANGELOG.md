@@ -5,6 +5,13 @@
 
 ---
 
+## [0.23.5] — 2026-07-22
+
+### Modificado
+- **Busca com ✕ para limpar** padronizada em todas as listas (Estoque, Reconciliação e Auditoria): os campos ganharam o mesmo botão ✕ já usado em Fornecedores e nos cadastros de apoio — aparece ao digitar, limpa a busca ao clicar. Antes usavam o estilo antigo (lupa, sem limpar). Helper compartilhado no `base.js`.
+
+---
+
 ## [0.23.4] — 2026-07-22
 
 ### Adicionado

@@ -109,6 +109,20 @@ function _debounce(fn, ms) {
   return (...args) => { clearTimeout(t); t = setTimeout(() => fn(...args), ms); };
 }
 
+/* ── Busca com ✕ para limpar ──────────────────────────────
+   Convenção: input#<id> + botão#<id>-clear (oculto quando vazio).
+   No oninput: `toggleSearchClear(this); <render>`.
+   No botão:   `clearSearch('<id>', <render>)`. */
+function toggleSearchClear(input) {
+  const btn = input && document.getElementById(input.id + '-clear');
+  if (btn) btn.style.display = input.value ? '' : 'none';
+}
+function clearSearch(inputId, cb) {
+  const i = document.getElementById(inputId);
+  if (i) { i.value = ''; toggleSearchClear(i); }
+  if (typeof cb === 'function') cb();
+}
+
 function _hideAllViews() { document.querySelectorAll('.view').forEach(v => v.classList.remove('active')); }
 function setNavActive(id) {
   document.querySelectorAll('.nav-item').forEach(b => b.classList.remove('active'));
