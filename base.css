@@ -176,11 +176,11 @@ footer { text-align: center; padding: 18px 16px 14px calc(var(--sidebar-w) + 16p
 /* ── Formulários ─────────────────────────────────────────────── */
 .info-field { margin-bottom: 12px; }
 .info-field label { display: block; font-size: .72rem; font-weight: 700; text-transform: uppercase; letter-spacing: .4px; color: var(--gray-500); margin-bottom: 3px; }
-.info-field input, .info-field select, .info-field textarea {
+.info-field input, .info-field select, .info-field textarea, input.input {
   width: 100%; border: 1px solid var(--gray-200); border-radius: 6px; padding: 7px 10px;
   font-size: .85rem; font-family: inherit; color: var(--gray-900); background: #fff; outline: none;
 }
-.info-field input:focus, .info-field select:focus, .info-field textarea:focus { border-color: var(--brand-text); box-shadow: 0 0 0 3px color-mix(in srgb, var(--brand) 25%, transparent); }
+.info-field input:focus, .info-field select:focus, .info-field textarea:focus, input.input:focus { border-color: var(--brand-text); box-shadow: 0 0 0 3px color-mix(in srgb, var(--brand) 25%, transparent); }
 .info-field textarea { min-height: 60px; resize: vertical; }
 .info-field.checkbox { display: flex; align-items: center; gap: 8px; }
 .info-field.checkbox input { width: auto; }

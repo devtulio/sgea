@@ -5,6 +5,17 @@
 
 ---
 
+## [0.23.3] — 2026-07-22
+
+### Alterado
+- **Aba Dados em paridade visual com a família**: a seção de backup deixou de ser fragmentada (cards "Pasta de Backup" e "Backup Automático" separados + fileira solta de botões) e virou uma seção **"Backup de Dados"** coesa, com o backup manual em duas colunas (Sistema JSON / Banco de dados .db) e o backup automático aninhado, no mesmo padrão do SGCD/SGCA/SGDP.
+
+### Adicionado
+- Botão **Exportar backup (JSON)** no cartão "Sistema (JSON)" da aba Dados (usa o endpoint `/api/backup` já existente) — antes o SGEA só restaurava JSON, não exportava.
+
+### Corrigido
+- Inputs da aba Dados (pasta de backup, backups mantidos) agora aparecem arredondados: a classe `.input` que esses campos usavam **nunca havia sido definida** no CSS — definida no `base.css` compartilhado (também corrige os inputs equivalentes de SGCD/SGCA).
+
 ## [0.23.2] — 2026-07-21
 
 ### Corrigido

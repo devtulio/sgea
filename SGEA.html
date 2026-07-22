@@ -721,31 +721,55 @@
     </div>
 
     <div class="cfg-panel" id="cfg-panel-dados">
-      <fieldset class="cfg-fieldset">
-        <legend>Pasta de Backup</legend>
-        <div class="info-field">
-          <div style="display:flex;gap:8px">
-            <input type="text" id="cfg-backup-path" readonly style="flex:1">
-            <button class="btn btn-outline btn-sm" onclick="selecionarPastaBackup()">Selecionar pasta</button>
+      <fieldset style="border:1px solid var(--gray-200);border-radius:var(--radius);padding:14px;margin-bottom:16px">
+        <legend style="font-size:.72rem;font-weight:700;color:var(--accent-light);padding:0 6px;text-transform:uppercase;letter-spacing:.4px">Backup de Dados</legend>
+
+        <!-- Pasta de backup -->
+        <div style="display:flex;align-items:center;gap:8px;margin-bottom:6px">
+          <label for="cfg-backup-path" style="font-size:.8rem;color:var(--gray-600);white-space:nowrap;min-width:120px">Pasta de backup</label>
+          <input id="cfg-backup-path" type="text" class="input" readonly style="flex:1;font-size:.8rem;background:var(--gray-50)" placeholder="Nenhuma pasta selecionada">
+          <button class="btn btn-outline btn-sm" onclick="selecionarPastaBackup()" style="white-space:nowrap">Selecionar pasta</button>
+        </div>
+        <p style="font-size:.7rem;color:var(--gray-500);margin-bottom:12px;line-height:1.5">Backups automáticos e manuais do banco são salvos nesta pasta.</p>
+        <button class="btn btn-outline btn-sm" onclick="gerarRelatorioIntegridade()" style="margin-bottom:12px">📊 Relatório de Backup e Integridade</button>
+
+        <hr style="border:none;border-top:1px solid var(--gray-100);margin:4px 0 12px">
+
+        <!-- Backup manual -->
+        <div style="font-size:.8rem;font-weight:600;color:var(--gray-700);margin-bottom:8px">Backup manual</div>
+        <div style="display:grid;grid-template-columns:1fr 1fr;gap:10px;margin-bottom:12px">
+          <div style="border:1px solid var(--gray-200);border-radius:var(--radius);padding:10px 12px;display:flex;flex-direction:column;gap:6px">
+            <div style="font-size:.7rem;font-weight:700;color:var(--gray-500);text-transform:uppercase;letter-spacing:.4px">Sistema (JSON)</div>
+            <button class="btn btn-outline btn-sm" onclick="exportarBackupJson()" style="justify-content:flex-start">⭳ Exportar backup</button>
+            <label class="btn btn-outline btn-sm" style="cursor:pointer;justify-content:flex-start">⭱ Restaurar backup
+              <input type="file" id="cfg-restore-json-input" accept=".json" style="display:none" onchange="restaurarBackupJson(this)"></label>
+          </div>
+          <div style="border:1px solid var(--gray-200);border-radius:var(--radius);padding:10px 12px;display:flex;flex-direction:column;gap:6px">
+            <div style="font-size:.7rem;font-weight:700;color:var(--gray-500);text-transform:uppercase;letter-spacing:.4px">Banco de dados (.db)</div>
+            <button class="btn btn-outline btn-sm" onclick="fazerBackupAgora()" style="justify-content:flex-start">⏱ Fazer backup agora</button>
+            <label class="btn btn-outline btn-sm" style="cursor:pointer;justify-content:flex-start">⭱ Restaurar backup
+              <input type="file" id="cfg-restore-db-input" accept=".db" style="display:none" onchange="restaurarBackupDb(this)"></label>
+          </div>
+        </div>
+        <div id="config-info" style="margin-bottom:8px;font-size:.8rem;color:var(--gray-600)"></div>
+        <div id="backups-list" style="margin-bottom:12px"></div>
+
+        <hr style="border:none;border-top:1px solid var(--gray-100);margin:4px 0 12px">
+
+        <!-- Backup automático -->
+        <div style="display:flex;align-items:flex-start;gap:10px">
+          <input type="checkbox" id="cfg-backup-auto" checked style="margin:1px 0 0;width:16px;height:16px;cursor:pointer;flex-shrink:0">
+          <div style="flex:1">
+            <div style="font-size:.82rem;font-weight:600;color:var(--gray-700)">Backup automático ao encerrar a última sessão</div>
+            <p style="font-size:.7rem;color:var(--gray-500);margin:3px 0 8px;line-height:1.5">Cria um backup do banco (sgea.db) sempre que a última sessão do sistema é encerrada.</p>
+            <div style="display:flex;align-items:center;gap:8px;padding:10px 12px;background:var(--gray-50);border-radius:var(--radius);border:1px solid var(--gray-100)">
+              <label for="cfg-backup-keep" style="font-size:.78rem;color:var(--gray-600);white-space:nowrap">Backups mantidos</label>
+              <input type="number" id="cfg-backup-keep" class="input" min="1" value="7" style="width:64px;font-size:.8rem">
+              <span style="font-size:.75rem;color:var(--gray-500)">arquivos mais recentes</span>
+            </div>
           </div>
         </div>
       </fieldset>
-      <fieldset class="cfg-fieldset">
-        <legend>Backup Automático</legend>
-        <div class="info-field checkbox"><input type="checkbox" id="cfg-backup-auto" checked><label for="cfg-backup-auto" style="margin:0;text-transform:none;font-weight:500">Backup automático ao encerrar a última sessão</label></div>
-        <div class="info-field"><label for="cfg-backup-keep">Backups mantidos</label><input type="number" id="cfg-backup-keep" min="1" value="7"></div>
-      </fieldset>
-
-      <div class="view-actions" style="margin-bottom:14px;flex-wrap:wrap;gap:8px">
-        <button class="btn btn-primary" onclick="fazerBackupAgora()">Fazer backup agora</button>
-        <button class="btn btn-outline" onclick="document.getElementById('cfg-restore-json-input').click()">Restaurar sistema (JSON)</button>
-        <input type="file" id="cfg-restore-json-input" accept=".json" style="display:none" onchange="restaurarBackupJson(this)">
-        <button class="btn btn-outline" onclick="document.getElementById('cfg-restore-db-input').click()">Restaurar banco (.db)</button>
-        <input type="file" id="cfg-restore-db-input" accept=".db" style="display:none" onchange="restaurarBackupDb(this)">
-        <button class="btn btn-outline" onclick="gerarRelatorioIntegridade()">📊 Relatório de Backup e Integridade</button>
-      </div>
-      <div id="config-info" style="margin-bottom:16px;font-size:.85rem;color:var(--gray-600)"></div>
-      <div id="backups-list"></div>
 
       <fieldset style="border:1.5px solid var(--danger);border-radius:8px;padding:14px 16px;margin-top:8px">
         <legend style="font-size:.72rem;font-weight:700;color:var(--danger);padding:0 6px;text-transform:uppercase;letter-spacing:.4px">Zona de Perigo</legend>
@@ -1134,7 +1158,7 @@
 // ══════════════════════════════════════════════════════════════
 // API / SESSÃO
 // ══════════════════════════════════════════════════════════════
-const SGEA_VERSION = '0.23.2';
+const SGEA_VERSION = '0.23.3';
 document.title = `SGEA v${SGEA_VERSION}`;
 
 let _apiToken = localStorage.getItem('sgea-token') || null;
@@ -3669,6 +3693,13 @@ async function renderBackups() {
     </tr>`).join('')}</tbody>
   </table></div>`;
 }
+async function exportarBackupJson() {
+  const r = await API.get('/api/backup');
+  if (!r || !r.ok) { toast('Erro ao exportar backup.', 'error'); return; }
+  const blob = await r.blob();
+  await _salvarArquivoComo(blob, `SIS_SGEA_BACKUP_${new Date().toISOString().slice(0, 10)}.json`, 'application/json');
+}
+
 async function fazerBackupAgora() {
   const r = await API.post('/api/backups/db/now');
   const d = await API.json(r);
