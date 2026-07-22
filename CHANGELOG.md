@@ -5,6 +5,14 @@
 
 ---
 
+## [0.25.0] — 2026-07-22
+
+### Adicionado
+- **Ficha do Veículo** (imprimível) — botão **Ficha** por linha na tela de Frota gera um documento A4 com o cadastro do veículo e todo o catálogo de peças (filtros, óleos, bateria e pneus) organizado em seções, para o almoxarifado visualizar e imprimir/salvar em PDF.
+- **Relatórios de Frota** na página de Relatórios: **Inventário da Frota** (relação completa), **Frota por Centro de Custo** (agrupado, com totais), **Frota por Combustível** (distribuição, útil para planejar compras) e **Pendências de Peças** (veículos com peça ainda vazia ou "FALTA INFORMAÇÃO", para dirigir o preenchimento).
+
+---
+
 ## [0.24.0] — 2026-07-22
 
 ### Adicionado

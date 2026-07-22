@@ -3,7 +3,7 @@
 <head>
 <meta charset="UTF-8">
 <meta name="viewport" content="width=device-width, initial-scale=1.0">
-<title>Manual Operacional — SGEA v0.24.0</title>
+<title>Manual Operacional — SGEA v0.25.0</title>
 <style>
   * { box-sizing: border-box; margin: 0; padding: 0; }
   body { font-family: 'Times New Roman', Times, serif; font-size: 12pt; color: #000; background: #f5f5f5; }
@@ -53,7 +53,7 @@
       size: A4;
       margin: 20mm 20mm 25mm;
       @top-center {
-        content: "SGEA v0.24.0 — Manual Operacional";
+        content: "SGEA v0.25.0 — Manual Operacional";
         font-family: 'Times New Roman', serif;
         font-size: 9pt;
         color: #666;
@@ -79,7 +79,7 @@
     <div class="cover-title">Manual Operacional</div>
     <div class="cover-subtitle">SGEA — Sistema de Gestão de Estoque do Almoxarifado</div>
     <div class="cover-system">Entradas, Saídas, Lotes/Validade e cadastros de apoio</div>
-    <div class="cover-version">Versão v0.24.0</div>
+    <div class="cover-version">Versão v0.25.0</div>
     <br>
     <div style="font-size:11pt; color:#555; line-height:1.8;">
       Aplicação web multiusuário para o Almoxarifado<br>
@@ -140,6 +140,10 @@
     <li><strong>Lotes a Vencer/Vencidos</strong> — mesma janela de 90 dias usada na tela de Alertas de Validade, com badge indicando se o lote já venceu ou está vencendo</li>
     <li><strong>Pedidos em Aberto</strong> — uma seção por pedido em aberto, com os itens ainda pendentes (quantidade pedida, recebida e saldo)</li>
     <li><strong>Curva ABC</strong> — classifica os produtos por participação no valor total do estoque: classe A até 80% do valor acumulado, B até 95%, C o restante</li>
+    <li><strong>Inventário da Frota</strong> — relação de todos os veículos (nº, placa, ano, marca/modelo, combustível, centro de custo e situação)</li>
+    <li><strong>Frota por Centro de Custo</strong> — veículos agrupados por centro de custo, com o total de cada grupo</li>
+    <li><strong>Frota por Combustível</strong> — distribuição dos veículos por tipo de combustível (útil para dimensionar a compra de combustível)</li>
+    <li><strong>Pendências de Peças</strong> — lista os veículos que ainda têm peças sem definição (célula vazia ou "FALTA INFORMAÇÃO"), indicando quais peças faltam — serve de guia para a mecânica completar o cadastro</li>
   </ul>
   <p>Todos os relatórios seguem o mesmo padrão visual do relatório de Backup e Integridade e da Trilha de Auditoria: cabeçalho com o brasão e nome do órgão, tipografia Times New Roman e numeração de página no rodapé — sem código QR nem bloco de assinatura, por serem documentos gerenciais, não formais.</p>
 
@@ -173,7 +177,7 @@
   <p>Esta tela lista todos os lotes com saldo que estão vencidos ou vencendo dentro de uma janela configurável (30, 60 ou 90 dias), mostrando o produto, o lote, a data de validade, o saldo restante e o centro de custo de origem do produto. Use-a periodicamente para priorizar o consumo de itens perto do vencimento.</p>
 
   <h2 id="sec9">9. Cadastros de Apoio</h2>
-  <p>As telas de <strong>Centros de Custo</strong>, <strong>Funcionários</strong> e <strong>Frota</strong> seguem o mesmo padrão de lista + formulário. <strong>Funcionários</strong> são usados como solicitantes de saída — qualquer servidor pode retirar material do almoxarifado. Cada funcionário guarda nome, cargo, unidade/setor, matrícula, natureza do cargo, forma de provimento, e data e ato de admissão — a <strong>Natureza do Cargo</strong> e a <strong>Forma de Provimento</strong> são escolhidas em listas de seleção com as opções da folha do Fiorilli (Efetivo, Comissão, Temporário etc.), evitando erro de digitação. <strong>Frota</strong> cadastra os veículos do município (número, placa, ano, marca/modelo, combustível e centro de custo) para permitir vincular uma saída de combustível ou peça a um veículo específico; cada veículo guarda ainda uma <strong>ficha de manutenção</strong> — o catálogo de peças compatíveis (11 tipos de filtro, óleos de motor e transmissão, bateria e pneus), com as referências cruzadas entre marcas, organizado em seções no formulário. Em qualquer das três listas, <strong>clicar no título de uma coluna ordena por ela</strong> (clicar de novo inverte a ordem).</p>
+  <p>As telas de <strong>Centros de Custo</strong>, <strong>Funcionários</strong> e <strong>Frota</strong> seguem o mesmo padrão de lista + formulário. <strong>Funcionários</strong> são usados como solicitantes de saída — qualquer servidor pode retirar material do almoxarifado. Cada funcionário guarda nome, cargo, unidade/setor, matrícula, natureza do cargo, forma de provimento, e data e ato de admissão — a <strong>Natureza do Cargo</strong> e a <strong>Forma de Provimento</strong> são escolhidas em listas de seleção com as opções da folha do Fiorilli (Efetivo, Comissão, Temporário etc.), evitando erro de digitação. <strong>Frota</strong> cadastra os veículos do município (número, placa, ano, marca/modelo, combustível e centro de custo) para permitir vincular uma saída de combustível ou peça a um veículo específico; cada veículo guarda ainda uma <strong>ficha de manutenção</strong> — o catálogo de peças compatíveis (11 tipos de filtro, óleos de motor e transmissão, bateria e pneus), com as referências cruzadas entre marcas, organizado em seções no formulário. Em qualquer das três listas, <strong>clicar no título de uma coluna ordena por ela</strong> (clicar de novo inverte a ordem). Na Frota, cada linha tem o botão <strong>Ficha</strong>, que gera um documento imprimível (A4) com o cadastro do veículo e todo o catálogo de peças por seção — o almoxarifado pode visualizar na tela e imprimir ou salvar em PDF para levar na hora de comprar peças.</p>
   <p>Para não cadastrar os servidores um a um, a tela de Funcionários tem o botão <strong>Importar CSV</strong> (visível para administradores): ele lê o CSV da <strong>folha de pagamento exportada do Fiorilli</strong> e cadastra todos de uma vez. O importador detecta automaticamente o encoding do arquivo, ignora as colunas de salário, e <strong>deduplica por matrícula</strong> — quando o mesmo servidor aparece em mais de uma linha (folha mensal + 13º salário, por exemplo), só a primeira é usada. Uma prévia mostra quantos funcionários únicos foram encontrados, quantas linhas repetidas foram descartadas e quantas ficaram sem nome, antes de confirmar. A importação é <strong>idempotente</strong>: reimportar a folha do mês seguinte atualiza os dados de quem já está cadastrado (casando pela matrícula) e insere apenas os novos, sem duplicar.</p>
   <p>A tela de <strong>Frota</strong> tem um <strong>Importar CSV</strong> equivalente (administradores): ele lê a planilha <strong>CONTROLE DE FROTA</strong> exportada em CSV — com o cadastro do veículo e todo o catálogo de peças — e cadastra a frota de uma vez. Detecta o delimitador (<code>;</code> ou <code>,</code>) e o encoding do arquivo, <strong>deduplica por número de frota</strong> e vincula o <strong>Centro de Custo pelo nome</strong>, criando os que ainda não existirem (isso pode ser desligado na própria janela de importação). Também é <strong>idempotente</strong>: reimportar atualiza o veículo já cadastrado (mesmo número) e insere só os novos.</p>
   <p><strong>Fornecedores</strong> tem cadastro próprio, mais completo — ver seção seguinte.</p>
@@ -226,6 +230,7 @@
   <h2 id="sec15">15. Histórico de Versões</h2>
   <table>
     <tr><th>Versão</th><th>Data</th><th>Resumo</th></tr>
+    <tr><td>0.25.0</td><td>22/07/2026</td><td><strong>Ficha do Veículo</strong> imprimível (botão "Ficha" por linha na Frota) com cadastro + catálogo de peças por seção. <strong>Relatórios de Frota</strong> na página de Relatórios: Inventário, por Centro de Custo, por Combustível e Pendências de Peças (veículos com peça ainda não definida).</td></tr>
     <tr><td>0.24.0</td><td>22/07/2026</td><td><strong>Ficha de manutenção da Frota</strong>: cada veículo passa a guardar o Ano e um catálogo de peças (11 filtros, óleos de motor/transmissão, bateria e pneus) com referências cruzadas entre marcas, em seções no formulário. Novo <strong>Importar CSV</strong> na tela de Frota (admin) que lê a planilha CONTROLE DE FROTA, deduplica por número, vincula o centro de custo pelo nome e faz upsert.</td></tr>
     <tr><td>0.23.6</td><td>22/07/2026</td><td>Campos de busca das listas (Estoque, Reconciliação, Auditoria, cadastros de apoio) padronizados com o mesmo visual arredondado de Fornecedores — estilo único compartilhado (<code>.search-inp</code> no <code>base.css</code>). Relatórios: os campos de data do card "Movimentação por Período" não transbordam mais o card em telas estreitas.</td></tr>
     <tr><td>0.23.5</td><td>22/07/2026</td><td><strong>Busca com ✕ para limpar</strong> padronizada em todas as listas (Estoque, Reconciliação e Auditoria), igual à de Fornecedores e dos cadastros de apoio: o ✕ aparece ao digitar e limpa a busca ao clicar. Antes usavam o estilo antigo com lupa e sem limpar.</td></tr>

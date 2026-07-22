@@ -1195,7 +1195,7 @@
 // ══════════════════════════════════════════════════════════════
 // API / SESSÃO
 // ══════════════════════════════════════════════════════════════
-const SGEA_VERSION = '0.24.0';
+const SGEA_VERSION = '0.25.0';
 document.title = `SGEA v${SGEA_VERSION}`;
 
 let _apiToken = localStorage.getItem('sgea-token') || null;
@@ -1669,6 +1669,7 @@ async function renderCrud() {
     <tbody>${filtrados.map(i => `<tr>
       ${cols.map(c => `<td>${_crudCell(c, i)}</td>`).join('')}
       <td class="col-actions">
+        ${_crudAtual === 'frota' ? `<button class="btn btn-ghost btn-sm" onclick="gerarFichaVeiculo('${i.id}')" title="Gerar ficha do veículo (imprimir)">Ficha</button>` : ''}
         <button class="btn btn-ghost btn-sm" onclick="openCrudModal('${i.id}')">Editar</button>
         <button class="btn btn-ghost btn-sm" onclick="deleteCrudItem('${i.id}')" aria-label="Excluir">Excluir</button>
       </td>
@@ -4264,6 +4265,26 @@ function renderRelatoriosList() {
         <p>Classificação dos produtos por participação no valor total do estoque.</p>
         <button class="btn btn-primary" onclick="gerarRelatorioABC()">Gerar</button>
       </div>
+      <div class="rel-card">
+        <h3>🚗 Inventário da Frota</h3>
+        <p>Relação de todos os veículos: nº, placa, ano, marca/modelo, combustível e centro de custo.</p>
+        <button class="btn btn-primary" onclick="gerarRelatorioFrotaInventario()">Gerar</button>
+      </div>
+      <div class="rel-card">
+        <h3>🏛️ Frota por Centro de Custo</h3>
+        <p>Veículos agrupados por centro de custo (Urbanismo, Saúde, Educação…), com totais.</p>
+        <button class="btn btn-primary" onclick="gerarRelatorioFrotaCentroCusto()">Gerar</button>
+      </div>
+      <div class="rel-card">
+        <h3>⛽ Frota por Combustível</h3>
+        <p>Distribuição dos veículos por tipo de combustível — útil para planejar compras.</p>
+        <button class="btn btn-primary" onclick="gerarRelatorioFrotaCombustivel()">Gerar</button>
+      </div>
+      <div class="rel-card">
+        <h3>🔧 Pendências de Peças</h3>
+        <p>Veículos com peças ainda não definidas (vazias ou "FALTA INFORMAÇÃO"), para preencher.</p>
+        <button class="btn btn-primary" onclick="gerarRelatorioFrotaPendencias()">Gerar</button>
+      </div>
     </div>
   `;
 }
@@ -4383,6 +4404,114 @@ async function gerarRelatorioABC() {
     <div class="meta">${produtos.length} produto(s) ativo(s) · valor total ${fmtMoney(totalValor)} · A: até 80% · B: até 95% · C: restante</div>
     <table><thead><tr><th>Produto</th><th>Valor em Estoque</th><th>% Acumulado</th><th>Classe</th></tr></thead><tbody>${linhas}</tbody></table>`;
   _abrirRelatorio(org, 'Curva ABC de Estoque', corpo, 'Relatório de Curva ABC');
+}
+
+// ── Frota: ficha do veículo + relatórios ────────────────────────
+// Peças (label+key) derivadas da própria config da Frota — sem duplicar a lista.
+const _FROTA_PECAS = CRUD_MODULES.frota.fields.filter(f => f.type === 'textarea').map(f => ({ key: f.key, label: f.label }));
+const _FROTA_PECA_PENDENTE = v => !String(v || '').trim() || /FALTA\s+INFORMA/i.test(v);
+const _frotaMM = v => `${v.marca || ''} ${v.modelo || ''}`.trim() || '—';
+const _frotaOrdNum = (a, b) => String(a.numero).localeCompare(String(b.numero), 'pt', { numeric: true });
+
+// Lista de frota com o nome do centro de custo resolvido (a lista crua traz só o id).
+async function _frotaComCentro() {
+  const [frota, centros] = await Promise.all([_fetchList('frota'), _fetchList('centros-custo')]);
+  const nome = Object.fromEntries(centros.map(c => [String(c.id), c.nome]));
+  return frota.map(v => ({ ...v, centro_custo_nome: nome[String(v.centro_custo_id)] || '—' }));
+}
+
+function gerarFichaVeiculo(id) {
+  const v = _crudCache.find(i => String(i.id) === String(id));
+  if (!v) { toast('Veículo não encontrado.', 'error'); return; }
+  _gerarFichaVeiculo(v);
+}
+async function _gerarFichaVeiculo(v) {
+  const org = await _orgBrasao();
+  const centros = await _fetchList('centros-custo');
+  const ccNome = centros.find(c => String(c.id) === String(v.centro_custo_id))?.nome || '—';
+  const kv = (k, val) => `<tr><th style="width:32%;background:#f0f0f0;color:#000;text-align:left;vertical-align:top">${esc(k)}</th><td>${val && String(val).trim() ? esc(val) : '<span style="color:#999">—</span>'}</td></tr>`;
+  const cad = [
+    ['Nº da Frota', v.numero], ['Placa', v.placa], ['Ano (fab./mod.)', v.ano],
+    ['Marca', v.marca], ['Modelo', v.modelo], ['Combustível', v.combustivel],
+    ['Centro de Custo', ccNome], ['Situação', v.ativo ? 'Ativo' : 'Inativo'],
+  ].map(([k, val]) => kv(k, val)).join('');
+  const pecas = defs => defs.map(f => kv(f.label, v[f.key])).join('');
+  const filtros = _FROTA_PECAS.filter(f => f.key.startsWith('filtro_'));
+  const outros = _FROTA_PECAS.filter(f => !f.key.startsWith('filtro_'));
+  const corpo = `
+    <div class="meta">Ficha do veículo · emitida em ${new Date().toLocaleDateString('pt-BR')}</div>
+    <table>${cad}</table>
+    <h4 style="font-size:11pt;margin:16pt 0 6pt">Filtros</h4>
+    <table>${pecas(filtros)}</table>
+    <h4 style="font-size:11pt;margin:16pt 0 6pt">Óleos, bateria e pneus</h4>
+    <table>${pecas(outros)}</table>`;
+  _abrirRelatorio(org, `Ficha do Veículo — Frota ${v.numero}`, corpo, `Ficha do veículo Frota ${v.numero}`);
+}
+
+async function gerarRelatorioFrotaInventario() {
+  const org = await _orgBrasao();
+  const frota = (await _frotaComCentro()).sort(_frotaOrdNum);
+  const linhas = frota.map(v => `<tr>
+    <td>${esc(v.numero)}</td><td>${esc(v.placa || '—')}</td><td>${esc(v.ano || '—')}</td>
+    <td>${esc(_frotaMM(v))}</td><td>${esc(v.combustivel || '—')}</td><td>${esc(v.centro_custo_nome)}</td>
+    <td style="text-align:center">${v.ativo ? 'Ativo' : 'Inativo'}</td>
+  </tr>`).join('');
+  const corpo = `
+    <div class="meta">${frota.length} veículo(s)</div>
+    <table><thead><tr><th>Nº</th><th>Placa</th><th>Ano</th><th>Marca/Modelo</th><th>Combustível</th><th>Centro de Custo</th><th>Situação</th></tr></thead><tbody>${linhas}</tbody></table>`;
+  _abrirRelatorio(org, 'Inventário da Frota', corpo, 'Relatório de Inventário da Frota');
+}
+
+async function gerarRelatorioFrotaCentroCusto() {
+  const org = await _orgBrasao();
+  const frota = await _frotaComCentro();
+  const grupos = {};
+  frota.forEach(v => { (grupos[v.centro_custo_nome] ||= []).push(v); });
+  const nomes = Object.keys(grupos).sort((a, b) => a.localeCompare(b, 'pt'));
+  const corpo = `<div class="meta">${frota.length} veículo(s) em ${nomes.length} centro(s) de custo</div>` +
+    nomes.map(n => {
+      const vs = grupos[n].sort(_frotaOrdNum);
+      const linhas = vs.map(v => `<tr><td>${esc(v.numero)}</td><td>${esc(v.placa || '—')}</td><td>${esc(_frotaMM(v))}</td><td>${esc(v.combustivel || '—')}</td></tr>`).join('');
+      return `<h4 style="font-size:11pt;margin:14pt 0 4pt">${esc(n)} — ${vs.length} veículo(s)</h4>
+        <table><thead><tr><th>Nº</th><th>Placa</th><th>Marca/Modelo</th><th>Combustível</th></tr></thead><tbody>${linhas}</tbody></table>`;
+    }).join('');
+  _abrirRelatorio(org, 'Frota por Centro de Custo', corpo, 'Relatório de Frota por Centro de Custo');
+}
+
+async function gerarRelatorioFrotaCombustivel() {
+  const org = await _orgBrasao();
+  const frota = await _frotaComCentro();
+  const grupos = {};
+  frota.forEach(v => { const k = (v.combustivel || '—').trim() || '—'; (grupos[k] ||= []).push(v); });
+  const nomes = Object.keys(grupos).sort((a, b) => grupos[b].length - grupos[a].length);
+  const resumo = nomes.map(n => `<tr><td>${esc(n)}</td><td style="text-align:right;font-weight:700">${grupos[n].length}</td></tr>`).join('');
+  const detalhe = nomes.map(n => {
+    const vs = grupos[n].sort(_frotaOrdNum);
+    const linhas = vs.map(v => `<tr><td>${esc(v.numero)}</td><td>${esc(v.placa || '—')}</td><td>${esc(_frotaMM(v))}</td><td>${esc(v.centro_custo_nome)}</td></tr>`).join('');
+    return `<h4 style="font-size:11pt;margin:14pt 0 4pt">${esc(n)} — ${vs.length} veículo(s)</h4>
+      <table><thead><tr><th>Nº</th><th>Placa</th><th>Marca/Modelo</th><th>Centro de Custo</th></tr></thead><tbody>${linhas}</tbody></table>`;
+  }).join('');
+  const corpo = `
+    <div class="meta">${frota.length} veículo(s) · ${nomes.length} tipo(s) de combustível</div>
+    <table><thead><tr><th>Combustível</th><th style="text-align:right">Veículos</th></tr></thead><tbody>${resumo}</tbody></table>
+    ${detalhe}`;
+  _abrirRelatorio(org, 'Frota por Combustível', corpo, 'Relatório de Frota por Combustível');
+}
+
+async function gerarRelatorioFrotaPendencias() {
+  const org = await _orgBrasao();
+  const frota = (await _frotaComCentro()).sort(_frotaOrdNum);
+  const comPend = frota.map(v => ({ v, faltam: _FROTA_PECAS.filter(f => _FROTA_PECA_PENDENTE(v[f.key])) })).filter(x => x.faltam.length);
+  const linhas = comPend.map(({ v, faltam }) => `<tr>
+    <td>${esc(v.numero)}</td><td>${esc(v.placa || '—')}</td><td>${esc(_frotaMM(v))}</td>
+    <td style="text-align:center">${faltam.length}</td>
+    <td>${faltam.map(f => esc(f.label)).join(', ')}</td>
+  </tr>`).join('');
+  const corpo = `
+    <div class="meta">${comPend.length} de ${frota.length} veículo(s) com peça(s) a definir (vazias ou "FALTA INFORMAÇÃO")</div>
+    ${comPend.length ? `<table><thead><tr><th>Nº</th><th>Placa</th><th>Marca/Modelo</th><th>Pendências</th><th>Peças a definir</th></tr></thead><tbody>${linhas}</tbody></table>`
+      : '<p style="font-size:10pt;color:#666">Nenhuma pendência — todas as peças estão preenchidas. 🎉</p>'}`;
+  _abrirRelatorio(org, 'Frota — Pendências de Peças', corpo, 'Relatório de Pendências de Peças da Frota');
 }
 
 // ── Comunicação (SMTP) ──────────────────────────────────────────

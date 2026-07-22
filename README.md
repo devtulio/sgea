@@ -1,6 +1,6 @@
 # SGEA — Sistema de Gestão de Estoque do Almoxarifado
 
-![Versão](https://img.shields.io/badge/versão-v0.24.0-blue) ![Tecnologia](https://img.shields.io/badge/tecnologia-Python%20%2B%20SQLite-orange) ![Licença](https://img.shields.io/badge/licença-MIT-green) ![Multiusuário](https://img.shields.io/badge/acesso-multiusuário-blueviolet)
+![Versão](https://img.shields.io/badge/versão-v0.25.0-blue) ![Tecnologia](https://img.shields.io/badge/tecnologia-Python%20%2B%20SQLite-orange) ![Licença](https://img.shields.io/badge/licença-MIT-green) ![Multiusuário](https://img.shields.io/badge/acesso-multiusuário-blueviolet)
 
 ## Descrição
 
@@ -15,7 +15,7 @@ Funciona em rede local: um único computador executa o servidor e todos os usuá
 ## Funcionalidades Principais
 
 - **Dashboard** — tela inicial após o login, com indicadores de valor em estoque, produtos ativos/zerados, lotes vencendo/vencidos e pedidos em aberto, e um gráfico de entradas × saídas dos últimos 6 meses
-- **Relatórios** — Posição de Estoque Valorizado, Movimentação por Período, Lotes a Vencer/Vencidos, Pedidos em Aberto e Curva ABC, todos imprimíveis no mesmo padrão visual dos demais documentos do sistema
+- **Relatórios** — Posição de Estoque Valorizado, Movimentação por Período, Lotes a Vencer/Vencidos, Pedidos em Aberto, Curva ABC e relatórios da Frota (Inventário, por Centro de Custo, por Combustível e Pendências de Peças), todos imprimíveis no mesmo padrão visual dos demais documentos do sistema
 - **Estoque sempre em unidade de consumo** — produtos guardam um fator de conversão (unidades por embalagem); a entrada informa quantas embalagens chegaram e o sistema converte para unidades automaticamente, permitindo que a saída seja de qualquer quantidade fracionária (ex.: 2 unidades de uma caixa de 12)
 - **Controle de lote e validade** — cada entrada gera um lote com data de validade opcional; o painel do produto mostra o saldo por lote e destaca lotes vencidos
 - **Saída por FEFO** (*first-expire, first-out*) — ao registrar uma saída, o sistema consome primeiro o lote que vence mais cedo, dividindo automaticamente entre lotes quando um não é suficiente
@@ -24,7 +24,7 @@ Funciona em rede local: um único computador executa o servidor e todos os usuá
 - **Reversão segura** — excluir uma saída devolve exatamente as quantidades aos lotes de origem; excluir uma entrada é bloqueado se algum de seus lotes já foi parcialmente consumido
 - **Fornecedores** — cadastro rico: consulta automática de CNPJ (ReceitaWS/BrasilAPI) com endereço, CNAE e quadro societário; consulta de sanções federais (CEIS/CNEP); certidões e sanções manuais (Art. 156, Lei 14.133/2021) com relatórios imprimíveis (com QR de autenticidade); importação a partir de um backup do SGCA/SGDP; exclusão reversível pela Lixeira
 - **Cadastros de apoio** — Centros de Custo, Funcionários (solicitantes de saída; com cargo, unidade, matrícula, natureza/forma de provimento e data/ato de admissão) e Frota (veículos, para correlacionar saídas de combustível/peças)
-- **Ficha de manutenção da Frota** — além do cadastro do veículo (nº, placa, ano, marca/modelo, combustível, centro de custo), cada veículo guarda um catálogo de peças: 11 tipos de filtro, óleos de motor/transmissão, bateria e pneus, com as referências cruzadas entre marcas
+- **Ficha de manutenção da Frota** — além do cadastro do veículo (nº, placa, ano, marca/modelo, combustível, centro de custo), cada veículo guarda um catálogo de peças: 11 tipos de filtro, óleos de motor/transmissão, bateria e pneus, com as referências cruzadas entre marcas; o botão **Ficha** gera um documento A4 imprimível com o cadastro e todo o catálogo por seção
 - **Importação de funcionários pela folha do Fiorilli** — botão que lê o CSV da folha de pagamento e cadastra todos os servidores de uma vez, detectando o encoding, ignorando salários, deduplicando por matrícula e fazendo upsert (reimportar atualiza, não duplica)
 - **Importação da Frota por CSV** — botão que lê a planilha *CONTROLE DE FROTA*, deduplica por número, vincula o centro de custo pelo nome (criando os que faltarem) e faz upsert
 - **Autenticação multiusuário** com hashing PBKDF2-HMAC-SHA256 e gestão de usuários pelo admin
