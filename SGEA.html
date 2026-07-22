@@ -542,6 +542,42 @@
     </div>
   </div>
 
+  <!-- ── Importar planilha CONTROLE DE FROTA (CSV) ── -->
+  <div class="overlay hidden" id="modal-frota-csv" role="dialog" aria-modal="true" aria-labelledby="modal-frota-csv-titulo">
+    <div class="modal" style="max-width:640px;width:96vw">
+      <div class="modal-header">
+        <h2 id="modal-frota-csv-titulo">Importar Frota (planilha CONTROLE DE FROTA)</h2>
+        <button class="btn btn-ghost btn-icon" onclick="fecharImportFrota()">✕</button>
+      </div>
+      <div class="modal-body">
+        <div id="frota-csv-upload">
+          <div style="background:var(--gray-50);border:1px solid var(--gray-200);border-radius:8px;padding:12px 16px;margin-bottom:14px;font-size:.8rem;color:var(--gray-600)">
+            <div style="font-weight:600;margin-bottom:6px;color:var(--gray-700)">Como funciona</div>
+            Selecione o CSV da planilha <strong>CONTROLE DE FROTA</strong> (colunas Frota, Placa, Centro de Custo,
+            Marca, Modelo, Fabricação/Modelo, Combustível, filtros, óleos, bateria e pneus). O importador:<br>
+            • deduplica <strong>por número de frota</strong>;<br>
+            • vincula o Centro de Custo <strong>pelo nome</strong>;<br>
+            • atualiza quem já existe (mesmo número) e insere quem é novo — reimportar não duplica.
+          </div>
+          <label style="display:flex;align-items:center;gap:8px;font-size:.8rem;margin-bottom:12px;text-transform:none;font-weight:500"><input type="checkbox" id="frota-csv-criar-cc" checked> Criar centros de custo que não existirem no cadastro</label>
+          <div style="border:2px dashed var(--gray-300);border-radius:8px;padding:32px;text-align:center;cursor:pointer" onclick="document.getElementById('frota-csv-input').click()" role="button" tabindex="0">
+            <div style="font-size:2rem;margin-bottom:8px">📂</div>
+            <div style="font-size:.85rem;color:var(--gray-600)">Clique para selecionar o arquivo CSV</div>
+            <input type="file" id="frota-csv-input" accept=".csv,text/csv" style="display:none" onchange="carregarFrotaCsv(this)">
+          </div>
+        </div>
+        <div id="frota-csv-preview" style="display:none">
+          <div id="frota-csv-cards" style="display:flex;gap:10px;flex-wrap:wrap"></div>
+        </div>
+        <div id="frota-csv-done" style="display:none;text-align:center;padding:24px;font-size:.9rem;color:var(--gray-700)"></div>
+      </div>
+      <div class="modal-footer">
+        <button class="btn btn-ghost" onclick="fecharImportFrota()">Fechar</button>
+        <button class="btn btn-primary" id="frota-csv-btn-aplicar" style="display:none" onclick="aplicarImportFrota()">Importar</button>
+      </div>
+    </div>
+  </div>
+
   <!-- ── CRUD genérico (Centros de Custo, Funcionários, Frota, Pedidos) ── -->
   <div id="view-crud" class="view">
     <div class="dash-top">
@@ -552,6 +588,7 @@
           <button onclick="limparBuscaCrud()" id="crud-search-clear" title="Limpar busca" style="display:none;position:absolute;right:7px;top:50%;transform:translateY(-50%);background:none;border:none;cursor:pointer;color:var(--gray-400);font-size:.85rem;padding:0;line-height:1">✕</button>
         </div>
         <button class="btn btn-outline" id="crud-btn-import-func" onclick="abrirImportFuncionarios()" style="display:none" title="Importar funcionários da folha do Fiorilli (CSV)">Importar CSV</button>
+        <button class="btn btn-outline" id="crud-btn-import-frota" onclick="abrirImportFrota()" style="display:none" title="Importar a planilha CONTROLE DE FROTA (CSV)">Importar CSV</button>
         <button class="btn btn-primary" id="crud-btn-novo" onclick="openCrudModal()">+ Novo</button>
       </div>
     </div>
@@ -1158,7 +1195,7 @@
 // ══════════════════════════════════════════════════════════════
 // API / SESSÃO
 // ══════════════════════════════════════════════════════════════
-const SGEA_VERSION = '0.23.6';
+const SGEA_VERSION = '0.24.0';
 document.title = `SGEA v${SGEA_VERSION}`;
 
 let _apiToken = localStorage.getItem('sgea-token') || null;
@@ -1545,15 +1582,35 @@ const CRUD_MODULES = {
   'frota': {
     titulo: 'Frota', navId: 'nav-frota',
     fields: [
+      { key: '_sec_cad', type: 'section', label: 'Cadastro' },
       { key: 'numero', label: 'Número da Frota', required: true },
       { key: 'placa', label: 'Placa' },
+      { key: 'ano', label: 'Ano (fabricação/modelo)', placeholder: 'ex.: 2021/2022' },
       { key: 'marca', label: 'Marca' },
       { key: 'modelo', label: 'Modelo' },
       { key: 'combustivel', label: 'Combustível' },
       { key: 'centro_custo_id', label: 'Centro de Custo', type: 'select', source: 'centros-custo', optLabel: 'nome' },
       { key: 'ativo', label: 'Ativo', type: 'checkbox', default: true },
+      { key: '_sec_filtros', type: 'section', label: 'Filtros' },
+      { key: 'filtro_ar_cabine', label: 'Filtro de ar (cabine)', type: 'textarea' },
+      { key: 'filtro_ar_motor', label: 'Filtro de ar (motor)', type: 'textarea' },
+      { key: 'filtro_ar_primario', label: 'Filtro de ar primário', type: 'textarea' },
+      { key: 'filtro_ar_secundario', label: 'Filtro de ar secundário', type: 'textarea' },
+      { key: 'filtro_combustivel', label: 'Filtro de combustível', type: 'textarea' },
+      { key: 'filtro_sedimentador', label: 'Filtro sedimentador', type: 'textarea' },
+      { key: 'filtro_lubrificante', label: 'Filtro lubrificante (óleo)', type: 'textarea' },
+      { key: 'filtro_desumidificador', label: 'Filtro desumidificador', type: 'textarea' },
+      { key: 'filtro_hidraulico', label: 'Filtro hidráulico', type: 'textarea' },
+      { key: 'filtro_transmissao', label: 'Filtro de transmissão', type: 'textarea' },
+      { key: 'filtro_ureia', label: 'Filtro de ureia (ARLA)', type: 'textarea' },
+      { key: '_sec_outros', type: 'section', label: 'Óleos, bateria e pneus' },
+      { key: 'oleo_motor', label: 'Óleo do motor', type: 'textarea' },
+      { key: 'oleo_transmissao', label: 'Óleo da transmissão', type: 'textarea' },
+      { key: 'bateria', label: 'Bateria', type: 'textarea' },
+      { key: 'pneu_dianteiro', label: 'Pneu dianteiro', type: 'textarea' },
+      { key: 'pneu_traseiro', label: 'Pneu traseiro', type: 'textarea' },
     ],
-    columns: [{ h: 'Nº', k: 'numero' }, { h: 'Placa', k: 'placa' }, { h: 'Marca/Modelo', kfn: i => `${i.marca || ''} ${i.modelo || ''}`.trim() }, { h: 'Status', k: 'ativo', badge: true }],
+    columns: [{ h: 'Nº', k: 'numero' }, { h: 'Placa', k: 'placa' }, { h: 'Marca/Modelo', kfn: i => `${i.marca || ''} ${i.modelo || ''}`.trim() }, { h: 'Ano', k: 'ano' }, { h: 'Status', k: 'ativo', badge: true }],
   },
   // pedidos NÃO está aqui — tem itens (produto/quantidade), o motor genérico
   // só sabe campos escalares. Tela própria: showPedidos/renderPedidos/
@@ -1574,6 +1631,9 @@ function showCrud(modKey) {
   // Import de funcionários (folha do Fiorilli) só faz sentido nesse módulo e para admin
   document.getElementById('crud-btn-import-func').style.display =
     (modKey === 'funcionarios' && _apiUser?.admin) ? '' : 'none';
+  // Import da planilha CONTROLE DE FROTA, idem, só na Frota e para admin
+  document.getElementById('crud-btn-import-frota').style.display =
+    (modKey === 'frota' && _apiUser?.admin) ? '' : 'none';
   renderCrud();
 }
 
@@ -1641,8 +1701,12 @@ async function openCrudModal(id) {
   const body = document.getElementById('crud-modal-body');
   const parts = [];
   for (const f of cfg.fields) {
+    if (f.type === 'section') {
+      parts.push(`<div class="span-2" style="grid-column:1/-1;font-size:.7rem;font-weight:700;letter-spacing:.06em;text-transform:uppercase;color:var(--gray-500);border-bottom:1px solid var(--gray-200);padding-bottom:4px;margin-top:8px">${esc(f.label)}</div>`);
+      continue;
+    }
     const val = item ? item[f.key] : (f.default !== undefined ? f.default : '');
-    const span = f.type === 'checkbox' ? 'span-2' : '';
+    const span = (f.type === 'checkbox' || f.type === 'textarea') ? 'span-2' : '';
     if (f.type === 'checkbox') {
       parts.push(`<div class="info-field checkbox ${span}"><input type="checkbox" id="cf-${f.key}" ${val ? 'checked' : ''}><label for="cf-${f.key}" style="margin:0;text-transform:none;font-weight:500">${esc(f.label)}</label></div>`);
     } else if (f.type === 'select' && f.source) {
@@ -1654,6 +1718,8 @@ async function openCrudModal(id) {
       if (val && !opts.includes(val)) opts.unshift(val);  // preserva valor importado fora da lista
       const optHtml = opts.map(o => `<option value="${esc(o)}" ${val === o ? 'selected' : ''}>${esc(o)}</option>`).join('');
       parts.push(`<div class="info-field ${span}"><label for="cf-${f.key}">${esc(f.label)}</label><select id="cf-${f.key}"><option value=""${val ? '' : ' selected'}>—</option>${optHtml}</select></div>`);
+    } else if (f.type === 'textarea') {
+      parts.push(`<div class="info-field span-2"><label for="cf-${f.key}">${esc(f.label)}</label><textarea id="cf-${f.key}" rows="2" placeholder="${esc(f.placeholder || '')}" style="width:100%;resize:vertical">${esc(val ?? '')}</textarea></div>`);
     } else {
       parts.push(`<div class="info-field ${span}"><label for="cf-${f.key}">${esc(f.label)}${f.required ? ' *' : ''}</label><input type="${f.type || 'text'}" id="cf-${f.key}" value="${esc(val ?? '')}" placeholder="${esc(f.placeholder || '')}"></div>`);
     }
@@ -1678,6 +1744,7 @@ async function saveCrudModal() {
   const id = body.dataset.id;
   const data = {};
   for (const f of cfg.fields) {
+    if (f.type === 'section') continue;
     const el = document.getElementById(`cf-${f.key}`);
     data[f.key] = f.type === 'checkbox' ? el.checked : (el.value || null);
   }
@@ -1800,6 +1867,56 @@ async function aplicarImportFuncionarios() {
   done.style.display = '';
   done.innerHTML = `<div style="font-size:2rem;margin-bottom:8px">✅</div><strong>${d.inseridos}</strong> inserido(s) e <strong>${d.atualizados}</strong> atualizado(s).${d.ignorados ? `<br><span style="color:var(--gray-500)">${d.ignorados} linha(s) sem nome ignorada(s).</span>` : ''}`;
   toast('Funcionários importados.', 'success');
+}
+
+// ── Importar planilha CONTROLE DE FROTA (CSV) ───────────
+let _frotaCsvText = '';
+function abrirImportFrota() {
+  _frotaCsvText = '';
+  document.getElementById('frota-csv-upload').style.display = '';
+  document.getElementById('frota-csv-preview').style.display = 'none';
+  document.getElementById('frota-csv-done').style.display = 'none';
+  document.getElementById('frota-csv-btn-aplicar').style.display = 'none';
+  document.getElementById('frota-csv-input').value = '';
+  document.getElementById('modal-frota-csv').classList.remove('hidden');
+}
+function fecharImportFrota() {
+  document.getElementById('modal-frota-csv').classList.add('hidden');
+  if (_crudAtual === 'frota') renderCrud();
+}
+async function carregarFrotaCsv(input) {
+  const file = input.files[0];
+  if (!file) return;
+  const buf = await file.arrayBuffer();
+  let text;
+  try { text = new TextDecoder('utf-8', { fatal: true }).decode(buf); }
+  catch { text = new TextDecoder('iso-8859-1').decode(buf); }  // fallback p/ CSV latin-1 do Excel
+  _frotaCsvText = text;
+  const linhas = text.split(/\r?\n/).filter(l => l.trim());
+  if (linhas.length < 2) { toast('CSV vazio ou sem dados.', 'error'); _frotaCsvText = ''; return; }
+  const card = (n, lbl) => `<div style="flex:1;min-width:140px;background:var(--gray-50);border:1px solid var(--gray-200);border-radius:8px;padding:10px 14px"><div style="font-size:1.2rem;font-weight:700;word-break:break-word">${esc(String(n))}</div><div style="font-size:.72rem;color:var(--gray-600)">${lbl}</div></div>`;
+  document.getElementById('frota-csv-cards').innerHTML =
+    card(linhas.length - 1, 'linhas de veículo detectadas') + card(file.name, 'arquivo selecionado');
+  document.getElementById('frota-csv-upload').style.display = 'none';
+  document.getElementById('frota-csv-preview').style.display = '';
+  document.getElementById('frota-csv-btn-aplicar').style.display = '';
+}
+async function aplicarImportFrota() {
+  if (!_frotaCsvText) return;
+  const btn = document.getElementById('frota-csv-btn-aplicar');
+  btn.disabled = true; btn.textContent = 'Importando…';
+  const criar = document.getElementById('frota-csv-criar-cc').checked;
+  const r = await API.post('/api/frota/import', { csv: _frotaCsvText, criar_centros: criar });
+  const d = await API.json(r);
+  btn.disabled = false; btn.textContent = 'Importar';
+  if (!r || !r.ok) { toast(d?.error || 'Falha ao importar.', 'error'); return; }
+  await _auditEvento('FROTA_IMPORTADA', `Importação da planilha de frota: ${d.inseridos} inserido(s), ${d.atualizados} atualizado(s)${d.centros_criados ? `, ${d.centros_criados} centro(s) de custo criado(s)` : ''}`, null);
+  document.getElementById('frota-csv-preview').style.display = 'none';
+  btn.style.display = 'none';
+  const done = document.getElementById('frota-csv-done');
+  done.style.display = '';
+  done.innerHTML = `<div style="font-size:2rem;margin-bottom:8px">✅</div><strong>${d.inseridos}</strong> inserido(s) e <strong>${d.atualizados}</strong> atualizado(s).${d.centros_criados ? `<br><span style="color:var(--gray-500)">${d.centros_criados} centro(s) de custo criado(s).</span>` : ''}${d.ignorados ? `<br><span style="color:var(--gray-500)">${d.ignorados} linha(s) ignorada(s).</span>` : ''}`;
+  toast('Frota importada.', 'success');
 }
 
 // ══════════════════════════════════════════════════════════════

@@ -5,6 +5,18 @@
 
 ---
 
+## [0.24.0] — 2026-07-22
+
+### Adicionado
+- **Ficha de manutenção do veículo** no cadastro de Frota: além dos dados cadastrais, cada veículo passa a guardar o **Ano (fabricação/modelo)** e um **catálogo de peças** — 11 tipos de filtro (ar cabine/motor/primário/secundário, combustível, sedimentador, lubrificante, desumidificador, hidráulico, transmissão, ureia), óleo de motor e transmissão, bateria e pneus (dianteiro/traseiro) — com as referências cruzadas entre marcas. O formulário é organizado em seções (Cadastro / Filtros / Óleos, bateria e pneus).
+- **Importar CSV** na tela de Frota (admin): lê a planilha *CONTROLE DE FROTA* exportada em CSV, deduplica por número de frota, vincula o Centro de Custo pelo nome (criando os que faltarem, opcional) e faz upsert (reimportar atualiza, não duplica). Detecta o delimitador (`;`/`,`) e o encoding (UTF-8/latin-1).
+
+### Técnico
+- Tabela `frota` ganhou 17 colunas TEXT (`ano` + catálogo de peças), adicionadas por migração automática (`ALTER TABLE`) nos bancos existentes.
+- CRUD genérico ganhou suporte a campos `textarea` e a separadores de seção.
+
+---
+
 ## [0.23.6] — 2026-07-22
 
 ### Corrigido

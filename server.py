@@ -1,4 +1,4 @@
-# SGEA v0.23.6 — Servidor local: SQLite, autenticação, REST API, controle de estoque por lote (FEFO), backup automático
+# SGEA v0.24.0 — Servidor local: SQLite, autenticação, REST API, controle de estoque por lote (FEFO), backup automático
 import http.server
 import socketserver
 import os
@@ -18,6 +18,7 @@ import uuid
 import re
 import csv
 import io
+import unicodedata
 from email.mime.text import MIMEText
 from email.mime.multipart import MIMEMultipart
 from urllib.parse import urlparse, parse_qs
@@ -36,7 +37,7 @@ for _stream in (sys.stdout, sys.stderr):
 # Versão do servidor — DEVE acompanhar o SGEA_VERSION do SGEA.html a cada release.
 # Exposta em /health para o frontend detectar quando o processo em execução está
 # desatualizado (HTML novo servido, mas server.py antigo ainda rodando em memória).
-SERVER_VERSION = '0.23.6'
+SERVER_VERSION = '0.24.0'
 
 PORT        = int(os.environ.get('SGEA_PORT', 3003))
 _BASE       = os.path.dirname(os.path.abspath(__file__))
@@ -76,6 +77,17 @@ _ConnAutoClose = sgx_base.ConnAutoClose
 
 def get_db():
     return sgx_base.connect_db(DB_PATH)
+
+# Ficha de manutenção do veículo: ano + catálogo de peças por veículo.
+# Ordem = ordem das colunas na planilha "CONTROLE DE FROTA" (usada na migração,
+# no CRUD e no importador). Todas TEXT, valor livre (referências cruzadas de marcas).
+FROTA_PECAS_COLS = (
+    'ano',
+    'filtro_ar_cabine', 'filtro_ar_motor', 'filtro_ar_primario', 'filtro_ar_secundario',
+    'filtro_combustivel', 'filtro_sedimentador', 'filtro_lubrificante', 'filtro_desumidificador',
+    'filtro_hidraulico', 'filtro_transmissao', 'filtro_ureia',
+    'oleo_motor', 'oleo_transmissao', 'bateria', 'pneu_dianteiro', 'pneu_traseiro',
+)
 
 def init_db():
     with get_db() as conn:
@@ -266,6 +278,12 @@ def init_db():
         cols_func = [r[1] for r in conn.execute('PRAGMA table_info(funcionarios)').fetchall()]
         for _fc in ('natureza', 'forma_provimento', 'data_admissao', 'ato_admissao'):
             if _fc not in cols_func: conn.execute(f"ALTER TABLE funcionarios ADD COLUMN {_fc} TEXT DEFAULT ''")
+
+        # Ficha de manutenção do veículo (ano + catálogo de peças por veículo:
+        # filtros, óleos, bateria, pneus — referências cruzadas entre marcas).
+        cols_frota = [r[1] for r in conn.execute('PRAGMA table_info(frota)').fetchall()]
+        for _vc in FROTA_PECAS_COLS:
+            if _vc not in cols_frota: conn.execute(f"ALTER TABLE frota ADD COLUMN {_vc} TEXT DEFAULT ''")
 
         cols_forn = [r[1] for r in conn.execute('PRAGMA table_info(fornecedores)').fetchall()]
         if 'data' not in cols_forn:
@@ -467,6 +485,56 @@ def _parse_fiorilli_posicao(csv_text):
             'valor_negativo': val < 0,
         }
     return itens
+
+# ── Importação da planilha "CONTROLE DE FROTA" ──────────────────────────────
+def _norm_header(h):
+    """Normaliza um cabeçalho de coluna: sem acento, maiúsculo, espaços colapsados."""
+    h = unicodedata.normalize('NFKD', h or '').encode('ascii', 'ignore').decode()
+    return ' '.join(h.upper().split())
+
+# Cabeçalho da planilha (normalizado) -> campo da tabela frota.
+_FROTA_HEADER_MAP = {
+    'FROTA': 'numero', 'PLACA': 'placa', 'CENTRO DE CUSTO': '_centro_custo_nome',
+    'MARCA': 'marca', 'MODELO': 'modelo', 'COMBUSTIVEL': 'combustivel',
+    'FABRICACAO / MODELO': 'ano', 'FABRICACAO/MODELO': 'ano', 'ANO': 'ano',
+    'FILTRO AR CABINE': 'filtro_ar_cabine', 'FILTRO AR MOTOR': 'filtro_ar_motor',
+    'FILTRO AR PRIMARIO': 'filtro_ar_primario', 'FILTRO AR SECUNDARIO': 'filtro_ar_secundario',
+    'FILTRO COMBUSTIVEL': 'filtro_combustivel', 'FILTRO SEDIMENTADOR': 'filtro_sedimentador',
+    'FILTRO LUBRIFICANTE': 'filtro_lubrificante', 'FILTRO DESUMIDIFICADOR': 'filtro_desumidificador',
+    'FILTRO HIDRAULICO': 'filtro_hidraulico', 'FILTRO TRANSMISSAO': 'filtro_transmissao',
+    'FILTRO UREIA': 'filtro_ureia', 'OLEO DE MOTOR': 'oleo_motor',
+    'OLEO DA TRANSMISSAO': 'oleo_transmissao', 'BATERIA': 'bateria',
+    'PNEU DIANTEIRO': 'pneu_dianteiro', 'PNEU TRASEIRO': 'pneu_traseiro',
+}
+
+def _parse_frota_csv(csv_text):
+    """Parseia a planilha CONTROLE DE FROTA exportada em CSV. Detecta o delimitador
+    (; ou ,), mapeia colunas por cabeçalho (sem acento/caixa) e deduplica por número
+    de frota (última linha vence). Retorna lista de dicts (campo -> valor)."""
+    csv_text = csv_text.lstrip('﻿')
+    linhas = csv_text.splitlines()
+    if not linhas or not csv_text.strip():
+        raise ValueError('CSV vazio.')
+    delim = ';' if linhas[0].count(';') >= linhas[0].count(',') else ','
+    rows = list(csv.reader(io.StringIO(csv_text), delimiter=delim))
+    header = [_norm_header(h) for h in rows[0]]
+    idx = {}
+    for i, h in enumerate(header):
+        campo = _FROTA_HEADER_MAP.get(h)
+        if campo and campo not in idx:
+            idx[campo] = i
+    if 'numero' not in idx:
+        raise ValueError('Não encontrei a coluna "FROTA" (número do veículo) no CSV.')
+    dedup = {}  # numero -> registro (última linha vence)
+    for r in rows[1:]:
+        if not any((c or '').strip() for c in r):
+            continue
+        reg = {campo: (r[i].strip() if i < len(r) and r[i] is not None else '') for campo, i in idx.items()}
+        num = (reg.get('numero') or '').strip()
+        if not num:
+            continue
+        dedup[num] = reg
+    return list(dedup.values())
 
 def _classificar_reconciliacao(fiorilli, produtos, data_corte):
     """Cruza o Fiorilli (só itens com saldo; zerados omitidos) com os produtos do
@@ -697,7 +765,8 @@ CRUD_TABLES = {
         'search_fields': ['nome', 'cargo', 'unidade', 'matricula'],
     },
     'frota': {
-        'id_type': 'int', 'fields': ['numero', 'placa', 'marca', 'modelo', 'combustivel', 'centro_custo_id', 'ativo'],
+        'id_type': 'int',
+        'fields': ['numero', 'placa', 'marca', 'modelo', 'combustivel', 'centro_custo_id', 'ativo', *FROTA_PECAS_COLS],
         'required': ['numero'], 'order': 'numero ASC', 'search_fields': ['numero', 'placa', 'modelo'],
     },
 }
@@ -1023,6 +1092,9 @@ class SGEAHandler(http.server.SimpleHTTPRequestHandler):
         elif p == '/api/funcionarios/import':
             if not s['admin']: self._json(403, {'error': 'Acesso restrito'}); return
             self._import_funcionarios(data)
+        elif p == '/api/frota/import':
+            if not s['admin']: self._json(403, {'error': 'Acesso restrito'}); return
+            self._import_frota(data)
         elif p == '/api/pedidos':
             self._create_pedido(data)
         elif p == '/api/entradas':
@@ -1290,6 +1362,48 @@ class SGEAHandler(http.server.SimpleHTTPRequestHandler):
                         [vals[c] for c in cols])
                     inseridos += 1
         self._json(200, {'inseridos': inseridos, 'atualizados': atualizados, 'ignorados': ignorados})
+
+    def _import_frota(self, data):
+        """Importa a planilha CONTROLE DE FROTA (CSV). Upsert por número de frota
+        (idempotente). O centro de custo vem por nome; casa com o cadastro existente
+        (case-insensitive) e, se criar_centros!=False, cria o que faltar."""
+        csv_text = data.get('csv') or ''
+        if not csv_text.strip():
+            self._json(400, {'error': 'CSV vazio.'}); return
+        criar_cc = data.get('criar_centros', True)
+        try:
+            registros = _parse_frota_csv(csv_text)
+        except ValueError as e:
+            self._json(400, {'error': str(e)}); return
+        import_cols = ('numero', 'placa', 'marca', 'modelo', 'combustivel') + FROTA_PECAS_COLS
+        inseridos = atualizados = ignorados = cc_criados = 0
+        with get_db() as conn:
+            cc_map = {(r['nome'] or '').strip().upper(): r['id']
+                      for r in conn.execute('SELECT id, nome FROM centros_custo').fetchall()}
+            for reg in registros:
+                numero = (reg.get('numero') or '').strip()
+                if not numero:
+                    ignorados += 1; continue
+                cc_nome = (reg.pop('_centro_custo_nome', '') or '').strip()
+                cc_id = cc_map.get(cc_nome.upper()) if cc_nome else None
+                if cc_nome and cc_id is None and criar_cc:
+                    cur = conn.execute('INSERT INTO centros_custo (nome, ativo) VALUES (?, 1)', (cc_nome,))
+                    cc_id = cur.lastrowid; cc_map[cc_nome.upper()] = cc_id; cc_criados += 1
+                vals = {c: reg[c] for c in import_cols if c in reg}
+                vals['centro_custo_id'] = cc_id
+                existing = conn.execute('SELECT id FROM frota WHERE numero=?', (numero,)).fetchone()
+                if existing:
+                    setc = [c for c in vals if c != 'numero']
+                    conn.execute(f"UPDATE frota SET {','.join(f'{c}=?' for c in setc)},updated_at=? WHERE id=?",
+                                 [vals[c] for c in setc] + [_now(), existing['id']])
+                    atualizados += 1
+                else:
+                    cols = list(vals.keys())
+                    conn.execute(f"INSERT INTO frota ({','.join(cols)}) VALUES ({','.join('?' * len(cols))})",
+                                 [vals[c] for c in cols])
+                    inseridos += 1
+        self._json(200, {'inseridos': inseridos, 'atualizados': atualizados,
+                         'ignorados': ignorados, 'centros_criados': cc_criados})
 
     def _save_settings(self, data):
         # ponytail: string vazia nunca sobrescreve um valor já salvo — evita que um
