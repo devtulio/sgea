@@ -93,7 +93,7 @@
   .rel-card h3 { font-size: .95rem; }
   .rel-card p { font-size: .8rem; color: var(--gray-500); flex: 1; }
   .rel-card .rel-datas { display: flex; gap: 8px; }
-  .rel-card .rel-datas input { flex: 1; padding: 6px 8px; border: 1px solid var(--gray-300); border-radius: 6px; font-size: .8rem; }
+  .rel-card .rel-datas input { flex: 1; min-width: 0; padding: 6px 8px; border: 1px solid var(--gray-300); border-radius: 6px; font-size: .8rem; }
   body.dark .rel-card { background: #2a2a2a; }
 
   /* Fornecedores — cadastro rico (portado do SGCD/SGCA) */
@@ -137,14 +137,14 @@
   .forn-cert-badge.none     { background: var(--gray-100); color: var(--gray-500); }
   .forn-cert-actions { display: flex; gap: 4px; flex-shrink: 0; }
   .filters { display: flex; gap: 10px; margin-bottom: 16px; flex-wrap: wrap; }
-  .filters input, .filters select {
+  .filters > input, .filters select {
     border: 1px solid var(--gray-200); border-radius: var(--radius);
     padding: 8px 12px; font-size: .875rem; background: #fff;
     color: var(--gray-900); outline: none;
   }
-  .filters input { flex: 1; min-width: 180px; }
-  .filters input:focus, .filters select:focus { border-color: var(--brand-text); outline: 2px solid color-mix(in srgb, var(--brand) 20%, transparent); }
-  body.dark .filters input, body.dark .filters select { background: #2a2a2a; }
+  .filters > input { flex: 1; min-width: 180px; }
+  .filters > input:focus, .filters select:focus { border-color: var(--brand-text); outline: 2px solid color-mix(in srgb, var(--brand) 20%, transparent); }
+  body.dark .filters > input, body.dark .filters select { background: #2a2a2a; }
   .csv-preview-table { width: 100%; border-collapse: collapse; font-size: .76rem; }
   .csv-preview-table th { background: var(--gray-100); padding: 4px 8px; text-align: left; border: 1px solid var(--gray-200); font-weight: 600; }
   .csv-preview-table td { padding: 4px 8px; border: 1px solid var(--gray-200); }
@@ -268,7 +268,7 @@
       <h2>Estoque</h2>
       <div class="view-actions">
         <div style="position:relative;flex:1;min-width:180px;max-width:340px">
-          <input type="text" id="produtos-search" placeholder="Buscar por nome ou código..." oninput="toggleSearchClear(this);_debouncedRenderProdutos()" aria-label="Buscar produto" style="width:100%;padding-right:28px">
+          <input type="text" id="produtos-search" class="search-inp" placeholder="Buscar por nome ou código..." oninput="toggleSearchClear(this);_debouncedRenderProdutos()" aria-label="Buscar produto" style="width:100%;padding-right:28px">
           <button onclick="clearSearch('produtos-search', renderProdutos)" id="produtos-search-clear" title="Limpar busca" style="display:none;position:absolute;right:7px;top:50%;transform:translateY(-50%);background:none;border:none;cursor:pointer;color:var(--gray-400);font-size:.85rem;padding:0;line-height:1">✕</button>
         </div>
         <button class="btn btn-primary" onclick="openProdutoModal()">+ Novo Produto</button>
@@ -357,7 +357,7 @@
 
       <div id="recon-conteudo" class="hidden">
         <div class="view-actions" style="margin-bottom:12px;display:flex;gap:8px;flex-wrap:wrap">
-          <div style="position:relative;flex:1;min-width:180px;max-width:340px"><input type="text" id="recon-q" placeholder="Buscar por código ou item..." aria-label="Buscar" oninput="toggleSearchClear(this);_reconFiltrar()" style="width:100%;padding-right:28px"><button onclick="clearSearch('recon-q', _reconFiltrar)" id="recon-q-clear" title="Limpar busca" style="display:none;position:absolute;right:7px;top:50%;transform:translateY(-50%);background:none;border:none;cursor:pointer;color:var(--gray-400);font-size:.85rem;padding:0;line-height:1">✕</button></div>
+          <div style="position:relative;flex:1;min-width:180px;max-width:340px"><input type="text" id="recon-q" class="search-inp" placeholder="Buscar por código ou item..." aria-label="Buscar" oninput="toggleSearchClear(this);_reconFiltrar()" style="width:100%;padding-right:28px"><button onclick="clearSearch('recon-q', _reconFiltrar)" id="recon-q-clear" title="Limpar busca" style="display:none;position:absolute;right:7px;top:50%;transform:translateY(-50%);background:none;border:none;cursor:pointer;color:var(--gray-400);font-size:.85rem;padding:0;line-height:1">✕</button></div>
           <select id="recon-balde" class="btn btn-outline btn-sm" aria-label="Filtrar por situação" onchange="_reconFiltrar()">
             <option value="">Todos</option>
             <option value="pendencias">Só pendências</option>
@@ -406,7 +406,7 @@
     </div>
     <div class="filters" style="flex-wrap:nowrap;align-items:center">
       <div style="position:relative;flex:1;min-width:180px">
-        <input type="text" id="forn-search" placeholder="Buscar por CNPJ, razão social…" oninput="_debouncedRenderForn()" aria-label="Buscar fornecedor" style="width:100%;padding-right:28px">
+        <input type="text" id="forn-search" class="search-inp" placeholder="Buscar por CNPJ, razão social…" oninput="_debouncedRenderForn()" aria-label="Buscar fornecedor" style="width:100%;padding-right:28px">
         <button onclick="limparBuscaForn()" id="forn-search-clear" title="Limpar busca" style="display:none;position:absolute;right:7px;top:50%;transform:translateY(-50%);background:none;border:none;cursor:pointer;color:var(--gray-400);font-size:.85rem;padding:0;line-height:1">✕</button>
       </div>
       <select id="forn-sort" onchange="renderFornecedores()" title="Ordenar fornecedores" style="flex:0 0 auto;width:170px">
@@ -548,7 +548,7 @@
       <h2 id="crud-titulo">—</h2>
       <div class="view-actions">
         <div style="position:relative;flex:1;min-width:180px;max-width:340px">
-          <input type="text" id="crud-search" placeholder="Buscar..." oninput="_debouncedRenderCrud()" aria-label="Buscar" style="width:100%;padding-right:28px">
+          <input type="text" id="crud-search" class="search-inp" placeholder="Buscar..." oninput="_debouncedRenderCrud()" aria-label="Buscar" style="width:100%;padding-right:28px">
           <button onclick="limparBuscaCrud()" id="crud-search-clear" title="Limpar busca" style="display:none;position:absolute;right:7px;top:50%;transform:translateY(-50%);background:none;border:none;cursor:pointer;color:var(--gray-400);font-size:.85rem;padding:0;line-height:1">✕</button>
         </div>
         <button class="btn btn-outline" id="crud-btn-import-func" onclick="abrirImportFuncionarios()" style="display:none" title="Importar funcionários da folha do Fiorilli (CSV)">Importar CSV</button>
@@ -586,7 +586,7 @@
     </div>
     <div id="audit-inner" style="max-width:960px;margin:0 auto">
       <div class="view-actions" style="margin-bottom:12px">
-        <div style="position:relative;flex:1;min-width:180px;max-width:340px"><input type="text" id="aud-q" placeholder="Buscar por usuário ou detalhe..." aria-label="Buscar" oninput="toggleSearchClear(this);_auditFiltrar()" style="width:100%;padding-right:28px"><button onclick="clearSearch('aud-q', _auditFiltrar)" id="aud-q-clear" title="Limpar busca" style="display:none;position:absolute;right:7px;top:50%;transform:translateY(-50%);background:none;border:none;cursor:pointer;color:var(--gray-400);font-size:.85rem;padding:0;line-height:1">✕</button></div>
+        <div style="position:relative;flex:1;min-width:180px;max-width:340px"><input type="text" id="aud-q" class="search-inp" placeholder="Buscar por usuário ou detalhe..." aria-label="Buscar" oninput="toggleSearchClear(this);_auditFiltrar()" style="width:100%;padding-right:28px"><button onclick="clearSearch('aud-q', _auditFiltrar)" id="aud-q-clear" title="Limpar busca" style="display:none;position:absolute;right:7px;top:50%;transform:translateY(-50%);background:none;border:none;cursor:pointer;color:var(--gray-400);font-size:.85rem;padding:0;line-height:1">✕</button></div>
         <select id="aud-tipo" class="btn btn-outline btn-sm" aria-label="Tipo de evento" onchange="_auditFiltrar()"><option value="">Todos os tipos</option></select>
         <input type="date" id="aud-de" class="btn btn-outline btn-sm" aria-label="De" title="De" onchange="_auditFiltrar()">
         <input type="date" id="aud-ate" class="btn btn-outline btn-sm" aria-label="Até" title="Até" onchange="_auditFiltrar()">
@@ -1158,7 +1158,7 @@
 // ══════════════════════════════════════════════════════════════
 // API / SESSÃO
 // ══════════════════════════════════════════════════════════════
-const SGEA_VERSION = '0.23.5';
+const SGEA_VERSION = '0.23.6';
 document.title = `SGEA v${SGEA_VERSION}`;
 
 let _apiToken = localStorage.getItem('sgea-token') || null;

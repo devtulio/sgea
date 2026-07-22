@@ -5,6 +5,14 @@
 
 ---
 
+## [0.23.6] — 2026-07-22
+
+### Corrigido
+- Campos de busca das listas (Estoque, Reconciliação, Auditoria e cadastros de apoio) apareciam "quadradões" (sem borda arredondada/padding) porque estavam fora do contexto `.filters`. Agora usam um estilo único compartilhado (`.search-inp` no `base.css`), idêntico ao campo de Fornecedores.
+- Relatórios: os dois campos de data do card "Movimentação por Período" transbordavam a borda do card em telas estreitas (faltava `min-width:0` no flex). Corrigido.
+
+---
+
 ## [0.23.5] — 2026-07-22
 
 ### Modificado

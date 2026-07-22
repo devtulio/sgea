@@ -322,6 +322,17 @@ body.dark input:focus, body.dark textarea:focus, body.dark select:focus {
   border-color: var(--brand-text); background: #3a3a3a;
   box-shadow: 0 0 0 3px color-mix(in srgb, var(--brand) 35%, transparent);
 }
+
+/* Campo de busca canônico da família — mesmo visual em todas as listas.
+   Fonte única: aplicar class="search-inp" em qualquer <input> de busca. */
+.search-inp {
+  width: 100%; border: 1px solid var(--gray-200); border-radius: var(--radius);
+  padding: 8px 12px; font-size: .875rem; font-family: inherit;
+  color: var(--gray-900); background: #fff; outline: none;
+}
+.search-inp:focus { border-color: var(--brand-text); box-shadow: 0 0 0 3px color-mix(in srgb, var(--brand) 25%, transparent); }
+body.dark .search-inp { background: #2a2a2a; border-color: #444; color: #f0ece8; }
+body.dark .search-inp:focus { background: #2a2a2a; }
 body.dark .cfg-tabs { border-bottom-color: #383838; }
 body.dark .cfg-tab { color: var(--gray-500); }
 body.dark .cfg-tab.active { color: var(--brand-text); border-bottom-color: var(--brand-text); }
