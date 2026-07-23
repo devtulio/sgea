@@ -38,7 +38,7 @@ const API = {
       const r = await fetch(path, opts);
       // 401 no próprio login é "senha incorreta", não sessão expirada — deixa
       // o chamador (verificarSenha) tratar a resposta em vez de disparar logout.
-      if (r.status === 401 && path !== '/api/auth/login') { _apiLogout(); return null; }
+      if (r.status === 401 && path !== '/api/auth/login') { _apiLogout('expirada'); return null; }
       return r;
     } catch (e) {
       console.error('[API]', method, path, e.message);
@@ -54,11 +54,16 @@ const API = {
   async json(r) { try { return r ? await r.json() : null; } catch { return null; } },
 };
 
-function _apiLogout() {
+function _apiLogout(motivo) {
   if (_apiToken) fetch('/api/auth/logout', { method: 'POST', headers: { Authorization: `Bearer ${_apiToken}` } }).catch(() => {});
   _apiToken = null; _apiUser = null;
   localStorage.removeItem(`${SGX_APP_ID}-token`);
   if (typeof _showLoginOverlay === 'function') _showLoginOverlay();
+  // Sessão derrubada pelo servidor (401): sem aviso, a ação em curso — enviar um
+  // e-mail, por exemplo — parecia simplesmente não fazer nada.
+  if (motivo === 'expirada' && typeof toast === 'function') {
+    toast('Sua sessão expirou. Entre novamente e repita a operação.', 'error');
+  }
 }
 
 // ── Toast ────────────────────────────────────────────────────────────────

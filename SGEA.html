@@ -1233,7 +1233,7 @@
 // ══════════════════════════════════════════════════════════════
 // API / SESSÃO
 // ══════════════════════════════════════════════════════════════
-const SGEA_VERSION = '0.26.1';
+const SGEA_VERSION = '0.26.2';
 document.title = `SGEA v${SGEA_VERSION}`;
 
 let _apiToken = localStorage.getItem('sgea-token') || null;
@@ -2359,7 +2359,7 @@ async function salvarFornecedor(data) {
     err.conflict = true;
     throw err;
   }
-  if (!r.ok) {
+  if (!r || !r.ok) {
     const body = await API.json(r).catch(() => null);
     throw new Error(body?.error || `Erro ao salvar (HTTP ${r.status}).`);
   }
@@ -4228,7 +4228,7 @@ async function gerarRelatorioIntegridade() {
   const [r, rSet, rBrasao] = await Promise.all([
     API.get('/api/relatorio/integridade'), API.get('/api/settings'), API.get('/api/settings/brasao'),
   ]);
-  if (!r.ok) { toast((await API.json(r))?.error || 'Erro ao gerar relatório.', 'error'); return; }
+  if (!r || !r.ok) { toast((await API.json(r))?.error || 'Erro ao gerar relatório.', 'error'); return; }
   const d = await API.json(r);
   const settings = (await API.json(rSet)) || {};
   const brasao = (await API.json(rBrasao))?.brasao_dataurl || '';

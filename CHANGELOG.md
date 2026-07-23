@@ -5,6 +5,14 @@
 
 ---
 
+## [0.26.2] — 2026-07-22
+
+### Corrigido
+- **Falhas silenciosas na comunicação com o servidor.** Vários pontos checavam `r.ok` sem antes verificar se a chamada devolveu resposta — e a camada de API devolve `null` quando a sessão expira (401) ou a rede falha. O resultado era um `TypeError` engolido: o botão simplesmente não fazia nada, sem mensagem alguma. Todos os pontos passaram a usar a guarda que o próprio código já adotava em outros lugares.
+- **Sessão deslizante.** A sessão (60s) era renovada **apenas** pelo `/api/auth/ping`, um `setInterval` que o navegador estrangula em aba de segundo plano — quem ficasse redigindo com a aba atrás perdia a sessão e a ação seguinte falhava com 401. Agora **qualquer requisição autenticada renova** a sessão. O backup automático não muda: navegador fechado não faz requisições, então a sessão ociosa continua expirando em 60s.
+
+---
+
 ## [0.26.1] — 2026-07-22
 
 ### Adicionado
