@@ -1,4 +1,4 @@
-# SGEA v0.26.0 — Servidor local: SQLite, autenticação, REST API, controle de estoque por lote (FEFO), backup automático
+# SGEA v0.26.1 — Servidor local: SQLite, autenticação, REST API, controle de estoque por lote (FEFO), backup automático
 import http.server
 import socketserver
 import os
@@ -37,7 +37,7 @@ for _stream in (sys.stdout, sys.stderr):
 # Versão do servidor — DEVE acompanhar o SGEA_VERSION do SGEA.html a cada release.
 # Exposta em /health para o frontend detectar quando o processo em execução está
 # desatualizado (HTML novo servido, mas server.py antigo ainda rodando em memória).
-SERVER_VERSION = '0.26.0'
+SERVER_VERSION = '0.26.1'
 
 PORT        = int(os.environ.get('SGEA_PORT', 3003))
 _BASE       = os.path.dirname(os.path.abspath(__file__))

@@ -5,6 +5,13 @@
 
 ---
 
+## [0.26.1] — 2026-07-22
+
+### Adicionado
+- Coluna **Centro de Custo** na lista de Frota, mostrando o nome do centro vinculado (a lista guardava só o id) — com `—` quando o veículo não tem centro. A coluna é ordenável como as demais, e a **busca da tela passa a encontrar pelo nome do centro** (ex.: digitar "educa" filtra os veículos da Educação).
+
+---
+
 ## [0.26.0] — 2026-07-22
 
 ### Adicionado

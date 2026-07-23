@@ -1233,7 +1233,7 @@
 // ══════════════════════════════════════════════════════════════
 // API / SESSÃO
 // ══════════════════════════════════════════════════════════════
-const SGEA_VERSION = '0.26.0';
+const SGEA_VERSION = '0.26.1';
 document.title = `SGEA v${SGEA_VERSION}`;
 
 let _apiToken = localStorage.getItem('sgea-token') || null;
@@ -1620,7 +1620,7 @@ const CRUD_MODULES = {
     columns: [{ h: 'Nome', k: 'nome' }, { h: 'Cargo', k: 'cargo' }, { h: 'Unidade', k: 'unidade' }, { h: 'Matrícula', k: 'matricula' }, { h: 'Status', k: 'ativo', badge: true }],
   },
   'frota': {
-    titulo: 'Frota', navId: 'nav-frota',
+    titulo: 'Frota', navId: 'nav-frota', usaCentroCusto: true,
     fields: [
       { key: '_sec_cad', type: 'section', label: 'Cadastro' },
       { key: 'numero', label: 'Número da Frota', required: true },
@@ -1650,7 +1650,7 @@ const CRUD_MODULES = {
       { key: 'pneu_dianteiro', label: 'Pneu dianteiro', type: 'textarea' },
       { key: 'pneu_traseiro', label: 'Pneu traseiro', type: 'textarea' },
     ],
-    columns: [{ h: 'Nº', k: 'numero' }, { h: 'Placa', k: 'placa' }, { h: 'Marca/Modelo', kfn: i => `${i.marca || ''} ${i.modelo || ''}`.trim() }, { h: 'Ano', k: 'ano' }, { h: 'Status', k: 'ativo', badge: true }],
+    columns: [{ h: 'Nº', k: 'numero' }, { h: 'Placa', k: 'placa' }, { h: 'Marca/Modelo', kfn: i => `${i.marca || ''} ${i.modelo || ''}`.trim() }, { h: 'Ano', k: 'ano' }, { h: 'Centro de Custo', kfn: i => _ccNome(i) || '—' }, { h: 'Status', k: 'ativo', badge: true }],
   },
   // pedidos NÃO está aqui — tem itens (produto/quantidade), o motor genérico
   // só sabe campos escalares. Tela própria: showPedidos/renderPedidos/
@@ -1659,6 +1659,10 @@ const CRUD_MODULES = {
 let _crudAtual = null;
 let _crudCache = [];
 let _crudSort = { idx: null, dir: 1 };
+// Nome do centro de custo por id — preenchido no renderCrud dos módulos que
+// declaram `usaCentroCusto`, já que a lista crua traz apenas o centro_custo_id.
+let _ccNomes = {};
+const _ccNome = i => _ccNomes[String(i.centro_custo_id)] || '';
 
 function showCrud(modKey) {
   _crudAtual = modKey;
@@ -1693,7 +1697,13 @@ async function renderCrud() {
   if (clearBtn) clearBtn.style.display = q ? '' : 'none';
   const items = await _fetchList(_crudAtual);
   _crudCache = items;
-  const filtrados = q ? items.filter(i => JSON.stringify(i).toLowerCase().includes(q)) : items;
+  // A lista traz só o centro_custo_id: resolve o nome para a coluna, a ordenação e a busca.
+  if (cfg.usaCentroCusto) {
+    const cc = await _fetchList('centros-custo');
+    _ccNomes = Object.fromEntries(cc.map(c => [String(c.id), c.nome || '']));
+  }
+  const _busca = i => (JSON.stringify(i) + (cfg.usaCentroCusto ? ' ' + _ccNome(i) : '')).toLowerCase();
+  const filtrados = q ? items.filter(i => _busca(i).includes(q)) : items;
   const el = document.getElementById('crud-list');
   if (!filtrados.length) { el.innerHTML = '<div class="empty">Nenhum registro encontrado.</div>'; return; }
   const cols = cfg.columns;
