@@ -5,6 +5,13 @@
 
 ---
 
+## [0.25.1] — 2026-07-22
+
+### Corrigido
+- **Ficha do Veículo**: a tabela de dados usava rótulos com fundo cinza (`<th>`), que destoava do padrão dos relatórios e desalinhava rótulo e valor (padding diferente de `<th>`/`<td>`). Agora os rótulos são células normais em negrito, com o mesmo alinhamento e o zebrado padrão dos demais relatórios.
+
+---
+
 ## [0.25.0] — 2026-07-22
 
 ### Adicionado

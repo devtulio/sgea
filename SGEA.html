@@ -1195,7 +1195,7 @@
 // ══════════════════════════════════════════════════════════════
 // API / SESSÃO
 // ══════════════════════════════════════════════════════════════
-const SGEA_VERSION = '0.25.0';
+const SGEA_VERSION = '0.25.1';
 document.title = `SGEA v${SGEA_VERSION}`;
 
 let _apiToken = localStorage.getItem('sgea-token') || null;
@@ -4429,7 +4429,7 @@ async function _gerarFichaVeiculo(v) {
   const org = await _orgBrasao();
   const centros = await _fetchList('centros-custo');
   const ccNome = centros.find(c => String(c.id) === String(v.centro_custo_id))?.nome || '—';
-  const kv = (k, val) => `<tr><th style="width:32%;background:#f0f0f0;color:#000;text-align:left;vertical-align:top">${esc(k)}</th><td>${val && String(val).trim() ? esc(val) : '<span style="color:#999">—</span>'}</td></tr>`;
+  const kv = (k, val) => `<tr><td style="width:30%;font-weight:700;vertical-align:top">${esc(k)}</td><td style="vertical-align:top">${val && String(val).trim() ? esc(val) : '<span style="color:#999">—</span>'}</td></tr>`;
   const cad = [
     ['Nº da Frota', v.numero], ['Placa', v.placa], ['Ano (fab./mod.)', v.ano],
     ['Marca', v.marca], ['Modelo', v.modelo], ['Combustível', v.combustivel],
