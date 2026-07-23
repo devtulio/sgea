@@ -561,16 +561,30 @@ document.addEventListener('keydown', e => {
   else if (!e.shiftKey && document.activeElement === ultimo) { e.preventDefault(); primeiro.focus(); }
 });
 
-document.addEventListener('keydown', e => {
-  if (e.key === 'Escape') {
-    const aberto = [...document.querySelectorAll('.overlay:not(.hidden)')].find(o => o.id !== 'overlay-pin' && o.id !== 'overlay-force-pwd');
-    if (!aberto) return;
-    // #confirm-overlay precisa passar pelo botão Cancelar (não só esconder) —
-    // ver comentário equivalente no handler de clique-fora, mesmo overlay.
-    if (aberto.id === 'confirm-overlay') { document.getElementById('confirm-cancel')?.click(); return; }
-    aberto.classList.add('hidden');
-  }
-});
+// Escape genérico: fecha o primeiro overlay aberto que não tenha tratamento próprio.
+// REGISTRADO POR ÚLTIMO (dentro de DOMContentLoaded) de propósito: os sistemas
+// registram os handlers deles durante a análise do script, antes deste evento.
+// Quando este aqui era registrado primeiro, ele escondia o overlay e o handler do
+// sistema — que roda depois — via "já fechado" e pulava a função de fechar, que é
+// quem restaura o scroll da página e reseta o estado. Resultado: a página ficava
+// sem rolagem até recarregar.
+function _escFecharOverlay(e) {
+  if (e.key !== 'Escape') return;
+  const aberto = [...document.querySelectorAll('.overlay:not(.hidden)')].find(o => o.id !== 'overlay-pin' && o.id !== 'overlay-force-pwd');
+  if (!aberto) return;
+  // #confirm-overlay precisa passar pelo botão Cancelar (não só esconder) —
+  // ver comentário equivalente no handler de clique-fora, mesmo overlay.
+  if (aberto.id === 'confirm-overlay') { document.getElementById('confirm-cancel')?.click(); return; }
+  aberto.classList.add('hidden');
+  // Rede de segurança: se coube a este handler fechar (overlay sem função própria),
+  // destrava a rolagem que o modal possa ter travado ao abrir.
+  document.body.style.overflow = '';
+}
+if (document.readyState === 'loading') {
+  document.addEventListener('DOMContentLoaded', () => document.addEventListener('keydown', _escFecharOverlay));
+} else {
+  document.addEventListener('keydown', _escFecharOverlay);
+}
 
 document.addEventListener('keydown', e => {
   if ((e.key === 'Enter' || e.key === ' ') && e.target.getAttribute('role') === 'button') {

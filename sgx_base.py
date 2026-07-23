@@ -150,6 +150,11 @@ def purge_expired_sessions(get_db):
 
 # ── E-mail (SMTP puro, sem dependência externa) ─────────────────────────────
 
+# Segundos por operação de socket no envio. Generoso o bastante para anexo
+# grande em link lento, curto o bastante para não segurar uma thread do servidor.
+SMTP_TIMEOUT = 30
+
+
 def send_email_raw(smtp, frm, to, subj, html, plain=''):
     msg = MIMEMultipart('alternative')
     msg['Subject'] = subj
@@ -168,11 +173,15 @@ def send_email_raw(smtp, frm, to, subj, html, plain=''):
         ctx.check_hostname = False
         ctx.verify_mode    = ssl.CERT_NONE
 
+    # timeout OBRIGATÓRIO: sem ele o socket usa o padrão do Python (None = espera
+    # para sempre). Como os servidores são ThreadingTCPServer, um SMTP que aceita
+    # a conexão e não responde prendia a thread permanentemente — e isso se repete
+    # a cada envio, inclusive no resumo diário automático.
     if smtp.get('secure'):
-        with smtplib.SMTP_SSL(host, port, context=ctx) as s:
+        with smtplib.SMTP_SSL(host, port, context=ctx, timeout=SMTP_TIMEOUT) as s:
             s.login(user, pw); s.send_message(msg)
     else:
-        with smtplib.SMTP(host, port) as s:
+        with smtplib.SMTP(host, port, timeout=SMTP_TIMEOUT) as s:
             s.ehlo()
             if smtp.get('requireTLS', True): s.starttls(context=ctx)
             s.login(user, pw); s.send_message(msg)

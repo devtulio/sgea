@@ -5,6 +5,15 @@
 
 ---
 
+## [0.26.3] — 2026-07-22
+
+### Corrigido
+- **Envio de e-mail podia prender uma thread do servidor para sempre.** O helper compartilhado `send_email_raw` abria a conexão SMTP sem `timeout`, e o padrão do Python é esperar indefinidamente; como o servidor é multithread, cada envio a um SMTP que aceita a conexão e não responde deixava uma thread presa — inclusive no resumo diário automático, que se repete todo dia. Agora o timeout é de 30 s e a falha vira mensagem de erro. Verificado contra um SMTP que nunca responde: falha em 30 s, em vez de travar.
+- **Tecla Esc deixava a página sem rolagem.** O tratamento genérico de Esc (compartilhado) era registrado antes dos tratamentos de cada tela e apenas escondia a janela; o tratamento da tela, ao rodar depois, via a janela "já fechada" e pulava a rotina de fechamento — que é quem devolve a rolagem da página. Fechar um modal com Esc travava a rolagem até recarregar. O tratamento genérico passou a ser registrado por último, e ainda devolve a rolagem por segurança.
+- **Margem de impressão dos documentos.** A margem agora é declarada no `@page` (vale para **todas** as páginas) e padronizada em **20 mm** nos quatro lados, em todos os modelos de documento e relatório. Antes, o recuo era zerado na impressão em vários modelos e o rodapé saía a ~4 mm da borda — dentro da faixa que muitas impressoras não imprimem, com risco de cortar o código de autenticidade. Medido em PDF gerado: 20,1 mm.
+
+---
+
 ## [0.26.2] — 2026-07-22
 
 ### Corrigido
