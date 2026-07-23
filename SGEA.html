@@ -578,6 +578,43 @@
     </div>
   </div>
 
+  <!-- ── Importar cadastro de centros de custo (CSV do Fiorilli) ── -->
+  <div class="overlay hidden" id="modal-cc-csv" role="dialog" aria-modal="true" aria-labelledby="modal-cc-csv-titulo">
+    <div class="modal" style="max-width:640px;width:96vw">
+      <div class="modal-header">
+        <h2 id="modal-cc-csv-titulo">Importar Centros de Custo (cadastro do Fiorilli)</h2>
+        <button class="btn btn-ghost btn-icon" onclick="fecharImportCentros()">✕</button>
+      </div>
+      <div class="modal-body">
+        <div id="cc-csv-upload">
+          <div style="background:var(--gray-50);border:1px solid var(--gray-200);border-radius:8px;padding:12px 16px;margin-bottom:14px;font-size:.8rem;color:var(--gray-600)">
+            <div style="font-weight:600;margin-bottom:6px;color:var(--gray-700)">Como funciona</div>
+            Selecione o CSV do <strong>cadastro de centros de custo</strong> exportado do Fiorilli
+            (colunas CODCCUSTO, DESCR, RESPONSA e EMAIL). O importador:<br>
+            • usa o <strong>CODCCUSTO</strong> como código e a <strong>DESCR</strong> como nome;<br>
+            • casa primeiro pelo <strong>código</strong>; não achando, casa pelo <strong>nome</strong> e
+              <strong>adota</strong> o centro já cadastrado, gravando nele o código — assim os vínculos
+              existentes (veículos, saídas) são preservados e não se criam duplicados;<br>
+            • atualiza quem já existe e insere quem é novo — reimportar não duplica.
+          </div>
+          <div style="border:2px dashed var(--gray-300);border-radius:8px;padding:32px;text-align:center;cursor:pointer" onclick="document.getElementById('cc-csv-input').click()" role="button" tabindex="0">
+            <div style="font-size:2rem;margin-bottom:8px">📂</div>
+            <div style="font-size:.85rem;color:var(--gray-600)">Clique para selecionar o arquivo CSV</div>
+            <input type="file" id="cc-csv-input" accept=".csv,text/csv" style="display:none" onchange="carregarCentrosCsv(this)">
+          </div>
+        </div>
+        <div id="cc-csv-preview" style="display:none">
+          <div id="cc-csv-cards" style="display:flex;gap:10px;flex-wrap:wrap"></div>
+        </div>
+        <div id="cc-csv-done" style="display:none;text-align:center;padding:24px;font-size:.9rem;color:var(--gray-700)"></div>
+      </div>
+      <div class="modal-footer">
+        <button class="btn btn-ghost" onclick="fecharImportCentros()">Fechar</button>
+        <button class="btn btn-primary" id="cc-csv-btn-aplicar" style="display:none" onclick="aplicarImportCentros()">Importar</button>
+      </div>
+    </div>
+  </div>
+
   <!-- ── CRUD genérico (Centros de Custo, Funcionários, Frota, Pedidos) ── -->
   <div id="view-crud" class="view">
     <div class="dash-top">
@@ -589,6 +626,7 @@
         </div>
         <button class="btn btn-outline" id="crud-btn-import-func" onclick="abrirImportFuncionarios()" style="display:none" title="Importar funcionários da folha do Fiorilli (CSV)">Importar CSV</button>
         <button class="btn btn-outline" id="crud-btn-import-frota" onclick="abrirImportFrota()" style="display:none" title="Importar a planilha CONTROLE DE FROTA (CSV)">Importar CSV</button>
+        <button class="btn btn-outline" id="crud-btn-import-cc" onclick="abrirImportCentros()" style="display:none" title="Importar o cadastro de centros de custo do Fiorilli (CSV)">Importar CSV</button>
         <button class="btn btn-primary" id="crud-btn-novo" onclick="openCrudModal()">+ Novo</button>
       </div>
     </div>
@@ -1195,7 +1233,7 @@
 // ══════════════════════════════════════════════════════════════
 // API / SESSÃO
 // ══════════════════════════════════════════════════════════════
-const SGEA_VERSION = '0.25.1';
+const SGEA_VERSION = '0.26.0';
 document.title = `SGEA v${SGEA_VERSION}`;
 
 let _apiToken = localStorage.getItem('sgea-token') || null;
@@ -1557,9 +1595,11 @@ const CRUD_MODULES = {
     fields: [
       { key: 'codigo', label: 'Código' },
       { key: 'nome', label: 'Nome', required: true },
+      { key: 'responsavel', label: 'Responsável' },
+      { key: 'email', label: 'E-mail', type: 'email' },
       { key: 'ativo', label: 'Ativo', type: 'checkbox', default: true },
     ],
-    columns: [{ h: 'Código', k: 'codigo' }, { h: 'Nome', k: 'nome' }, { h: 'Status', k: 'ativo', badge: true }],
+    columns: [{ h: 'Código', k: 'codigo' }, { h: 'Nome', k: 'nome' }, { h: 'Responsável', k: 'responsavel' }, { h: 'Status', k: 'ativo', badge: true }],
   },
   // fornecedores NÃO está aqui — cadastro rico (CNPJ/CEIS-CNEP/certidões/
   // sanções), tela própria: showFornecedores/renderFornecedores/
@@ -1634,6 +1674,9 @@ function showCrud(modKey) {
   // Import da planilha CONTROLE DE FROTA, idem, só na Frota e para admin
   document.getElementById('crud-btn-import-frota').style.display =
     (modKey === 'frota' && _apiUser?.admin) ? '' : 'none';
+  // Import do cadastro de centros de custo do Fiorilli, idem
+  document.getElementById('crud-btn-import-cc').style.display =
+    (modKey === 'centros-custo' && _apiUser?.admin) ? '' : 'none';
   renderCrud();
 }
 
@@ -1868,6 +1911,55 @@ async function aplicarImportFuncionarios() {
   done.style.display = '';
   done.innerHTML = `<div style="font-size:2rem;margin-bottom:8px">✅</div><strong>${d.inseridos}</strong> inserido(s) e <strong>${d.atualizados}</strong> atualizado(s).${d.ignorados ? `<br><span style="color:var(--gray-500)">${d.ignorados} linha(s) sem nome ignorada(s).</span>` : ''}`;
   toast('Funcionários importados.', 'success');
+}
+
+// ── Importar cadastro de centros de custo (CSV do Fiorilli) ───────────
+let _ccCsvText = '';
+function abrirImportCentros() {
+  _ccCsvText = '';
+  document.getElementById('cc-csv-upload').style.display = '';
+  document.getElementById('cc-csv-preview').style.display = 'none';
+  document.getElementById('cc-csv-done').style.display = 'none';
+  document.getElementById('cc-csv-btn-aplicar').style.display = 'none';
+  document.getElementById('cc-csv-input').value = '';
+  document.getElementById('modal-cc-csv').classList.remove('hidden');
+}
+function fecharImportCentros() {
+  document.getElementById('modal-cc-csv').classList.add('hidden');
+  if (_crudAtual === 'centros-custo') renderCrud();
+}
+async function carregarCentrosCsv(input) {
+  const file = input.files[0];
+  if (!file) return;
+  const buf = await file.arrayBuffer();
+  let text;
+  try { text = new TextDecoder('utf-8', { fatal: true }).decode(buf); }
+  catch { text = new TextDecoder('iso-8859-1').decode(buf); }
+  _ccCsvText = text;
+  const linhas = text.split(/\r?\n/).filter(l => l.trim());
+  if (linhas.length < 2) { toast('CSV vazio ou sem dados.', 'error'); _ccCsvText = ''; return; }
+  const card = (n, lbl) => `<div style="flex:1;min-width:140px;background:var(--gray-50);border:1px solid var(--gray-200);border-radius:8px;padding:10px 14px"><div style="font-size:1.2rem;font-weight:700;word-break:break-word">${esc(String(n))}</div><div style="font-size:.72rem;color:var(--gray-600)">${lbl}</div></div>`;
+  document.getElementById('cc-csv-cards').innerHTML =
+    card(linhas.length - 1, 'linhas detectadas') + card(file.name, 'arquivo selecionado');
+  document.getElementById('cc-csv-upload').style.display = 'none';
+  document.getElementById('cc-csv-preview').style.display = '';
+  document.getElementById('cc-csv-btn-aplicar').style.display = '';
+}
+async function aplicarImportCentros() {
+  if (!_ccCsvText) return;
+  const btn = document.getElementById('cc-csv-btn-aplicar');
+  btn.disabled = true; btn.textContent = 'Importando…';
+  const r = await API.post('/api/centros-custo/import', { csv: _ccCsvText });
+  const d = await API.json(r);
+  btn.disabled = false; btn.textContent = 'Importar';
+  if (!r || !r.ok) { toast(d?.error || 'Falha ao importar.', 'error'); return; }
+  await _auditEvento('CENTRO_CUSTO_IMPORTADO', `Importação de centros de custo: ${d.inseridos} inserido(s), ${d.atualizados} atualizado(s), ${d.adotados} adotado(s) por nome`, null);
+  document.getElementById('cc-csv-preview').style.display = 'none';
+  btn.style.display = 'none';
+  const done = document.getElementById('cc-csv-done');
+  done.style.display = '';
+  done.innerHTML = `<div style="font-size:2rem;margin-bottom:8px">✅</div><strong>${d.inseridos}</strong> inserido(s) e <strong>${d.atualizados}</strong> atualizado(s).${d.adotados ? `<br><span style="color:var(--gray-500)">${d.adotados} centro(s) já existente(s) adotado(s) pelo nome (código preenchido, vínculos preservados).</span>` : ''}${d.ignorados ? `<br><span style="color:var(--gray-500)">${d.ignorados} linha(s) ignorada(s).</span>` : ''}${(d.nomes_repetidos || []).length ? `<div style="background:#fffbeb;border:1px solid #fcd34d;border-radius:6px;padding:8px 10px;margin-top:12px;font-size:.78rem;color:#92400e;text-align:left">⚠️ Nome(s) repetido(s) no cadastro, com códigos diferentes (é assim no Fiorilli): <strong>${d.nomes_repetidos.map(esc).join(', ')}</strong>. Renomeie ou desative o que não usar.</div>` : ''}`;
+  toast('Centros de custo importados.', 'success');
 }
 
 // ── Importar planilha CONTROLE DE FROTA (CSV) ───────────

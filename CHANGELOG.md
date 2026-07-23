@@ -5,6 +5,18 @@
 
 ---
 
+## [0.26.0] — 2026-07-22
+
+### Adicionado
+- **Importar CSV** na tela de Centros de Custo (admin): lê o cadastro exportado do Fiorilli, usando **CODCCUSTO** como código e **DESCR** como nome. A conciliação é em duas etapas — casa primeiro pelo **código** e, não achando, pelo **nome**, **adotando** o centro já cadastrado e gravando nele o código. Isso preserva os vínculos existentes (veículos, saídas) dos centros que haviam sido criados sem código pela importação da frota, em vez de duplicá-los.
+- **Responsável** e **e-mail** no cadastro de Centro de Custo (colunas novas, migração automática), preenchidos pelo import a partir de `RESPONSA` e `EMAIL`.
+
+### Notas
+- Nomes repetidos com códigos diferentes (é assim no Fiorilli — ex.: dois centros "TRANSPORTE") são importados **fielmente**, e o resultado da importação avisa quais são, para você renomear ou desativar o que não usar. A alternativa (fundir pelo nome) descartaria um dos códigos.
+- A importação é **idempotente**: reimportar o mesmo arquivo atualiza e não duplica.
+
+---
+
 ## [0.25.1] — 2026-07-22
 
 ### Corrigido

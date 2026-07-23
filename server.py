@@ -1,4 +1,4 @@
-# SGEA v0.25.1 — Servidor local: SQLite, autenticação, REST API, controle de estoque por lote (FEFO), backup automático
+# SGEA v0.26.0 — Servidor local: SQLite, autenticação, REST API, controle de estoque por lote (FEFO), backup automático
 import http.server
 import socketserver
 import os
@@ -37,7 +37,7 @@ for _stream in (sys.stdout, sys.stderr):
 # Versão do servidor — DEVE acompanhar o SGEA_VERSION do SGEA.html a cada release.
 # Exposta em /health para o frontend detectar quando o processo em execução está
 # desatualizado (HTML novo servido, mas server.py antigo ainda rodando em memória).
-SERVER_VERSION = '0.25.1'
+SERVER_VERSION = '0.26.0'
 
 PORT        = int(os.environ.get('SGEA_PORT', 3003))
 _BASE       = os.path.dirname(os.path.abspath(__file__))
@@ -284,6 +284,11 @@ def init_db():
         cols_frota = [r[1] for r in conn.execute('PRAGMA table_info(frota)').fetchall()]
         for _vc in FROTA_PECAS_COLS:
             if _vc not in cols_frota: conn.execute(f"ALTER TABLE frota ADD COLUMN {_vc} TEXT DEFAULT ''")
+
+        # Responsável e e-mail do centro de custo (vêm do cadastro do Fiorilli).
+        cols_cc = [r[1] for r in conn.execute('PRAGMA table_info(centros_custo)').fetchall()]
+        for _cc in ('responsavel', 'email'):
+            if _cc not in cols_cc: conn.execute(f"ALTER TABLE centros_custo ADD COLUMN {_cc} TEXT DEFAULT ''")
 
         cols_forn = [r[1] for r in conn.execute('PRAGMA table_info(fornecedores)').fetchall()]
         if 'data' not in cols_forn:
@@ -536,6 +541,49 @@ def _parse_frota_csv(csv_text):
         dedup[num] = reg
     return list(dedup.values())
 
+# ── Importação do "CADASTRO DE CENTROS DE CUSTO" (export do Fiorilli) ───────
+# CODCCUSTO é o código único do centro (1..N); DESCR é a descrição usada como nome.
+_CC_HEADER_MAP = {
+    'CODCCUSTO': 'codigo', 'CODIGO': 'codigo', 'COD': 'codigo',
+    'DESCR': 'nome', 'DESCRICAO': 'nome', 'NOME': 'nome',
+    'RESPONSA': 'responsavel', 'RESPONSAVEL': 'responsavel',
+    'EMAIL': 'email', 'E-MAIL': 'email',
+}
+
+def _norm_nome(s):
+    """Nome sem acento, maiúsculo e com espaços colapsados — usado para casar
+    um centro do arquivo com um já cadastrado (que pode ter vindo sem código)."""
+    s = unicodedata.normalize('NFKD', s or '').encode('ascii', 'ignore').decode()
+    return ' '.join(s.upper().split())
+
+def _parse_centros_csv(csv_text):
+    """Parseia o CSV de centros de custo do Fiorilli. Detecta o delimitador,
+    mapeia colunas por cabeçalho e deduplica por código. Retorna lista de dicts."""
+    csv_text = csv_text.lstrip('﻿')
+    linhas = csv_text.splitlines()
+    if not linhas or not csv_text.strip():
+        raise ValueError('CSV vazio.')
+    delim = ';' if linhas[0].count(';') >= linhas[0].count(',') else ','
+    rows = list(csv.reader(io.StringIO(csv_text), delimiter=delim))
+    header = [_norm_header(h) for h in rows[0]]
+    idx = {}
+    for i, h in enumerate(header):
+        campo = _CC_HEADER_MAP.get(h)
+        if campo and campo not in idx:
+            idx[campo] = i
+    if 'nome' not in idx:
+        raise ValueError('Não encontrei a coluna de descrição do centro de custo (DESCR) no CSV.')
+    dedup = {}
+    for r in rows[1:]:
+        if not any((c or '').strip() for c in r):
+            continue
+        reg = {campo: (r[i].strip() if i < len(r) and r[i] is not None else '') for campo, i in idx.items()}
+        if not (reg.get('nome') or '').strip():
+            continue
+        chave = (reg.get('codigo') or '').strip() or _norm_nome(reg['nome'])
+        dedup[chave] = reg
+    return list(dedup.values())
+
 def _classificar_reconciliacao(fiorilli, produtos, data_corte):
     """Cruza o Fiorilli (só itens com saldo; zerados omitidos) com os produtos do
     SGEA (saldo inteiro em unidade_consumo) por codigo_fiorilli. Um balde por código."""
@@ -754,8 +802,9 @@ def _find_browser():
 
 CRUD_TABLES = {
     'centros_custo': {
-        'id_type': 'int', 'fields': ['codigo', 'nome', 'ativo'],
-        'required': ['nome'], 'order': 'nome ASC', 'search_fields': ['nome', 'codigo'],
+        'id_type': 'int', 'fields': ['codigo', 'nome', 'ativo', 'responsavel', 'email'],
+        'required': ['nome'], 'order': 'nome ASC',
+        'search_fields': ['nome', 'codigo', 'responsavel', 'email'],
     },
     'funcionarios': {
         'id_type': 'int',
@@ -1095,6 +1144,9 @@ class SGEAHandler(http.server.SimpleHTTPRequestHandler):
         elif p == '/api/frota/import':
             if not s['admin']: self._json(403, {'error': 'Acesso restrito'}); return
             self._import_frota(data)
+        elif p == '/api/centros-custo/import':
+            if not s['admin']: self._json(403, {'error': 'Acesso restrito'}); return
+            self._import_centros(data)
         elif p == '/api/pedidos':
             self._create_pedido(data)
         elif p == '/api/entradas':
@@ -1404,6 +1456,61 @@ class SGEAHandler(http.server.SimpleHTTPRequestHandler):
                     inseridos += 1
         self._json(200, {'inseridos': inseridos, 'atualizados': atualizados,
                          'ignorados': ignorados, 'centros_criados': cc_criados})
+
+    def _import_centros(self, data):
+        """Importa o cadastro de centros de custo do Fiorilli (CSV).
+        Concilia em duas etapas para não duplicar o que já existe: casa primeiro
+        pelo CÓDIGO; não achando, casa pelo NOME normalizado e ADOTA esse registro,
+        gravando nele o código do arquivo (é o caso dos centros criados sem código
+        pela importação da frota, que já têm veículos vinculados)."""
+        csv_text = data.get('csv') or ''
+        if not csv_text.strip():
+            self._json(400, {'error': 'CSV vazio.'}); return
+        try:
+            registros = _parse_centros_csv(csv_text)
+        except ValueError as e:
+            self._json(400, {'error': str(e)}); return
+        cols = ('codigo', 'nome', 'responsavel', 'email')
+        inseridos = atualizados = adotados = ignorados = 0
+        with get_db() as conn:
+            atuais = conn.execute('SELECT id, codigo, nome FROM centros_custo').fetchall()
+            por_codigo = {(r['codigo'] or '').strip(): r['id'] for r in atuais if (r['codigo'] or '').strip()}
+            # Só os centros que JÁ EXISTIAM entram na busca por nome, e cada um é
+            # adotado no máximo uma vez (por isso o pop). Sem isso, duas linhas do
+            # arquivo com o mesmo nome mas códigos diferentes (ex.: TRANSPORTE 14 e 15)
+            # se fundiriam numa só, descartando um dos códigos do Fiorilli.
+            por_nome = {_norm_nome(r['nome']): r['id'] for r in atuais}
+            for reg in registros:
+                nome = (reg.get('nome') or '').strip()
+                if not nome:
+                    ignorados += 1; continue
+                codigo = (reg.get('codigo') or '').strip()
+                vals = {c: (reg.get(c) or '').strip() for c in cols}
+                alvo = por_codigo.get(codigo) if codigo else None
+                adocao = False
+                if alvo is None:
+                    alvo = por_nome.pop(_norm_nome(nome), None)   # consome: adota uma vez só
+                    adocao = alvo is not None
+                if alvo is not None:
+                    setc = [c for c in cols if vals[c]]   # não apaga dado existente com string vazia
+                    conn.execute(f"UPDATE centros_custo SET {','.join(f'{c}=?' for c in setc)},updated_at=? WHERE id=?",
+                                 [vals[c] for c in setc] + [_now(), alvo])
+                    if adocao: adotados += 1
+                    else: atualizados += 1
+                else:
+                    cur = conn.execute(f"INSERT INTO centros_custo ({','.join(cols)}) VALUES ({','.join('?' * len(cols))})",
+                                       [vals[c] for c in cols])
+                    alvo = cur.lastrowid
+                    inseridos += 1
+                if codigo: por_codigo[codigo] = alvo
+        # Nomes repetidos são legítimos no Fiorilli (mesmo nome, códigos distintos):
+        # importa fiel e avisa, em vez de fundir e perder um código.
+        with get_db() as conn:
+            repetidos = [r['nome'] for r in conn.execute(
+                'SELECT nome FROM centros_custo GROUP BY nome HAVING COUNT(*) > 1').fetchall()]
+        self._json(200, {'inseridos': inseridos, 'atualizados': atualizados,
+                         'adotados': adotados, 'ignorados': ignorados,
+                         'nomes_repetidos': repetidos})
 
     def _save_settings(self, data):
         # ponytail: string vazia nunca sobrescreve um valor já salvo — evita que um
