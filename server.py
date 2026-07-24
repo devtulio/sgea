@@ -1,4 +1,4 @@
-# SGEA v0.27.0 — Servidor local: SQLite, autenticação, REST API, controle de estoque por lote (FEFO), backup automático
+# SGEA v0.27.1 — Servidor local: SQLite, autenticação, REST API, controle de estoque por lote (FEFO), backup automático
 import http.server
 import socketserver
 import os
@@ -37,7 +37,7 @@ for _stream in (sys.stdout, sys.stderr):
 # Versão do servidor — DEVE acompanhar o SGEA_VERSION do SGEA.html a cada release.
 # Exposta em /health para o frontend detectar quando o processo em execução está
 # desatualizado (HTML novo servido, mas server.py antigo ainda rodando em memória).
-SERVER_VERSION = '0.27.0'
+SERVER_VERSION = '0.27.1'
 
 PORT        = int(os.environ.get('SGEA_PORT', 3003))
 _BASE       = os.path.dirname(os.path.abspath(__file__))
@@ -1205,10 +1205,13 @@ class SGEAHandler(http.server.SimpleHTTPRequestHandler):
             self._update_entrada(p.split('/')[-1], data)
         elif p in ('/api/settings', '/api/settings/'):
             if not s['admin']: self._json(403, {'error': 'Acesso restrito'}); return
-            allowed = {'backup_path', 'auto_backup_enabled', 'auto_backup_keep'}
+            # portal_transparencia_key é credencial: fica aqui, não na rota de
+            # Dados de Organização, que é aberta a qualquer usuário autenticado.
+            allowed = {'backup_path', 'auto_backup_enabled', 'auto_backup_keep',
+                       'portal_transparencia_key'}
             self._save_settings({k: v for k, v in data.items() if k in allowed})
         elif p in ('/api/settings/org', '/api/settings/org/'):
-            allowed = {'orgao', 'municipio', 'cnpj_orgao', 'aut_nome', 'aut_cargo', 'portal_transparencia_key'}
+            allowed = {'orgao', 'municipio', 'cnpj_orgao', 'aut_nome', 'aut_cargo'}
             self._save_settings({k: v for k, v in data.items() if k in allowed})
         elif p in ('/api/settings/smtp', '/api/settings/smtp/'):
             if not s['admin']: self._json(403, {'error': 'Acesso restrito'}); return

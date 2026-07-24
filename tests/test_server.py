@@ -895,5 +895,58 @@ class TestSenhaPadraoObrigatoria(SGEATestCase):
                          'sistema continuou bloqueado depois de trocar a senha')
 
 
+class TestChavePortalSoAdmin(SGEATestCase):
+    """Regressão do eixo permissão/sigilo (auditoria 2026-07-24).
+
+    `portal_transparencia_key` é credencial de API, mas estava na lista de
+    campos graváveis por /api/settings/org — rota aberta a qualquer usuário
+    autenticado (Dados de Organização, por decisão de projeto). Um usuário
+    comum sobrescrevia a chave do órgão.
+    """
+
+    def _chave(self):
+        with server.get_db() as conn:
+            row = conn.execute("SELECT value FROM sys_settings WHERE key='portal_transparencia_key'").fetchone()
+        return row['value'] if row else None
+
+    def _comum(self):
+        # O banco é compartilhado pela suíte inteira: o usuário criado aqui é
+        # removido no fim, senão sobra para o teste de wipe, que confere quantos
+        # usuários existem.
+        adm = self.login()
+        self.request('POST', '/api/usuarios',
+                     {'username': 'semadmin', 'nome': 'Sem Admin', 'password': 'senha123',
+                      'senha': 'senha123', 'admin': False}, token=adm)
+        self.addCleanup(self._remover_semadmin)
+        st, log = self.request('POST', '/api/auth/login', {'username': 'semadmin', 'password': 'senha123'})
+        self.assertEqual(st, 200, log)
+        return adm, log['token']
+
+    def _remover_semadmin(self):
+        with server.get_db() as conn:
+            conn.execute("DELETE FROM usuarios WHERE username='semadmin'")
+            conn.commit()
+
+    def test_admin_grava_a_chave(self):
+        adm, _ = self._comum()
+        st, _ = self.request('PUT', '/api/settings', {'portal_transparencia_key': 'CHAVE-DO-ORGAO'}, token=adm)
+        self.assertEqual(st, 200)
+        self.assertEqual(self._chave(), 'CHAVE-DO-ORGAO')
+
+    def test_usuario_comum_nao_sobrescreve_a_chave(self):
+        adm, tok = self._comum()
+        self.request('PUT', '/api/settings', {'portal_transparencia_key': 'CHAVE-DO-ORGAO'}, token=adm)
+        # pela rota aberta de Dados de Organização (que ele pode usar para o resto)
+        st, _ = self.request('PUT', '/api/settings/org',
+                             {'orgao': 'Prefeitura de Teste',
+                              'portal_transparencia_key': 'CHAVE-DO-INVASOR'}, token=tok)
+        self.assertEqual(st, 200)
+        self.assertEqual(self._chave(), 'CHAVE-DO-ORGAO', 'usuário comum sobrescreveu a credencial')
+        # e o campo que ele PODE gravar continua funcionando
+        st, cfg = self.request('GET', '/api/settings', token=tok)
+        self.assertEqual(cfg.get('orgao'), 'Prefeitura de Teste')
+        self.assertNotIn('portal_transparencia_key', cfg)
+
+
 if __name__ == '__main__':
     unittest.main()

@@ -747,7 +747,7 @@
         <div class="info-field"><label for="cfg-aut-nome">Nome</label><input type="text" id="cfg-aut-nome" placeholder="Nome completo"></div>
         <div class="info-field"><label for="cfg-aut-cargo">Cargo</label><input type="text" id="cfg-aut-cargo" placeholder="Ex: Secretário de Administração"></div>
       </fieldset>
-      <fieldset class="cfg-fieldset">
+      <fieldset class="cfg-fieldset admin-only">
         <legend>Consulta de Sanções (CEIS/CNEP)</legend>
         <div class="info-field"><label for="cfg-portal-transparencia-key">Chave de API — Portal da Transparência <span style="color:var(--gray-400);font-weight:400">(consulta automática de CEIS/CNEP no cadastro de Fornecedores)</span></label>
           <input type="text" id="cfg-portal-transparencia-key" placeholder="Obtida gratuitamente em api.portaldatransparencia.gov.br"></div>
@@ -1233,7 +1233,7 @@
 // ══════════════════════════════════════════════════════════════
 // API / SESSÃO
 // ══════════════════════════════════════════════════════════════
-const SGEA_VERSION = '0.27.0';
+const SGEA_VERSION = '0.27.1';
 document.title = `SGEA v${SGEA_VERSION}`;
 
 let _apiToken = localStorage.getItem('sgea-token') || null;
@@ -3800,7 +3800,6 @@ async function saveSettings() {
     cnpj_orgao: document.getElementById('cfg-cnpj-orgao').value.trim(),
     aut_nome: document.getElementById('cfg-aut-nome').value.trim(),
     aut_cargo: document.getElementById('cfg-aut-cargo').value.trim(),
-    portal_transparencia_key: document.getElementById('cfg-portal-transparencia-key').value.trim(),
   };
   const results = await Promise.all([
     API.put('/api/settings/org', org),
@@ -3808,6 +3807,8 @@ async function saveSettings() {
     _apiUser?.admin ? API.put('/api/settings', {
       auto_backup_enabled: document.getElementById('cfg-backup-auto').checked ? '1' : '0',
       auto_backup_keep: document.getElementById('cfg-backup-keep').value,
+      // Credencial: vai junto do bloco administrativo, não dos Dados de Organização
+      portal_transparencia_key: document.getElementById('cfg-portal-transparencia-key').value.trim(),
     }) : Promise.resolve({ ok: true }),
   ]);
   if (results.some(r => !r || !r.ok)) { toast('Erro ao salvar configurações.', 'error'); return; }

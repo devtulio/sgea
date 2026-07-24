@@ -5,6 +5,13 @@
 
 ---
 
+## [0.27.1] — 2026-07-24
+
+### Corrigido
+- **Qualquer usuário podia trocar a chave de API do Portal da Transparência.** A chave estava na lista de campos salvos junto com os Dados de Organização — tela aberta a todos por decisão de projeto —, então um usuário comum sobrescrevia a credencial do órgão e a consulta automática de sanções (CEIS/CNEP) parava de funcionar. A chave passou a ser gravada e exibida apenas para o administrador; o restante dos Dados de Organização continua aberto como antes.
+
+---
+
 ## [0.27.0] — 2026-07-24
 
 ### Corrigido
