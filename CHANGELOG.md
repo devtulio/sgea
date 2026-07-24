@@ -5,6 +5,13 @@
 
 ---
 
+## [0.26.7] — 2026-07-24
+
+### Corrigido
+- **A senha do e-mail do sistema saía dentro do arquivo de backup.** O backup em JSON exportava todas as configurações, e entre elas está a senha do SMTP (guardada em texto puro) e a chave do Portal da Transparência. Como esse é o arquivo que se envia a outra máquina para sincronizar, essas credenciais circulavam junto. Elas passaram a ficar de fora. **Restaurar não as perde:** o que o arquivo não traz é preservado como já está no sistema.
+
+---
+
 ## [0.26.6] — 2026-07-24
 
 ### Corrigido

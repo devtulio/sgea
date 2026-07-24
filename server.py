@@ -1,4 +1,4 @@
-# SGEA v0.26.6 — Servidor local: SQLite, autenticação, REST API, controle de estoque por lote (FEFO), backup automático
+# SGEA v0.26.7 — Servidor local: SQLite, autenticação, REST API, controle de estoque por lote (FEFO), backup automático
 import http.server
 import socketserver
 import os
@@ -37,7 +37,7 @@ for _stream in (sys.stdout, sys.stderr):
 # Versão do servidor — DEVE acompanhar o SGEA_VERSION do SGEA.html a cada release.
 # Exposta em /health para o frontend detectar quando o processo em execução está
 # desatualizado (HTML novo servido, mas server.py antigo ainda rodando em memória).
-SERVER_VERSION = '0.26.6'
+SERVER_VERSION = '0.26.7'
 
 PORT        = int(os.environ.get('SGEA_PORT', 3003))
 _BASE       = os.path.dirname(os.path.abspath(__file__))
@@ -2391,6 +2391,13 @@ class SGEAHandler(http.server.SimpleHTTPRequestHandler):
         _do_db_backup()  # segurança antes de substituir tudo
         try:
             with get_db() as conn:
+                # sys_settings é apagado inteiro e repovoado pelo arquivo; como as
+                # credenciais não viajam nele (_CHAVES_SIGILOSAS), guardá-las antes
+                # e devolvê-las depois é o que impede a restauração de zerar a
+                # senha do SMTP e a chave do Portal da Transparência.
+                sigilosas = {r['key']: r['value'] for r in conn.execute(
+                    f"SELECT key,value FROM sys_settings WHERE key IN ({','.join('?' * len(_CHAVES_SIGILOSAS))})",
+                    _CHAVES_SIGILOSAS).fetchall()}
                 for t in reversed(_BACKUP_TABLES):
                     conn.execute(f'DELETE FROM {t}')
                 for t in _BACKUP_TABLES:
@@ -2398,6 +2405,8 @@ class SGEAHandler(http.server.SimpleHTTPRequestHandler):
                         cols = list(row.keys())
                         conn.execute(f'INSERT INTO {t} ({",".join(cols)}) VALUES ({",".join("?" * len(cols))})',
                                      [row[c] for c in cols])
+                for chave, valor in sigilosas.items():
+                    conn.execute('INSERT OR REPLACE INTO sys_settings (key,value) VALUES (?,?)', (chave, valor))
                 _insert_audit_raw(conn, {'type': 'RESTAURAR_BACKUP', 'ts': _now(),
                                           'user_id': s['user_id'], 'user_nome': s['nome'],
                                           'label': 'Backup do sistema restaurado', 'detail': 'Restauração via arquivo JSON'})
@@ -2633,11 +2642,19 @@ _BACKUP_TABLES = ('centros_custo', 'fornecedores', 'funcionarios', 'frota', 'pro
                    'entradas', 'entrada_itens', 'lotes', 'saidas', 'saida_itens', 'saida_item_lotes',
                    'sys_settings')
 
+# Credenciais que NÃO viajam no backup JSON: o arquivo sai do servidor e o
+# manual orienta enviá-lo a outra máquina. Restaurar não as perde — ver
+# _restore_backup, que relê e regrava esses valores em torno do DELETE.
+_CHAVES_SIGILOSAS = ('smtp_pass', 'portal_transparencia_key')
+
 def _build_backup_payload():
     with get_db() as conn:
         payload = {'_sgea': True, 'version': 1, 'exportedAt': _now()}
         for t in _BACKUP_TABLES:
-            payload[t] = [dict(r) for r in conn.execute(f'SELECT * FROM {t}').fetchall()]
+            linhas = [dict(r) for r in conn.execute(f'SELECT * FROM {t}').fetchall()]
+            if t == 'sys_settings':
+                linhas = [r for r in linhas if r.get('key') not in _CHAVES_SIGILOSAS]
+            payload[t] = linhas
     return payload
 
 def _do_json_backup(cfg=None):

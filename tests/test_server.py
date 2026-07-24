@@ -809,5 +809,45 @@ class TestImportFrotaNaoApagaDado(SGEATestCase):
         self.assertEqual(v['oleo_motor'], 'LUBRAX 20W50')
 
 
+class TestBackupNaoVazaCredencial(SGEATestCase):
+    """Regressão do eixo perda de dado (auditoria 2026-07-24).
+
+    O backup JSON exportava `sys_settings` inteiro, e ali mora a senha do SMTP
+    do sistema (texto puro) e a chave do Portal da Transparência. O arquivo sai
+    do servidor — o manual orienta enviá-lo a outra máquina —, então essas
+    credenciais circulavam junto. Restaurar não as perde: o que o arquivo não
+    traz é preservado como já está no banco.
+    """
+
+    SEGREDO = 'SENHA-SMTP-DO-SISTEMA-XYZ'
+
+    def _gravar_segredo(self):
+        with server.get_db() as conn:
+            conn.execute("INSERT OR REPLACE INTO sys_settings (key,value) VALUES ('smtp_pass',?)",
+                         (self.SEGREDO,))
+            conn.commit()
+
+    def _ler_segredo(self):
+        with server.get_db() as conn:
+            row = conn.execute("SELECT value FROM sys_settings WHERE key='smtp_pass'").fetchone()
+        return row['value'] if row else None
+
+    def test_backup_nao_contem_a_senha_do_smtp(self):
+        token = self.login()
+        self._gravar_segredo()
+        status, backup = self.request('GET', '/api/backup', token=token)
+        self.assertEqual(status, 200)
+        self.assertNotIn(self.SEGREDO, json.dumps(backup, ensure_ascii=False),
+                         'senha do SMTP do sistema vazou no arquivo de backup')
+
+    def test_restaurar_preserva_a_senha_do_smtp(self):
+        token = self.login()
+        self._gravar_segredo()
+        _, backup = self.request('GET', '/api/backup', token=token)
+        self.assertEqual(self.request('POST', '/api/backup/restore', backup, token=token)[0], 200)
+        self.assertEqual(self._ler_segredo(), self.SEGREDO,
+                         'restaurar backup apagou a senha do SMTP do sistema')
+
+
 if __name__ == '__main__':
     unittest.main()
