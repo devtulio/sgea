@@ -5,6 +5,13 @@
 
 ---
 
+## [0.27.2] — 2026-07-24
+
+### Adicionado
+- **Alterações nos Dados da Organização e no brasão passam a ficar registradas na Trilha de Auditoria**, com autor, data e quais campos mudaram. Esses dados saem em todo documento gerado — nome do órgão, município, autoridade, brasão —, e qualquer usuário pode editá-los (segue assim, é a forma de trabalho do setor); o que faltava era o rastro de quem mudou. Reenviar a tela sem alterar nada não gera evento.
+
+---
+
 ## [0.27.1] — 2026-07-24
 
 ### Corrigido

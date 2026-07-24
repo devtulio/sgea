@@ -948,5 +948,57 @@ class TestChavePortalSoAdmin(SGEATestCase):
         self.assertNotIn('portal_transparencia_key', cfg)
 
 
+class TestAuditoriaDeConfiguracao(SGEATestCase):
+    """Achado 9 do eixo permissão/sigilo (auditoria 2026-07-24).
+
+    Dados de Organização e brasão seguem abertos a qualquer usuário autenticado
+    — decisão de projeto —, mas saem em todo documento gerado. Sem registro na
+    trilha, uma alteração no nome do órgão ou no brasão aparecia em documento
+    oficial sem rastro de quem fez.
+    """
+    def _ids_config(self):
+        with server.get_db() as conn:
+            return {r['id'] for r in conn.execute(
+                "SELECT id FROM audit_global WHERE type='CONFIG_ALTERADA'")}
+
+    def _novos_desde(self, ids_antes):
+        # Compara por conjunto de ids, não por contagem: o banco é compartilhado
+        # pela suíte e outros testes também mexem em configuração.
+        with server.get_db() as conn:
+            return [dict(r) for r in conn.execute(
+                "SELECT * FROM audit_global WHERE type='CONFIG_ALTERADA'")
+                if r['id'] not in ids_antes]
+
+    def test_alterar_dados_da_organizacao_gera_evento(self):
+        token = self.login()
+        antes = self._ids_config()
+        st, _ = self.request('PUT', '/api/settings/org',
+                             {'orgao': f'Prefeitura {uuid.uuid4().hex[:8]}'}, token=token)
+        self.assertEqual(st, 200)
+        novos = self._novos_desde(antes)
+        self.assertEqual(len(novos), 1, 'alteração não entrou na trilha')
+        self.assertIn('orgao', novos[0]['detail'])
+        self.assertEqual(novos[0]['label'], 'Dados da organização alterados')
+
+    def test_reenviar_os_mesmos_valores_nao_polui_a_trilha(self):
+        # A tela reenvia todos os campos a cada "Salvar"; sem alteração real não
+        # deve virar evento.
+        token = self.login()
+        fixo = f'Prefeitura {uuid.uuid4().hex[:8]}'
+        self.request('PUT', '/api/settings/org', {'orgao': fixo}, token=token)
+        antes = self._ids_config()
+        self.request('PUT', '/api/settings/org', {'orgao': fixo}, token=token)
+        self.assertEqual(self._novos_desde(antes), [], 'reenvio sem alteração gerou evento')
+
+    def test_alterar_brasao_gera_evento(self):
+        token = self.login()
+        antes = self._ids_config()
+        st, _ = self.request('PUT', '/api/settings/brasao',
+                             {'brasao_dataurl': 'data:image/png;base64,' + uuid.uuid4().hex}, token=token)
+        self.assertEqual(st, 200)
+        novos = self._novos_desde(antes)
+        self.assertEqual(len(novos), 1)
+        self.assertEqual(novos[0]['label'], 'Brasão alterado')
+
 if __name__ == '__main__':
     unittest.main()

@@ -1,4 +1,4 @@
-# SGEA v0.27.1 — Servidor local: SQLite, autenticação, REST API, controle de estoque por lote (FEFO), backup automático
+# SGEA v0.27.2 — Servidor local: SQLite, autenticação, REST API, controle de estoque por lote (FEFO), backup automático
 import http.server
 import socketserver
 import os
@@ -37,7 +37,7 @@ for _stream in (sys.stdout, sys.stderr):
 # Versão do servidor — DEVE acompanhar o SGEA_VERSION do SGEA.html a cada release.
 # Exposta em /health para o frontend detectar quando o processo em execução está
 # desatualizado (HTML novo servido, mas server.py antigo ainda rodando em memória).
-SERVER_VERSION = '0.27.1'
+SERVER_VERSION = '0.27.2'
 
 PORT        = int(os.environ.get('SGEA_PORT', 3003))
 _BASE       = os.path.dirname(os.path.abspath(__file__))
@@ -1212,7 +1212,22 @@ class SGEAHandler(http.server.SimpleHTTPRequestHandler):
             self._save_settings({k: v for k, v in data.items() if k in allowed})
         elif p in ('/api/settings/org', '/api/settings/org/'):
             allowed = {'orgao', 'municipio', 'cnpj_orgao', 'aut_nome', 'aut_cargo'}
-            self._save_settings({k: v for k, v in data.items() if k in allowed})
+            gravados = {k: v for k, v in data.items() if k in allowed and str(v or '').strip()}
+            # Gravação e trilha na MESMA transação, antes de responder: só o que
+            # mudou de fato vira evento (a tela reenvia todos os campos a cada
+            # "Salvar"). Auditar depois de _save_settings não serve — ela já
+            # despacha a resposta, e o evento acabava gravado após o cliente
+            # receber o 200.
+            with get_db() as conn:
+                atuais = {r['key']: r['value'] for r in
+                          conn.execute('SELECT key,value FROM sys_settings').fetchall()}
+                mudou = sorted(k for k, v in gravados.items() if str(v) != atuais.get(k, ''))
+                for k, v in gravados.items():
+                    conn.execute('INSERT OR REPLACE INTO sys_settings (key,value) VALUES (?,?)',
+                                 (k, v if isinstance(v, str) else json.dumps(v, ensure_ascii=False)))
+                if mudou:
+                    _audit_config(conn, s, 'Dados da organização alterados', ', '.join(mudou))
+            self._json(200, {'ok': True})
         elif p in ('/api/settings/smtp', '/api/settings/smtp/'):
             if not s['admin']: self._json(403, {'error': 'Acesso restrito'}); return
             allowed = {'smtp_host', 'smtp_port', 'smtp_secure', 'smtp_require_tls',
@@ -1228,6 +1243,8 @@ class SGEAHandler(http.server.SimpleHTTPRequestHandler):
                     conn.execute('INSERT OR REPLACE INTO sys_settings (key,value) VALUES (?,?)', ('brasao_dataurl', dataurl))
                 else:
                     conn.execute("DELETE FROM sys_settings WHERE key='brasao_dataurl'")
+                _audit_config(conn, s, 'Brasão alterado',
+                              'removido' if not dataurl else f'{len(dataurl)} bytes')
             self._json(200, {'ok': True})
         elif re.fullmatch(r'/api/usuarios/[^/]+', p):
             uid = int(p.split('/')[-1])
@@ -2725,6 +2742,19 @@ def _insert_audit_raw(conn, a):
         (a.get('id') or str(uuid.uuid4()), a.get('ts'), a.get('user_id'), a.get('user_nome'),
          a.get('type'), a.get('label'), a.get('detail'), a.get('process_id'))
     )
+
+def _audit_config(conn, s, label, detail):
+    """Registra na trilha quem mexeu na identidade do órgão.
+
+    Dados de Organização e brasão continuam abertos a qualquer usuário
+    autenticado — decisão de projeto, não é config administrativa —, mas saem em
+    todo documento gerado. Sem rastro, uma alteração no nome do órgão ou no
+    brasão aparecia em documento oficial sem ninguém saber de onde veio.
+    """
+    _insert_audit_raw(conn, {'type': 'CONFIG_ALTERADA', 'ts': _now(),
+                             'user_id': s['user_id'], 'user_nome': s['nome'],
+                             'label': label, 'detail': detail})
+
 
 def _get_backup_cfg():
     try:

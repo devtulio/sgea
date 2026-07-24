@@ -1233,7 +1233,7 @@
 // ══════════════════════════════════════════════════════════════
 // API / SESSÃO
 // ══════════════════════════════════════════════════════════════
-const SGEA_VERSION = '0.27.1';
+const SGEA_VERSION = '0.27.2';
 document.title = `SGEA v${SGEA_VERSION}`;
 
 let _apiToken = localStorage.getItem('sgea-token') || null;
@@ -4851,6 +4851,7 @@ const _AUDIT_EVENT_LABELS = {
   PEDIDO_ITEM_ANULADO: 'Saldo de item anulado', PEDIDO_CANCELADO: 'Pedido cancelado',
   USUARIO_CRIADO: 'Usuário criado', USUARIO_EDITADO: 'Usuário editado', USUARIO_EXCLUIDO: 'Usuário excluído',
   RESTAURAR_BACKUP: 'Backup restaurado (JSON)', RESTAURAR_DB: 'Banco restaurado (.db)', FACTORY_RESET: 'Reset de fábrica',
+  CONFIG_ALTERADA: 'Configuração alterada',
   DOCUMENTO_GERADO: 'Relatório gerado',
 };
 
