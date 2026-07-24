@@ -5,6 +5,16 @@
 
 ---
 
+## [0.29.0] — 2026-07-24
+
+### Adicionado
+- **Cadastro de fornecedores compartilhado entre os sistemas.** Agora dá para **exportar** o cadastro de fornecedores e **sincronizá-lo** com os outros sistemas da família por CNPJ: soma os novos, atualiza os que mudaram e, quando o mesmo fornecedor foi editado dos dois lados desde a última sincronização, abre uma tela para você escolher qual versão manter. Não apaga nada.
+
+### Segurança
+- **A senha de fábrica não pode mais ser definida como nova senha.** Ao trocar a senha, `admin123` (a padrão publicada no manual) é recusada — antes era possível "trocar" para ela e assim contornar a exigência de sair da senha padrão.
+
+---
+
 ## [0.28.0] — 2026-07-24
 
 ### Alterado

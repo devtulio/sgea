@@ -91,6 +91,102 @@ def parse_valor(v):
     return -n if negativo else n
 
 
+# ── Cadastro compartilhado de fornecedores (sync peer SGCD/SGCA/SGEA) ────────────
+# Mesmo schema nos três; qualquer um cadastra/edita e propaga. Chave natural =
+# CNPJ (só dígitos). Merge por last-write-wins via `updatedAt`, com detecção
+# precisa de conflito por marca d'água `syncedAt` (estado no último sync): só é
+# conflito quando OS DOIS lados mexeram desde então — aí vai pra revisão manual.
+# Compliance (ceis/cnep/sancoes) é editável só no SGCD (regra de UI); o merge
+# carrega esses campos, mas os receptores não os editam. Sync nunca apaga.
+
+# Campos congelados do fornecedor canônico — contrato entre SGCD/SGCA/SGEA.
+# SGCD já grava todos; SGCA idem (mesmo JSON); SGEA guarda em coluna `data`.
+# updatedAt = última edição; syncedAt = estado no último sync (controle, não conteúdo).
+CAMPOS_FORNECEDOR = (
+    'cnpj', 'razao_social', 'nome_fantasia',
+    'situacao', 'porte', 'natureza_juridica', 'capital_social', 'opcao_simples', 'opcao_mei',
+    'logradouro', 'numero', 'complemento', 'bairro', 'municipio', 'uf', 'cep', 'endereco',
+    'telefone', 'telefone2', 'email', 'website',
+    'ceis', 'cnep', 'sancoes', 'qsa', 'obs',
+    'updatedAt', 'syncedAt',
+)
+# Campos de conteúdo (comparados para decidir igualdade) — tudo menos os de controle.
+_CONTROLE_FORNECEDOR = ('updatedAt', 'syncedAt')
+CAMPOS_CONTEUDO_FORNECEDOR = tuple(c for c in CAMPOS_FORNECEDOR if c not in _CONTROLE_FORNECEDOR)
+
+def cnpj_digits(v):
+    """CNPJ só com dígitos — chave natural estável entre os sistemas."""
+    return re.sub(r'\D', '', v or '')
+
+def ts_ms(v):
+    """updatedAt/syncedAt em milissegundos comparáveis. O campo chega em dois
+    formatos na família — número epoch (Date.now() no front) ou string ISO com
+    ms (_now_precise no server) — e comparar str com int estoura. Normaliza os
+    dois para int-ms; vazio/inválido = 0."""
+    if v is None or v == '':
+        return 0
+    if isinstance(v, (int, float)):
+        return int(v)
+    s = str(v)
+    try:
+        import datetime
+        return int(datetime.datetime.fromisoformat(s).timestamp() * 1000)
+    except ValueError:
+        try:
+            return int(float(s))
+        except ValueError:
+            return 0
+
+def _fornecedores_iguais(a, b, campos=CAMPOS_CONTEUDO_FORNECEDOR):
+    return all((a.get(c) or '') == (b.get(c) or '') for c in campos)
+
+def classificar_merge(existente, novo):
+    """Classifica um fornecedor `novo` (do arquivo de sync) contra o `existente`
+    local (ou None). Devolve:
+      'novo'      -> não existe local: inserir.
+      'igual'     -> mesmo conteúdo: nada a fazer (idempotente).
+      'conflito'  -> os dois mexeram desde o último sync: revisão manual.
+      'atualizar' -> só o de fora mudou e é mais novo: aplica.
+      'ignorar'   -> o local é mais novo / o de fora não avançou: mantém local.
+    Nunca devolve ação de apagar — sync só insere/atualiza."""
+    if existente is None:
+        return 'novo'
+    if _fornecedores_iguais(existente, novo):
+        return 'igual'
+    synced        = ts_ms(existente.get('syncedAt'))
+    local_ts      = ts_ms(existente.get('updatedAt'))
+    entrada_ts    = ts_ms(novo.get('updatedAt'))
+    if local_ts > synced and entrada_ts > synced:
+        return 'conflito'
+    if entrada_ts > local_ts:
+        return 'atualizar'
+    return 'ignorar'
+
+def planejar_sync_fornecedores(locais, entrada):
+    """Planeja o import de fornecedores (função pura — não toca banco). Cada
+    sistema monta `locais` (dict cnpj_digits -> registro local) e passa a lista
+    `entrada` (do arquivo). Devolve os baldes para o sistema executar:
+      {'inserir': [...], 'atualizar': [...], 'conflitos': [{'cnpj','local','entrada'}], 'ignorados': n}
+    Entrada sem CNPJ é descartada — CNPJ é a chave; sem ela não há como casar."""
+    plano = {'inserir': [], 'atualizar': [], 'conflitos': [], 'ignorados': 0, 'sem_cnpj': 0}
+    for novo in entrada:
+        cnpj = cnpj_digits(novo.get('cnpj'))
+        if not cnpj:
+            plano['sem_cnpj'] += 1
+            continue
+        existente = locais.get(cnpj)
+        acao = classificar_merge(existente, novo)
+        if acao == 'novo':
+            plano['inserir'].append(novo)
+        elif acao == 'atualizar':
+            plano['atualizar'].append(novo)
+        elif acao == 'conflito':
+            plano['conflitos'].append({'cnpj': cnpj, 'local': existente, 'entrada': novo})
+        else:  # 'igual' ou 'ignorar'
+            plano['ignorados'] += 1
+    return plano
+
+
 # ── Senhas (PBKDF2-HMAC-SHA256) ──────────────────────────────────────────────
 
 def hash_password(password, salt=None):
@@ -106,6 +202,16 @@ def verify_password(password, stored):
         return secrets.compare_digest(hash_password(password, salt), stored)
     except Exception:
         return False
+
+
+# Senha de fábrica (admin/admin123, publicada no README/manual). Recusada como
+# NOVA senha: sem isso a troca obrigatória vira contornável — o usuário digita o
+# próprio padrão, o hash bate, a marca must_change_password zera e a conta segue
+# com a senha de fábrica. Ver rota_liberada_sem_trocar_senha / marcar_senha_padrao.
+SENHA_PADRAO = 'admin123'
+
+def eh_senha_padrao(senha):
+    return (senha or '') == SENHA_PADRAO
 
 
 # O instalador cria o admin já com must_change_password=1, mas quem instalou

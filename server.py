@@ -1,4 +1,4 @@
-# SGEA v0.28.0 — Servidor local: SQLite, autenticação, REST API, controle de estoque por lote (FEFO), backup automático
+# SGEA v0.29.0 — Servidor local: SQLite, autenticação, REST API, controle de estoque por lote (FEFO), backup automático
 import http.server
 import socketserver
 import os
@@ -37,7 +37,7 @@ for _stream in (sys.stdout, sys.stderr):
 # Versão do servidor — DEVE acompanhar o SGEA_VERSION do SGEA.html a cada release.
 # Exposta em /health para o frontend detectar quando o processo em execução está
 # desatualizado (HTML novo servido, mas server.py antigo ainda rodando em memória).
-SERVER_VERSION = '0.28.0'
+SERVER_VERSION = '0.29.0'
 
 PORT        = int(os.environ.get('SGEA_PORT', 3003))
 _BASE       = os.path.dirname(os.path.abspath(__file__))
@@ -1003,6 +1003,9 @@ class SGEAHandler(http.server.SimpleHTTPRequestHandler):
         elif p == '/api/relatorio/pedidos-abertos':
             self._relatorio_pedidos_abertos()
 
+        elif p == '/api/fornecedores/export':
+            if not s['admin']: self._json(403, {'error': 'Acesso restrito'}); return
+            self._export_fornecedores()
         elif p == '/api/fornecedores':
             self._list_fornecedores(qs)
         elif re.fullmatch(r'/api/fornecedores/[^/]+', p):
@@ -1123,6 +1126,12 @@ class SGEAHandler(http.server.SimpleHTTPRequestHandler):
             self._create_produto(data)
         elif p == '/api/fornecedores':
             self._create_fornecedor(data)
+        elif p == '/api/fornecedores/sync/preview':
+            if not s['admin']: self._json(403, {'error': 'Acesso restrito'}); return
+            self._sync_forn_preview(data)
+        elif p == '/api/fornecedores/sync/apply':
+            if not s['admin']: self._json(403, {'error': 'Acesso restrito'}); return
+            self._sync_forn_apply(data)
         elif p == '/api/fornecedores/import':
             if not s['admin']: self._json(403, {'error': 'Acesso restrito'}); return
             self._import_fornecedores(data)
@@ -1394,6 +1403,8 @@ class SGEAHandler(http.server.SimpleHTTPRequestHandler):
             if data.get('password'):
                 if len(data['password']) < 6:
                     self._json(400, {'error': 'Senha mínima: 6 caracteres'}); return
+                if sgx_base.eh_senha_padrao(data['password']):
+                    self._json(400, {'error': 'Escolha uma senha diferente da padrão de fábrica.'}); return
                 if 'old_password' in data:
                     row = conn.execute('SELECT senha_hash FROM usuarios WHERE id=?', (uid,)).fetchone()
                     if not row or not _verify_password(data['old_password'], row['senha_hash']):
@@ -1769,6 +1780,105 @@ class SGEAHandler(http.server.SimpleHTTPRequestHandler):
                  data.get('cnpj'), data.get('razao_social'), data['updatedAt'], fid)
             )
         self._json(200, data)
+
+    # ── Sync peer de fornecedores (cadastro compartilhado da família) ───────────
+    # Espelha SGCD/SGCA; ver sgx_base.classificar_merge. SGEA não edita compliance
+    # (ceis/cnep/sancoes) — só carrega o que vem do SGCD. Campos locais do SGEA
+    # (ex. `ativo`) são preservados no merge (não estão em CAMPOS_FORNECEDOR).
+    def _export_fornecedores(self):
+        with get_db() as conn:
+            rows = conn.execute("SELECT data FROM fornecedores WHERE deleted_at IS NULL").fetchall()
+        itens = []
+        for r in rows:
+            d = json.loads(r['data'])
+            if not sgx_base.cnpj_digits(d.get('cnpj')):
+                continue
+            itens.append({c: d[c] for c in sgx_base.CAMPOS_FORNECEDOR if c in d})
+        payload = {'_sgx': 'SGEA', 'tipo': 'fornecedores', 'exportedAt': _now(), 'fornecedores': itens}
+        body = json.dumps(payload, ensure_ascii=False).encode('utf-8')
+        self.send_response(200); self._cors()
+        self.send_header('Content-Type', 'application/json')
+        self.send_header('Content-Length', str(len(body)))
+        self.send_header('Content-Disposition',
+                         f'attachment; filename="SGX_FORN_{time.strftime("%Y-%m-%d_%H-%M-%S")}.json"')
+        self.end_headers(); self.wfile.write(body)
+
+    def _forn_entrada_valida(self, data):
+        if not isinstance(data, dict) or data.get('tipo') != 'fornecedores' or not isinstance(data.get('fornecedores'), list):
+            return None
+        return data['fornecedores']
+
+    def _forn_locais(self, conn):
+        locais = {}
+        for r in conn.execute("SELECT id,data FROM fornecedores WHERE deleted_at IS NULL").fetchall():
+            d = json.loads(r['data'])
+            dig = sgx_base.cnpj_digits(d.get('cnpj'))
+            if dig:
+                d['_id'] = r['id']
+                locais[dig] = d
+        return locais
+
+    def _sync_forn_preview(self, data):
+        entrada = self._forn_entrada_valida(data)
+        if entrada is None:
+            self._json(400, {'error': 'Arquivo não é um cadastro de fornecedores válido'}); return
+        with get_db() as conn:
+            plano = sgx_base.planejar_sync_fornecedores(self._forn_locais(conn), entrada)
+        conflitos = [{'cnpj': c['cnpj'],
+                      'local':   {'razao_social': c['local'].get('razao_social'),   'updatedAt': c['local'].get('updatedAt')},
+                      'arquivo': {'razao_social': c['entrada'].get('razao_social'), 'updatedAt': c['entrada'].get('updatedAt')}}
+                     for c in plano['conflitos']]
+        self._json(200, {'inserir': len(plano['inserir']), 'atualizar': len(plano['atualizar']),
+                         'conflitos': conflitos, 'ignorados': plano['ignorados'], 'sem_cnpj': plano['sem_cnpj']})
+
+    def _forn_upsert(self, conn, local, item):
+        canon = {c: item[c] for c in sgx_base.CAMPOS_FORNECEDOR if c in item}
+        if local:
+            fid = local['_id']
+            base = {k: v for k, v in local.items() if k != '_id'}
+            merged = {**base, **canon}   # preserva campos locais (ex. ativo)
+        else:
+            fid = str(uuid.uuid4())
+            merged = dict(canon)
+            merged.setdefault('ativo', 1)
+        merged['id'] = fid
+        merged['syncedAt'] = item.get('updatedAt') or _now_precise()
+        merged.setdefault('updatedAt', merged['syncedAt'])
+        conn.execute(
+            '''INSERT OR REPLACE INTO fornecedores (id,data,cnpj,razao_social,updated_at,deleted_at)
+               VALUES (?,?,?,?,?,(SELECT deleted_at FROM fornecedores WHERE id=?))''',
+            (fid, json.dumps(merged, ensure_ascii=False),
+             merged.get('cnpj'), merged.get('razao_social'), merged.get('updatedAt'), fid))
+
+    def _forn_marcar_synced(self, conn, local, ate):
+        fid = local['_id']
+        d = {k: v for k, v in local.items() if k != '_id'}
+        d['syncedAt'] = ate or d.get('updatedAt')
+        conn.execute('UPDATE fornecedores SET data=? WHERE id=?', (json.dumps(d, ensure_ascii=False), fid))
+
+    def _sync_forn_apply(self, data):
+        entrada = self._forn_entrada_valida(data)
+        if entrada is None:
+            self._json(400, {'error': 'Arquivo não é um cadastro de fornecedores válido'}); return
+        resolver = data.get('resolver') or {}
+        with get_db() as conn:
+            locais = self._forn_locais(conn)
+            plano = sgx_base.planejar_sync_fornecedores(locais, entrada)
+            novos = atualizados = conflitos_aplicados = 0
+            for item in plano['inserir']:
+                self._forn_upsert(conn, None, item); novos += 1
+            for item in plano['atualizar']:
+                dig = sgx_base.cnpj_digits(item.get('cnpj'))
+                self._forn_upsert(conn, locais.get(dig), item); atualizados += 1
+            for c in plano['conflitos']:
+                local = locais.get(c['cnpj'])
+                if resolver.get(c['cnpj']) == 'arquivo':
+                    self._forn_upsert(conn, local, c['entrada']); conflitos_aplicados += 1
+                elif local:
+                    self._forn_marcar_synced(conn, local, c['entrada'].get('updatedAt'))
+            conn.commit()
+        self._json(200, {'ok': True, 'novos': novos, 'atualizados': atualizados,
+                         'conflitos_aplicados': conflitos_aplicados})
 
     def _update_fornecedor(self, fid, data):
         with get_db() as conn:

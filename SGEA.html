@@ -398,6 +398,15 @@
           <svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><path d="M21 15v4a2 2 0 0 1-2 2H5a2 2 0 0 1-2-2v-4"/><polyline points="17 8 12 3 7 8"/><line x1="12" y1="3" x2="12" y2="15"/></svg>
           Importar CSV
         </button>
+        <button class="btn btn-outline" onclick="exportarCadastroForn()" title="Exportar cadastro de fornecedores para sincronizar com SGCD/SGCA">
+          <svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><path d="M4 12v8a2 2 0 0 0 2 2h12a2 2 0 0 0 2-2v-8"/><polyline points="16 6 12 2 8 6"/><line x1="12" y1="2" x2="12" y2="15"/></svg>
+          Exportar cadastro
+        </button>
+        <label class="btn btn-outline" style="cursor:pointer" title="Sincronizar cadastro a partir de arquivo de outro sistema (SGCD/SGCA)">
+          <svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><polyline points="23 4 23 10 17 10"/><polyline points="1 20 1 14 7 14"/><path d="M3.51 9a9 9 0 0 1 14.85-3.36L23 10M1 14l4.64 4.36A9 9 0 0 0 20.49 15"/></svg>
+          Sincronizar cadastro
+          <input type="file" accept=".json" style="display:none" onchange="sincronizarCadastroForn(this.files[0]).then(()=>this.value='')">
+        </label>
         <button class="btn btn-primary" onclick="openFornModal()">
           <svg width="14" height="14" viewBox="0 0 14 14" fill="none"><path d="M7 1v12M1 7h12" stroke="#fff" stroke-width="2" stroke-linecap="round"/></svg>
           Novo Fornecedor
@@ -1233,7 +1242,7 @@
 // ══════════════════════════════════════════════════════════════
 // API / SESSÃO
 // ══════════════════════════════════════════════════════════════
-const SGEA_VERSION = '0.28.0';
+const SGEA_VERSION = '0.29.0';
 document.title = `SGEA v${SGEA_VERSION}`;
 
 let _apiToken = localStorage.getItem('sgea-token') || null;
@@ -3153,6 +3162,107 @@ async function exportarFornecedoresXlsx() {
   if (!lista.length) { toast('Nenhum fornecedor para exportar', 'error'); return; }
   if (await _exportarXlsx(`SGEA_fornecedores_${new Date().toISOString().slice(0, 10)}.xlsx`, _FORN_EXPORT_COLS, _fornExportRows(lista)))
     toast(`${lista.length} fornecedor(es) exportado(s).`, 'success');
+}
+
+// ── Sync peer do cadastro de fornecedores (SGEA ↔ SGCD/SGCA) ──────────────────
+const _forn_ts = v => (typeof v === 'number' ? v : Date.parse(v) || 0);
+const _forn_dt = v => v ? new Date(_forn_ts(v)).toLocaleString('pt-BR') : '—';
+
+async function exportarCadastroForn() {
+  const r = await API.get('/api/fornecedores/export');
+  if (!r?.ok) { toast('Erro ao exportar cadastro.', 'error'); return; }
+  const txt = await r.text();
+  let n = 0; try { n = (JSON.parse(txt).fornecedores || []).length; } catch {}
+  const nome = `SGX_FORN_${new Date().toISOString().slice(0,10)}_${new Date().toTimeString().slice(0,8).replace(/:/g,'-')}.json`;
+  const salvo = await _salvarArquivoComo(txt, nome, 'application/json');
+  if (salvo) toast(`${n} fornecedor(es) exportado(s) para sincronização.`, 'success');
+}
+
+async function sincronizarCadastroForn(file) {
+  if (!file) return;
+  let arquivo;
+  try { arquivo = JSON.parse(await file.text()); }
+  catch { toast('Arquivo inválido.', 'error'); return; }
+  if (arquivo.tipo !== 'fornecedores' || !Array.isArray(arquivo.fornecedores)) {
+    toast('Não é um cadastro de fornecedores.', 'error'); return;
+  }
+  const rp = await API.post('/api/fornecedores/sync/preview', arquivo);
+  const prev = await API.json(rp);
+  if (!rp?.ok) { toast(prev?.error || 'Erro ao ler o cadastro.', 'error'); return; }
+
+  const nConf = prev.conflitos.length;
+  if (prev.inserir + prev.atualizar + nConf === 0) {
+    toast('Nenhuma novidade — o cadastro já está em dia.', 'info'); return;
+  }
+  const resumo = [
+    prev.inserir && `${prev.inserir} novo(s)`,
+    prev.atualizar && `${prev.atualizar} atualizado(s)`,
+    nConf && `${nConf} em conflito`,
+  ].filter(Boolean).join(', ');
+  const ok = await customConfirm(
+    `Origem: ${arquivo._sgx || 'outro sistema'}. Serão aplicados: ${resumo}.` +
+    (nConf ? ' Os conflitos você revisa, um a um, na próxima tela.' : '') +
+    (prev.sem_cnpj ? ` (${prev.sem_cnpj} registro(s) sem CNPJ foram ignorados.)` : ''),
+    { title: 'Sincronizar cadastro de fornecedores', icon: '↻', okLabel: 'Continuar', okClass: 'btn-primary' }
+  );
+  if (!ok) return;
+
+  let resolver = {};
+  if (nConf) {
+    resolver = await _revisarConflitosForn(prev.conflitos);
+    if (resolver === null) { toast('Sincronização cancelada.', 'info'); return; }
+  }
+  const ra = await API.post('/api/fornecedores/sync/apply', { ...arquivo, resolver });
+  const ap = await API.json(ra);
+  if (!ra?.ok) { toast(ap?.error || 'Erro ao sincronizar.', 'error'); return; }
+  toast(`Sincronizado: ${ap.novos} novo(s), ${ap.atualizados} atualizado(s), ${ap.conflitos_aplicados} conflito(s) aplicado(s).`, 'success');
+  renderFornecedores();
+}
+
+// Conflito = os dois lados editaram desde o último sync. Você escolhe qual manter.
+function _revisarConflitosForn(conflitos) {
+  return new Promise(resolve => {
+    const linhas = conflitos.map((c, i) => `
+      <tr>
+        <td style="padding:8px 6px;border-bottom:1px solid var(--gray-100);font-size:.8rem">${esc(c.cnpj)}</td>
+        <td style="padding:8px 6px;border-bottom:1px solid var(--gray-100);font-size:.78rem">
+          <div><strong>Atual:</strong> ${esc(c.local.razao_social||'')} <span style="color:var(--gray-400)">(${_forn_dt(c.local.updatedAt)})</span></div>
+          <div><strong>Arquivo:</strong> ${esc(c.arquivo.razao_social||'')} <span style="color:var(--gray-400)">(${_forn_dt(c.arquivo.updatedAt)})</span></div>
+        </td>
+        <td style="padding:8px 6px;border-bottom:1px solid var(--gray-100);white-space:nowrap">
+          <label style="font-size:.78rem;margin-right:10px"><input type="radio" name="cf-${i}" value="local" data-cnpj="${c.cnpj}" checked> Manter atual</label>
+          <label style="font-size:.78rem"><input type="radio" name="cf-${i}" value="arquivo" data-cnpj="${c.cnpj}"> Usar arquivo</label>
+        </td>
+      </tr>`).join('');
+    const ov = document.createElement('div');
+    ov.style.cssText = 'position:fixed;inset:0;background:rgba(0,0,0,.45);display:flex;align-items:center;justify-content:center;z-index:9999';
+    ov.innerHTML = `
+      <div style="background:var(--card,#fff);border-radius:12px;max-width:820px;width:92vw;max-height:82vh;display:flex;flex-direction:column;box-shadow:0 10px 40px rgba(0,0,0,.3)">
+        <div style="padding:16px 20px;border-bottom:1px solid var(--gray-100)"><h2 style="margin:0;font-size:1.05rem">Revisar conflitos de fornecedor</h2>
+          <p style="margin:4px 0 0;font-size:.78rem;color:var(--gray-500)">Editados dos dois lados desde o último sync. Escolha qual manter.</p></div>
+        <div style="padding:8px 16px;overflow-y:auto">
+          <table style="width:100%;border-collapse:collapse">
+            <thead><tr>
+              <th style="text-align:left;padding:6px;font-size:.72rem;color:var(--gray-500)">CNPJ</th>
+              <th style="text-align:left;padding:6px;font-size:.72rem;color:var(--gray-500)">Versões</th>
+              <th style="text-align:left;padding:6px;font-size:.72rem;color:var(--gray-500)">Escolha</th>
+            </tr></thead>
+            <tbody>${linhas}</tbody>
+          </table>
+        </div>
+        <div style="padding:14px 20px;border-top:1px solid var(--gray-100);display:flex;justify-content:flex-end;gap:8px">
+          <button class="btn btn-outline" id="cf-cancelar">Cancelar</button>
+          <button class="btn btn-primary" id="cf-aplicar">Aplicar</button>
+        </div>
+      </div>`;
+    document.body.appendChild(ov);
+    ov.querySelector('#cf-cancelar').onclick = () => { ov.remove(); resolve(null); };
+    ov.querySelector('#cf-aplicar').onclick = () => {
+      const resolver = {};
+      ov.querySelectorAll('input[type=radio]:checked').forEach(el => { resolver[el.dataset.cnpj] = el.value; });
+      ov.remove(); resolve(resolver);
+    };
+  });
 }
 
 async function gerarRelatorioFornecedores() {

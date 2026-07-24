@@ -1042,6 +1042,71 @@ class TestSenhaPadraoMarcadaNoBoot(SGEATestCase):
                          'exigiu troca de quem já tinha saído da senha padrão')
 
 
+class TestRecusaSenhaPadrao(SGEATestCase):
+    """Não deixa definir a senha de fábrica como NOVA senha (ver sgx_base.eh_senha_padrao)."""
+
+    def test_recusa_admin123_como_nova_senha(self):
+        tok = self.login()
+        with server.get_db() as conn:
+            uid = conn.execute("SELECT id FROM usuarios WHERE username='admin'").fetchone()['id']
+        st, r = self.request('PUT', f'/api/usuarios/{uid}', {'password': 'admin123'}, token=tok)
+        self.assertEqual(st, 400, r)
+        self.assertIn('padrão', (r or {}).get('error', ''))
+
+
+class TestSyncFornecedor(SGEATestCase):
+    """Cadastro de fornecedor compartilhado (2026-07): export + sync peer por CNPJ,
+    last-write-wins com revisão manual (marca d'água syncedAt). Espelho de SGCD/SGCA.
+    SGEA já usa o schema JSON `data` do fornecedor (paridade), sem migração."""
+
+    def _set_data(self, cnpj_like, **kv):
+        with server.get_db() as conn:
+            row = conn.execute("SELECT id,data FROM fornecedores WHERE cnpj LIKE ?", (cnpj_like,)).fetchone()
+            d = json.loads(row['data']); d.update(kv)
+            conn.execute("UPDATE fornecedores SET data=? WHERE id=?", (json.dumps(d), row['id'])); conn.commit()
+
+    def test_export_envelope(self):
+        tok = self.login()
+        self.request('POST', '/api/fornecedores', {'cnpj': '90.201.001/0001-00', 'razao_social': 'ExpS', 'updatedAt': 1000}, tok)
+        st, d = self.request('GET', '/api/fornecedores/export', token=tok)
+        self.assertEqual(st, 200)
+        self.assertEqual((d['_sgx'], d['tipo']), ('SGEA', 'fornecedores'))
+
+    def test_preview_apply_e_preserva_ativo(self):
+        tok = self.login()
+        self.request('POST', '/api/fornecedores', {'cnpj': '90.202.001/0001-00', 'razao_social': 'Base', 'ativo': 1, 'updatedAt': 1000}, tok)
+        self._set_data('90.202.001%', syncedAt=1000)
+        arq = {'tipo': 'fornecedores', 'fornecedores': [
+            {'cnpj': '90.202.002/0001-00', 'razao_social': 'Novo', 'updatedAt': 2000},
+            {'cnpj': '90.202.001/0001-00', 'razao_social': 'Base Ltda', 'updatedAt': 5000}]}
+        st, prev = self.request('POST', '/api/fornecedores/sync/preview', arq, token=tok)
+        self.assertEqual((prev['inserir'], prev['atualizar'], len(prev['conflitos'])), (1, 1, 0))
+        st, ap = self.request('POST', '/api/fornecedores/sync/apply', arq, token=tok)
+        self.assertEqual((ap['novos'], ap['atualizados']), (1, 1))
+        st, lst = self.request('GET', '/api/fornecedores?per=2000', token=tok)
+        base = next(f for f in lst['items'] if (f.get('cnpj') or '').startswith('90.202.001'))
+        self.assertEqual(base['razao_social'], 'Base Ltda')
+        self.assertEqual(base.get('ativo'), 1)   # campo local do SGEA preservado no merge
+
+    def test_conflito_resolve_arquivo(self):
+        tok = self.login()
+        self.request('POST', '/api/fornecedores', {'cnpj': '90.203.001/0001-00', 'razao_social': 'Local', 'updatedAt': 5000}, tok)
+        self._set_data('90.203.001%', syncedAt=1000)
+        arq = {'tipo': 'fornecedores', 'fornecedores': [{'cnpj': '90.203.001/0001-00', 'razao_social': 'Remoto', 'updatedAt': 3000}]}
+        st, prev = self.request('POST', '/api/fornecedores/sync/preview', arq, token=tok)
+        self.assertEqual(len(prev['conflitos']), 1)
+        st, ap = self.request('POST', '/api/fornecedores/sync/apply',
+                              {**arq, 'resolver': {'90203001000100': 'arquivo'}}, token=tok)
+        self.assertEqual(ap['conflitos_aplicados'], 1)
+        st, lst = self.request('GET', '/api/fornecedores?per=2000', token=tok)
+        alvo = next(f for f in lst['items'] if (f.get('cnpj') or '').startswith('90.203.001'))
+        self.assertEqual(alvo['razao_social'], 'Remoto')
+
+    def test_arquivo_invalido(self):
+        tok = self.login()
+        self.assertEqual(self.request('POST', '/api/fornecedores/sync/preview', {'foo': 1}, token=tok)[0], 400)
+
+
 class TestBackupCofre(SGEATestCase):
     """Padronização do backup (2026-07): envelope único e Cofre .zip via sgx_base.
     SGEA não tem anexos, então o Cofre é um .zip só com banco.db. O restore aceita
