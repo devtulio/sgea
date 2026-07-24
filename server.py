@@ -1,4 +1,4 @@
-# SGEA v0.27.4 — Servidor local: SQLite, autenticação, REST API, controle de estoque por lote (FEFO), backup automático
+# SGEA v0.28.0 — Servidor local: SQLite, autenticação, REST API, controle de estoque por lote (FEFO), backup automático
 import http.server
 import socketserver
 import os
@@ -37,7 +37,7 @@ for _stream in (sys.stdout, sys.stderr):
 # Versão do servidor — DEVE acompanhar o SGEA_VERSION do SGEA.html a cada release.
 # Exposta em /health para o frontend detectar quando o processo em execução está
 # desatualizado (HTML novo servido, mas server.py antigo ainda rodando em memória).
-SERVER_VERSION = '0.27.4'
+SERVER_VERSION = '0.28.0'
 
 PORT        = int(os.environ.get('SGEA_PORT', 3003))
 _BASE       = os.path.dirname(os.path.abspath(__file__))
@@ -2344,29 +2344,27 @@ class SGEAHandler(http.server.SimpleHTTPRequestHandler):
 
     def _export_db_backup(self):
         import tempfile
-        tmp = tempfile.NamedTemporaryFile(suffix='.db', delete=False)
-        tmp.close()
+        tmpdir = tempfile.mkdtemp()
         try:
-            with sqlite3.connect(DB_PATH, factory=_ConnAutoClose) as src, \
-                 sqlite3.connect(tmp.name, factory=_ConnAutoClose) as bk:
-                src.backup(bk)
-            with open(tmp.name, 'rb') as f:
+            name = time.strftime('DB_SGEA_BACKUP_%Y-%m-%d_%H-%M-%S.zip')
+            dst = os.path.join(tmpdir, name)
+            sgx_base.escrever_cofre(DB_PATH, None, dst)   # SGEA não tem anexos
+            with open(dst, 'rb') as f:
                 data_bytes = f.read()
-            name = time.strftime('DB_SGEA_BACKUP_%Y-%m-%d_%H-%M-%S.db')
             self.send_response(200); self._cors()
-            self.send_header('Content-Type', 'application/octet-stream')
+            self.send_header('Content-Type', 'application/zip')
             self.send_header('Content-Length', str(len(data_bytes)))
             self.send_header('Content-Disposition', f'attachment; filename="{name}"')
             self.end_headers(); self.wfile.write(data_bytes)
         finally:
-            try: os.remove(tmp.name)
-            except Exception: pass
+            import shutil as _sh
+            _sh.rmtree(tmpdir, ignore_errors=True)
 
     def _list_db_backups(self):
         cfg = _get_backup_cfg()
         bdir = cfg['path']
         files = sorted(
-            (f for f in os.listdir(bdir) if f.startswith('DB_SGEA_BACKUP_') and f.endswith('.db')), reverse=True
+            (f for f in os.listdir(bdir) if f.startswith('DB_SGEA_BACKUP_') and f.endswith(_COFRE_EXTS)), reverse=True
         ) if os.path.isdir(bdir) else []
         items = [{'name': f, 'size': os.path.getsize(os.path.join(bdir, f)), 'ts': sgx_base.backup_ts(f)} for f in files]
         with get_db() as conn:
@@ -2374,7 +2372,7 @@ class SGEAHandler(http.server.SimpleHTTPRequestHandler):
         self._json(200, {'items': items, 'path': bdir, 'cfg': cfg, 'last_backup': last_row['value'] if last_row else None})
 
     def _download_db_backup(self, name):
-        if not name or not name.startswith('DB_SGEA_BACKUP_') or not name.endswith('.db') or '/' in name or '\\' in name:
+        if not name or not name.startswith('DB_SGEA_BACKUP_') or not name.endswith(_COFRE_EXTS) or '/' in name or '\\' in name:
             self._json(400, {'error': 'Nome inválido'}); return
         cfg = _get_backup_cfg()
         fp = os.path.join(cfg['path'], name)
@@ -2400,7 +2398,7 @@ class SGEAHandler(http.server.SimpleHTTPRequestHandler):
             _watchdog_paused = False
 
     def _restore_backup(self, data, s):
-        if not data.get('_sgea'):
+        if not sgx_base.eh_backup(data, _SGX_SIGLA):
             self._json(400, {'error': 'Arquivo não é um backup SGEA válido'}); return
         _do_db_backup()  # segurança antes de substituir tudo
         try:
@@ -2430,38 +2428,42 @@ class SGEAHandler(http.server.SimpleHTTPRequestHandler):
         self._json(200, {'ok': True})
 
     def _restore_db_backup(self, raw_bytes, s):
-        if len(raw_bytes) < 16 or raw_bytes[:16] != b'SQLite format 3\x00':
-            self._json(400, {'error': 'Arquivo não é um banco SQLite válido'}); return
-        import tempfile
-        tmp = tempfile.NamedTemporaryFile(suffix='.db', delete=False)
+        # Aceita o pacote .zip novo e o .db legado. SGEA não tem anexos, então os
+        # membros uploads/ (se houver, de um pacote de outro sistema) são ignorados.
+        import tempfile, shutil
+        tmpdir = tempfile.mkdtemp()
         try:
-            tmp.write(raw_bytes); tmp.close()
-            with sqlite3.connect(tmp.name, factory=_ConnAutoClose) as test_conn:
+            try:
+                dbfile, anexos = sgx_base.abrir_cofre(raw_bytes, tmpdir)
+            except ValueError as e:
+                self._json(400, {'error': str(e)}); return
+            with sqlite3.connect(dbfile, factory=_ConnAutoClose) as test_conn:
                 tables = {r[0] for r in test_conn.execute("SELECT name FROM sqlite_master WHERE type='table'").fetchall()}
             required = {'produtos', 'lotes', 'entradas', 'saidas', 'sys_settings'}
             if not required.issubset(tables):
                 self._json(400, {'error': 'Banco inválido: tabelas obrigatórias ausentes'}); return
-            _do_db_backup()
-            with sqlite3.connect(tmp.name, factory=_ConnAutoClose) as src, get_db() as dst:
+            _do_db_backup()  # ponto de recuperação antes de substituir
+            with sqlite3.connect(dbfile, factory=_ConnAutoClose) as src, get_db() as dst:
                 src.backup(dst)
                 # Registrado na conexão já restaurada — o backup() acima substitui todo o
                 # banco, então logar antes seria sobrescrito pelo conteúdo do arquivo restaurado.
                 _insert_audit_raw(dst, {'type': 'RESTAURAR_DB', 'ts': _now(),
                                          'user_id': s['user_id'], 'user_nome': s['nome'],
-                                         'label': 'Banco de dados restaurado', 'detail': 'Restauração via arquivo .db'})
+                                         'label': 'Banco de dados restaurado',
+                                         'detail': 'Restauração via pacote .zip' if anexos is not None else 'Restauração via arquivo .db legado'})
             self._json(200, {'ok': True})
         except Exception as e:
             _log.error('Erro ao restaurar banco: %s', e)
             self._json(500, {'error': str(e)})
         finally:
-            try: os.remove(tmp.name)
-            except Exception: pass
+            import shutil as _sh
+            _sh.rmtree(tmpdir, ignore_errors=True)
 
     def _relatorio_integridade(self):
         cfg = _get_backup_cfg()
         bdir = cfg['path']
         backups_db = sorted(
-            (f for f in os.listdir(bdir) if f.startswith('DB_SGEA_BACKUP_') and f.endswith('.db')),
+            (f for f in os.listdir(bdir) if f.startswith('DB_SGEA_BACKUP_') and f.endswith(_COFRE_EXTS)),
             reverse=True
         ) if os.path.isdir(bdir) else []
         backups_json = sorted(
@@ -2661,6 +2663,14 @@ _BACKUP_TABLES = ('centros_custo', 'fornecedores', 'funcionarios', 'frota', 'pro
 # _restore_backup, que relê e regrava esses valores em torno do DELETE.
 _CHAVES_SIGILOSAS = ('smtp_pass', 'portal_transparencia_key')
 
+# Padronização do backup da família (2026-07): envelope único e Cofre .zip via
+# sgx_base. SGEA não tem anexos (uploads_dir=None), então o Cofre é um .zip só
+# com banco.db — uniforme com os irmãos. Flag de usuários = False.
+_SGX_SIGLA = 'SGEA'
+_BACKUP_SCHEMA = 1
+_BACKUP_INCLUI_USUARIOS = False
+_COFRE_EXTS = ('.zip', '.db')   # casa o .zip novo e o .db legado
+
 def _settings_para(result, s):
     """Recorta o que /api/settings devolve conforme quem pergunta.
 
@@ -2679,7 +2689,7 @@ def _settings_para(result, s):
 
 def _build_backup_payload():
     with get_db() as conn:
-        payload = {'_sgea': True, 'version': 1, 'exportedAt': _now()}
+        payload = {'_sgx': _SGX_SIGLA, 'schema': _BACKUP_SCHEMA, 'exportedAt': _now()}
         for t in _BACKUP_TABLES:
             linhas = [dict(r) for r in conn.execute(f'SELECT * FROM {t}').fetchall()]
             if t == 'sys_settings':
@@ -2706,7 +2716,7 @@ def _rotate_backups(cfg=None):
     if cfg is None: cfg = _get_backup_cfg()
     bdir, keep = cfg['path'], cfg['keep']
     if not os.path.isdir(bdir): return
-    for prefix, ext in [('DB_SGEA_BACKUP_', '.db'), ('SIS_SGEA_BACKUP_', '.json')]:
+    for prefix, ext in [('DB_SGEA_BACKUP_', _COFRE_EXTS), ('SIS_SGEA_BACKUP_', '.json')]:
         files = sorted(f for f in os.listdir(bdir) if f.startswith(prefix) and f.endswith(ext))
         for old in (files[:-keep] if keep else files):
             fp = os.path.join(bdir, old)
@@ -2762,11 +2772,10 @@ def _do_db_backup(cfg=None):
     if cfg is None: cfg = _get_backup_cfg()
     bdir = cfg['path']
     os.makedirs(bdir, exist_ok=True)
-    name = time.strftime('DB_SGEA_BACKUP_%Y-%m-%d_%H-%M-%S.db')
+    name = time.strftime('DB_SGEA_BACKUP_%Y-%m-%d_%H-%M-%S.zip')
     dst = os.path.join(bdir, name)
     try:
-        with sqlite3.connect(DB_PATH, factory=_ConnAutoClose) as src, sqlite3.connect(dst, factory=_ConnAutoClose) as bk:
-            src.backup(bk)
+        sgx_base.escrever_cofre(DB_PATH, None, dst)   # SGEA não tem anexos
         with get_db() as conn:
             conn.execute("INSERT OR REPLACE INTO sys_settings (key,value) VALUES ('auto_backup_last',?)", (_now(),))
         print(f'Backup automático: {name}')
@@ -2774,6 +2783,8 @@ def _do_db_backup(cfg=None):
         return name
     except Exception as e:
         _log.error('Falha no backup automático: %s', e)
+        try: os.remove(dst)
+        except OSError: pass
         return None
 
 def _purge_old_trash():

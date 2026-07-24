@@ -16,8 +16,10 @@
 #   token = sgx_base.create_session(get_db, user_id, SESSION_TTL)
 
 import hashlib
+import os
 import re
 import secrets
+import shutil
 import smtplib
 import ssl
 import sqlite3
@@ -293,6 +295,87 @@ def backup_ts(filename):
     sistemas (DB_ + código de 4 letras + _BACKUP_), então os offsets são fixos."""
     d = filename[15:25]; t = filename[26:34].replace('-', ':')
     return f'{d}T{t}'
+
+
+# ── Backup: contrato de envelope e Cofre (.zip = banco + anexos) ────────────────
+# Padrão da família (padronização 2026-07). O JSON portátil sai com envelope
+# `{"_sgx": "<SIGLA>", "schema": <int>, "exportedAt": "<ISO>", ...}`; a leitura
+# aceita também os envelopes antigos de cada sistema para os backups já gravados
+# em produção continuarem restauráveis. O Cofre deixa de ser só o .db e passa a
+# ser um pacote .zip com o banco (banco.db) + a pasta de anexos (uploads/…),
+# fechando a lacuna de os PDFs viverem fora do banco; o restore aceita o .db
+# legado (sem anexos). ponytail: zipfile/sqlite da stdlib, sem dependência.
+
+def eh_backup(data, sigla):
+    """True para o envelope novo (`_sgx`) e para os antigos de cada sistema
+    (marcador booleano `_sgcd`/`_sgca`/`_sgea`, ou string `sgdp_version`)."""
+    if not isinstance(data, dict):
+        return False
+    low = sigla.lower()
+    return (data.get('_sgx') == sigla
+            or data.get('_' + low) is not None
+            or (low + '_version') in data)
+
+def backup_exported_at(data):
+    return data.get('exportedAt') or data.get('exported_at')
+
+def escrever_cofre(db_path, uploads_dir, dst_zip):
+    """Grava o Cofre .zip: snapshot consistente do banco (via API de backup do
+    SQLite, não cópia a quente) como banco.db, mais a pasta de anexos quando
+    houver (uploads_dir=None nos sistemas sem anexos)."""
+    import tempfile, zipfile
+    fd, tmp_db = tempfile.mkstemp(suffix='.db'); os.close(fd)
+    src = sqlite3.connect(db_path); bk = sqlite3.connect(tmp_db)
+    try:
+        with bk:
+            src.backup(bk)
+    finally:
+        src.close(); bk.close()
+    try:
+        with zipfile.ZipFile(dst_zip, 'w', zipfile.ZIP_DEFLATED) as z:
+            z.write(tmp_db, 'banco.db')
+            if uploads_dir and os.path.isdir(uploads_dir):
+                for fn in os.listdir(uploads_dir):
+                    fp = os.path.join(uploads_dir, fn)
+                    if os.path.isfile(fp):
+                        z.write(fp, f'uploads/{fn}')
+    finally:
+        try: os.remove(tmp_db)
+        except OSError: pass
+
+def abrir_cofre(raw, destino_dir):
+    """Lê os bytes de um Cofre e extrai para destino_dir. Aceita o .zip novo
+    (banco + anexos) e o .db legado. Devolve (caminho_do_banco, anexos), onde
+    anexos é a lista de nomes extraídos (pacote .zip) ou None (.db legado, não
+    mexer nos uploads). Levanta ValueError se o formato for inválido.
+    Protegido contra zip-slip: dos membros uploads/ só o basename é usado."""
+    import zipfile
+    if raw[:4] == b'PK\x03\x04':
+        zpath = os.path.join(destino_dir, 'cofre.zip')
+        with open(zpath, 'wb') as f:
+            f.write(raw)
+        with zipfile.ZipFile(zpath) as z:
+            nomes = z.namelist()
+            if 'banco.db' not in nomes:
+                raise ValueError('Pacote inválido: banco.db ausente')
+            z.extract('banco.db', destino_dir)
+            anexos = []
+            for n in nomes:
+                if not n.startswith('uploads/') or n.endswith('/'):
+                    continue
+                base = os.path.basename(n)
+                if not base or base.startswith('..'):
+                    continue
+                with z.open(n) as src_f, open(os.path.join(destino_dir, base), 'wb') as out_f:
+                    shutil.copyfileobj(src_f, out_f)
+                anexos.append(base)
+        return os.path.join(destino_dir, 'banco.db'), anexos
+    if raw[:16] == b'SQLite format 3\x00':
+        dbfile = os.path.join(destino_dir, 'banco.db')
+        with open(dbfile, 'wb') as f:
+            f.write(raw)
+        return dbfile, None
+    raise ValueError('Arquivo não é um backup de banco válido (.zip ou .db)')
 
 
 def pick_folder_dialog(description):

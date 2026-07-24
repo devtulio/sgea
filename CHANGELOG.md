@@ -5,6 +5,13 @@
 
 ---
 
+## [0.28.0] — 2026-07-24
+
+### Alterado
+- **Formato de backup do banco unificado com os demais sistemas da família** (pacote **.zip**), com leitura compatível. Backups no formato antigo (.db) continuam podendo ser restaurados.
+
+---
+
 ## [0.27.4] — 2026-07-24
 
 ### Corrigido
