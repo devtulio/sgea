@@ -385,6 +385,12 @@ function _sanitizeEmailHtml(html) {
     'color', 'size', 'face',
   ]);
   const DANGEROUS_PROTOCOLS = /^(javascript|vbscript|data(?!:image\/(png|jpeg|gif|webp|svg)))/i;
+  // TAB, LF e CR dentro do esquema são ignorados pelo navegador ao resolver a
+  // URL: `java&#9;script:` chega aqui sem casar com a regex, mas o link vira
+  // `javascript:` de verdade (verificado — a.protocol devolve 'javascript:').
+  // Testar a versão sem caracteres de controle fecha essa passagem; o valor
+  // guardado no atributo continua o original.
+  const semControle = v => v.replace(/[\u0000-\u0020]/g, '');
   const doc = new DOMParser().parseFromString(html, 'text/html');
   function clean(node) {
     if (node.nodeType === Node.TEXT_NODE) return;
@@ -394,7 +400,7 @@ function _sanitizeEmailHtml(html) {
     if (!ALLOWED_TAGS.has(tag)) { node.replaceWith(document.createTextNode(node.textContent)); return; }
     for (const attr of [...node.attributes]) {
       if (!ALLOWED_ATTRS.has(attr.name.toLowerCase())) node.removeAttribute(attr.name);
-      else if ((attr.name === 'href' || attr.name === 'src') && DANGEROUS_PROTOCOLS.test(attr.value.trim())) node.removeAttribute(attr.name);
+      else if ((attr.name === 'href' || attr.name === 'src') && DANGEROUS_PROTOCOLS.test(semControle(attr.value))) node.removeAttribute(attr.name);
     }
     for (const attr of [...node.attributes]) { if (/^on/i.test(attr.name)) node.removeAttribute(attr.name); }
     for (const child of [...node.childNodes]) clean(child);
