@@ -128,6 +128,41 @@ document.addEventListener('DOMContentLoaded', () => {
 });
 
 // ── Utilitários genéricos ───────────────────────────────────────────────
+/* ── Dinheiro: um parser só para a família ───────────────────────────────────
+   Havia três, com regras diferentes: dois no front (que removiam TODOS os
+   pontos, então "1234.56" virava 123456 e o sinal negativo se perdia) e um no
+   servidor (que tratava ponto sozinho sempre como decimal, então "1.234" virava
+   1,234 — erro de mil vezes). O mesmo valor podia ser lido de dois jeitos
+   dependendo de quem lia.
+
+   Regra, igual à do sgx_base.parse_valor:
+     - com ponto E vírgula, o ÚLTIMO separador é o decimal ("1.234,56" e
+       "1,234.56" dão ambos 1234.56);
+     - só vírgula: decimal;
+     - só ponto: decimal, EXCETO quando o formato é claramente milhar
+       ("1.234", "1.234.567") — grupos de exatamente 3 dígitos. */
+function parseValorBR(v) {
+  if (v == null || v === '') return 0;
+  if (typeof v === 'number') return v;
+  let s = String(v).replace(/[R$\s ]/g, '');
+  if (!s) return 0;
+  const negativo = /^-/.test(s) || /^\(.*\)$/.test(s);
+  s = s.replace(/[()-]/g, '');
+  const temPonto = s.includes('.'), temVirgula = s.includes(',');
+  if (temPonto && temVirgula) {
+    s = s.lastIndexOf(',') > s.lastIndexOf('.')
+      ? s.replace(/\./g, '').replace(',', '.')
+      : s.replace(/,/g, '');
+  } else if (temVirgula) {
+    s = s.replace(',', '.');
+  } else if (temPonto && /^\d{1,3}(\.\d{3})+$/.test(s)) {
+    s = s.replace(/\./g, '');          // milhar: 1.234 / 1.234.567
+  }
+  const n = parseFloat(s.replace(/[^\d.]/g, ''));
+  if (isNaN(n)) return 0;
+  return negativo ? -n : n;
+}
+
 function _debounce(fn, ms) {
   let t;
   return (...args) => { clearTimeout(t); t = setTimeout(() => fn(...args), ms); };

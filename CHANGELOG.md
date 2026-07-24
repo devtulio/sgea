@@ -5,6 +5,13 @@
 
 ---
 
+## [0.27.3] — 2026-07-24
+
+### Corrigido
+- **Leitura de valores em dinheiro unificada** com o restante da família: `1.234` passa a valer mil duzentos e trinta e quatro (era interpretado como um vírgula dois) e valores negativos deixam de perder o sinal.
+
+---
+
 ## [0.27.2] — 2026-07-24
 
 ### Adicionado

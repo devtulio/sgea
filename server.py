@@ -1,4 +1,4 @@
-# SGEA v0.27.2 — Servidor local: SQLite, autenticação, REST API, controle de estoque por lote (FEFO), backup automático
+# SGEA v0.27.3 — Servidor local: SQLite, autenticação, REST API, controle de estoque por lote (FEFO), backup automático
 import http.server
 import socketserver
 import os
@@ -37,7 +37,7 @@ for _stream in (sys.stdout, sys.stderr):
 # Versão do servidor — DEVE acompanhar o SGEA_VERSION do SGEA.html a cada release.
 # Exposta em /health para o frontend detectar quando o processo em execução está
 # desatualizado (HTML novo servido, mas server.py antigo ainda rodando em memória).
-SERVER_VERSION = '0.27.2'
+SERVER_VERSION = '0.27.3'
 
 PORT        = int(os.environ.get('SGEA_PORT', 3003))
 _BASE       = os.path.dirname(os.path.abspath(__file__))
@@ -426,24 +426,9 @@ def _now_precise():
     return time.strftime('%Y-%m-%dT%H:%M:%S', time.localtime(t)) + f'.{int((t % 1) * 1000):03d}'
 
 def _float(v):
-    if v is None or v == '':
-        return None
-    if isinstance(v, (int, float)):
-        return float(v)
-    s = str(v).replace('R$', '').strip()
-    if not s:
-        return None
-    # Formato BR: ponto = milhar, vírgula = decimal. Com os dois presentes,
-    # remove os pontos e troca a vírgula por ponto (1.234,56 -> 1234.56).
-    # Só vírgula -> decimal (1234,56 -> 1234.56). Só ponto -> já é decimal.
-    if ',' in s and '.' in s:
-        s = s.replace('.', '').replace(',', '.')
-    elif ',' in s:
-        s = s.replace(',', '.')
-    try:
-        return float(s)
-    except (ValueError, TypeError):
-        return None
+    # Regra única da família — ver sgx_base.parse_valor. Antes, este parser e o
+    # do front discordavam: "1.234" virava 1,234 aqui e 1234 na tela.
+    return sgx_base.parse_valor(v)
 
 # ── Reconciliação com o Fiorilli (razão oficial; import read-only) ───────────
 # O Fiorilli não converte unidade: exporta um número achatado na UNID1 dele. Todo

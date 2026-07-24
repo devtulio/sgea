@@ -16,6 +16,7 @@
 #   token = sgx_base.create_session(get_db, user_id, SESSION_TTL)
 
 import hashlib
+import re
 import secrets
 import smtplib
 import ssl
@@ -57,6 +58,35 @@ def connect_db(db_path):
     conn.execute('PRAGMA journal_mode=WAL')
     conn.execute('PRAGMA foreign_keys=ON')
     return conn
+
+
+# ── Dinheiro: um parser só para a família ───────────────────────────────────
+# Espelha base.js/parseValorBR — as duas implementações TÊM de concordar, senão
+# o valor exibido na tela e o gravado na coluna divergem. Havia três parsers com
+# regras diferentes; ver o comentário lá para o histórico.
+def parse_valor(v):
+    if v is None or v == '':
+        return None
+    if isinstance(v, (int, float)):
+        return float(v)
+    s = re.sub(r'[R$\s ]', '', str(v))
+    if not s:
+        return None
+    negativo = s.startswith('-') or (s.startswith('(') and s.endswith(')'))
+    s = re.sub(r'[()-]', '', s)
+    tem_ponto, tem_virgula = '.' in s, ',' in s
+    if tem_ponto and tem_virgula:
+        s = (s.replace('.', '').replace(',', '.') if s.rfind(',') > s.rfind('.')
+             else s.replace(',', ''))
+    elif tem_virgula:
+        s = s.replace(',', '.')
+    elif tem_ponto and re.fullmatch(r'\d{1,3}(\.\d{3})+', s):
+        s = s.replace('.', '')          # milhar: 1.234 / 1.234.567
+    try:
+        n = float(re.sub(r'[^\d.]', '', s))
+    except ValueError:
+        return None
+    return -n if negativo else n
 
 
 # ── Senhas (PBKDF2-HMAC-SHA256) ──────────────────────────────────────────────
