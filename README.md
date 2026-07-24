@@ -1,6 +1,6 @@
 # SGEA — Sistema de Gestão de Estoque do Almoxarifado
 
-![Versão](https://img.shields.io/badge/versão-v0.26.3-blue) ![Tecnologia](https://img.shields.io/badge/tecnologia-Python%20%2B%20SQLite-orange) ![Licença](https://img.shields.io/badge/licença-MIT-green) ![Multiusuário](https://img.shields.io/badge/acesso-multiusuário-blueviolet)
+![Versão](https://img.shields.io/badge/versão-v0.26.4-blue) ![Tecnologia](https://img.shields.io/badge/tecnologia-Python%20%2B%20SQLite-orange) ![Licença](https://img.shields.io/badge/licença-MIT-green) ![Multiusuário](https://img.shields.io/badge/acesso-multiusuário-blueviolet)
 
 ## Descrição
 
@@ -150,6 +150,12 @@ O sistema em si continua zero-dependência (Python stdlib + HTML puro). Para que
 ```bash
 npm install   # uma vez, instala apenas o ESLint (ferramenta de dev, não é usada em produção)
 npm run lint
+```
+
+Parte do código é compartilhada com os outros sistemas da família (SGCD, SGCA e SGDP): `base.css`, `base.js` e `sgx_base.py` são cópias distribuídas a partir de uma fonte única, que fica fora deste repositório. Editar essas cópias aqui funciona e passa no lint — mas a alteração é silenciosamente sobrescrita na próxima distribuição. Por isso o CI confere as cópias contra o manifesto `_esqueleto.sha256` e quebra o build se elas divergirem:
+
+```bash
+python scripts/verificar_esqueleto.py
 ```
 
 Há também uma suíte de testes automatizados do backend (`server.py`), usando só `unittest` da stdlib — sobe o servidor real contra um banco temporário e testa os endpoints REST, com atenção especial à lógica de consumo por lote (FEFO):

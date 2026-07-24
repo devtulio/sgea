@@ -5,6 +5,16 @@
 
 ---
 
+## [0.26.4] — 2026-07-23
+
+### Alterado
+- **Fonte única para o que os quatro sistemas repetiam.** O aviso de rodapé (`toast`) e a caixa de confirmação (`customConfirm`) existiam em cópia local em cada sistema, quase idênticas: uma correção feita em um não chegava aos outros. Passaram a vir do esqueleto compartilhado — o som continua sendo de cada sistema, através de um gancho (`_toastSom`). 
+- **Margem de impressão dos documentos com fonte única.** O bloco `@page` (A4, 20 mm, "Folha N" no rodapé) estava copiado em cinco lugares nos quatro sistemas; agora é uma constante só, no esqueleto. Era exatamente o trecho que a versão anterior teve de corrigir em cinco lugares de uma vez.
+- **O esqueleto compartilhado passou a ter histórico.** Os arquivos comuns (`base.css`, `base.js`, `sgx_base.py`) tinham fonte única, mas fora de qualquer repositório: um erro neles se espalhava para os quatro sistemas sem registro do que mudou nem como voltar atrás. Agora são versionados.
+- **O CI acusa cópia do esqueleto editada por fora.** Alterar `base.js` dentro deste repositório funciona, passa no lint e é apagado sem aviso na próxima distribuição. O CI passou a conferir as cópias contra o manifesto `_esqueleto.sha256` e quebra o build quando divergem. Verificado nos dois sentidos: acusa edição real e ignora diferença de quebra de linha (o repositório guarda LF, o runner Windows faz checkout com CRLF).
+
+---
+
 ## [0.26.3] — 2026-07-22
 
 ### Corrigido

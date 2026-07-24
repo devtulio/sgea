@@ -26,6 +26,16 @@
  *     chamada por _apiLogout() quando a sessão expira
  */
 
+// ── Impressão dos documentos gerados ───────────────────────────────────────
+// Só o @page mora aqui: margem e rodapé de folha são regra de papel da família
+// inteira, e é o que desalinha entre os sistemas quando alguém ajusta um só. A
+// identidade visual de cada documento (fontes, cores, cabeçalho) segue local.
+// Uso: dentro do template literal do CSS do documento, `${DOC_PAGE_CSS}`.
+// A margem vai no @page, não no padding do body: em documento multipágina o
+// padding só vale no topo da 1ª página e no fim da última, deixando o miolo
+// colado na borda.
+const DOC_PAGE_CSS = `@page { size: A4; margin: 20mm; @bottom-right { content: "Folha " counter(page); font-size: 8pt; color: #888; } }`;
+
 // ── API wrapper (fetch + Bearer token + 401 → logout) ──────────────────────
 const API = {
   async req(method, path, body, isForm = false) {
@@ -67,12 +77,19 @@ function _apiLogout(motivo) {
 }
 
 // ── Toast ────────────────────────────────────────────────────────────────
+// Implementação única. O retorno sonoro é específico de cada sistema (cada um
+// tem seus próprios playSuccess/playError/playNotify), então entra por um gancho
+// opcional: basta o sistema definir _toastSom(type). Antes, cada sistema
+// redefinia toast() inteiro — e como declaração de função posterior sobrescreve
+// a anterior, esta aqui nunca executava, dando a falsa impressão de que corrigir
+// o toast no esqueleto valia para os quatro.
 function toast(msg, type = '') {
   const el = document.createElement('div');
   el.className = 'toast-msg ' + type;
   el.textContent = msg;
   document.getElementById('toast')?.appendChild(el);
   setTimeout(() => el.remove(), 3500);
+  if (typeof _toastSom === 'function') _toastSom(type);
 }
 
 // ── Confirmação customizada (reaproveita o modal #confirm-overlay) ─────────
@@ -94,6 +111,8 @@ function customConfirm(msg, { title = 'Confirmar', icon = '⚠️', okLabel = 'C
       cancelBtn.removeEventListener('click', onCancel);
       res(val);
     };
+    // Sem playClick() aqui: os 4 apps têm um listener global de clique que já
+    // sonoriza qualquer <button> (inclusive estes dois) em fase de captura.
     const onOk     = () => finish(true);
     const onCancel = () => finish(false);
     okBtn.addEventListener('click', onOk);

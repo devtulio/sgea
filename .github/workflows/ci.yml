@@ -28,6 +28,9 @@ jobs:
       - name: Instalar ferramentas de desenvolvimento
         run: npm ci
 
+      - name: Esqueleto em sincronia
+        run: python scripts/verificar_esqueleto.py
+
       - name: Lint
         run: npm run lint
 
