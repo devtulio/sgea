@@ -5,6 +5,16 @@
 
 ---
 
+## [0.26.6] — 2026-07-24
+
+### Corrigido
+- **Cadastrar ou importar um fornecedor ressuscitava quem estava na Lixeira.** Se o identificador de um fornecedor excluído aparecesse de novo, o registro voltava ao cadastro sem aviso.
+
+### Alterado
+- **Manual:** a seção de Configurações agora explica a diferença entre o backup em JSON (dados de trabalho, é o que se envia a outra máquina) e o backup do banco (.db), que é a cópia integral para recuperação completa.
+
+---
+
 ## [0.26.5] — 2026-07-24
 
 ### Corrigido

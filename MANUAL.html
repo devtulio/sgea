@@ -3,7 +3,7 @@
 <head>
 <meta charset="UTF-8">
 <meta name="viewport" content="width=device-width, initial-scale=1.0">
-<title>Manual Operacional — SGEA v0.26.5</title>
+<title>Manual Operacional — SGEA v0.26.6</title>
 <style>
   * { box-sizing: border-box; margin: 0; padding: 0; }
   body { font-family: 'Times New Roman', Times, serif; font-size: 12pt; color: #000; background: #f5f5f5; }
@@ -53,7 +53,7 @@
       size: A4;
       margin: 20mm 20mm 25mm;
       @top-center {
-        content: "SGEA v0.26.5 — Manual Operacional";
+        content: "SGEA v0.26.6 — Manual Operacional";
         font-family: 'Times New Roman', serif;
         font-size: 9pt;
         color: #666;
@@ -79,7 +79,7 @@
     <div class="cover-title">Manual Operacional</div>
     <div class="cover-subtitle">SGEA — Sistema de Gestão de Estoque do Almoxarifado</div>
     <div class="cover-system">Entradas, Saídas, Lotes/Validade e cadastros de apoio</div>
-    <div class="cover-version">Versão v0.26.5</div>
+    <div class="cover-version">Versão v0.26.6</div>
     <br>
     <div style="font-size:11pt; color:#555; line-height:1.8;">
       Aplicação web multiusuário para o Almoxarifado<br>
@@ -196,6 +196,7 @@
   <div class="nota">Excluir um fornecedor não é definitivo: ele vai para a Lixeira (junto com Entradas e Saídas excluídas) e pode ser restaurado por até 30 dias.</div>
 
   <h2 id="sec11">11. Configurações</h2>
+<p><strong>Dois tipos de backup, para usos diferentes.</strong> O arquivo <strong>JSON</strong> guarda os dados de trabalho (produtos, entradas, saídas, cadastros e configurações) e é o que se envia a outra máquina para sincronizar — ele <strong>não</strong> contém as contas de usuário nem as senhas. Para recuperação completa depois de perda de disco ou formatação, use o <strong>backup do banco (.db)</strong>, gerado automaticamente e disponível em Configurações → Backup: é uma cópia integral do sistema, contas inclusive. Guarde-o em local seguro, pois contém todos os dados.</p>
   <p>A tela <strong>Configurações</strong> reúne, em sete abas, tudo que não é operação de estoque no dia a dia. Um único botão <strong>Salvar</strong>, fixo no topo, grava as alterações das abas Interface/Organização/Comunicação/Dados de uma só vez — ele pulsa quando há alterações não salvas. O botão "← Voltar" retorna para o Estoque.</p>
   <ul>
     <li><strong>Interface</strong> — tema claro/escuro; <strong>largura do conteúdo</strong> (compacta ou expandida); <strong>tamanho da fonte</strong> (Normal/Pequena/Grande); e <strong>cor de destaque</strong> (Institucional, Azul, Verde ou Roxo). Essas escolhas ficam salvas no navegador de cada usuário e só entram em vigor ao clicar em Salvar</li>
@@ -231,6 +232,7 @@
   <h2 id="sec15">15. Histórico de Versões</h2>
   <table>
     <tr><th>Versão</th><th>Data</th><th>Resumo</th></tr>
+    <tr><td>0.26.6</td><td>24/07/2026</td><td>Corrigido: cadastrar ou importar um fornecedor <strong>ressuscitava quem estava na Lixeira</strong>. O manual passou a explicar a diferença entre o backup em JSON e o backup do banco (.db).</td></tr>
     <tr><td>0.26.5</td><td>24/07/2026</td><td>Corrigido: reimportar a planilha de frota com uma coluna em branco <strong>apagava a peça já cadastrada</strong> (filtro, óleo, correia) e o centro de custo do veículo. Célula vazia agora preserva o que existe; valores preenchidos continuam atualizando.</td></tr>
     <tr><td>0.26.4</td><td>23/07/2026</td><td>Reorganização interna do código compartilhado entre os quatro sistemas, com verificação automática que impede que uma correção feita em um deles se perca nos outros. Nada muda no uso do sistema.</td></tr>
     <tr><td>0.26.3</td><td>22/07/2026</td><td>Corrigidos três defeitos achados na auditoria da camada compartilhada: o envio de e-mail podia <strong>prender uma thread do servidor para sempre</strong> (conexão SMTP sem tempo limite — agora 30 s); a tecla <strong>Esc deixava a página sem rolagem</strong> ao fechar um modal; e a <strong>margem de impressão</strong> dos documentos passou a ser declarada no <code>@page</code>, padronizada em <strong>20 mm</strong> nos quatro lados, em todos os modelos — antes o rodapé saía a ~4 mm da borda.</td></tr>

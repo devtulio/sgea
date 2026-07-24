@@ -1,4 +1,4 @@
-# SGEA v0.26.5 — Servidor local: SQLite, autenticação, REST API, controle de estoque por lote (FEFO), backup automático
+# SGEA v0.26.6 — Servidor local: SQLite, autenticação, REST API, controle de estoque por lote (FEFO), backup automático
 import http.server
 import socketserver
 import os
@@ -37,7 +37,7 @@ for _stream in (sys.stdout, sys.stderr):
 # Versão do servidor — DEVE acompanhar o SGEA_VERSION do SGEA.html a cada release.
 # Exposta em /health para o frontend detectar quando o processo em execução está
 # desatualizado (HTML novo servido, mas server.py antigo ainda rodando em memória).
-SERVER_VERSION = '0.26.5'
+SERVER_VERSION = '0.26.6'
 
 PORT        = int(os.environ.get('SGEA_PORT', 3003))
 _BASE       = os.path.dirname(os.path.abspath(__file__))
@@ -1746,10 +1746,13 @@ class SGEAHandler(http.server.SimpleHTTPRequestHandler):
         data['id'] = fid
         data.setdefault('updatedAt', _now_precise())
         with get_db() as conn:
+            # deleted_at por subconsulta: sem isso o REPLACE zerava a coluna e um
+            # fornecedor que estava na Lixeira voltava sozinho ao cadastro.
             conn.execute(
-                'INSERT OR REPLACE INTO fornecedores (id,data,cnpj,razao_social,updated_at) VALUES (?,?,?,?,?)',
+                '''INSERT OR REPLACE INTO fornecedores (id,data,cnpj,razao_social,updated_at,deleted_at)
+                   VALUES (?,?,?,?,?,(SELECT deleted_at FROM fornecedores WHERE id=?))''',
                 (fid, json.dumps(data, ensure_ascii=False),
-                 data.get('cnpj'), data.get('razao_social'), data['updatedAt'])
+                 data.get('cnpj'), data.get('razao_social'), data['updatedAt'], fid)
             )
         self._json(200, data)
 
@@ -1829,9 +1832,10 @@ class SGEAHandler(http.server.SimpleHTTPRequestHandler):
                 f['cnpj_digits'] = cnpj_d
                 f['updatedAt'] = _now_precise()
                 conn.execute(
-                    'INSERT OR REPLACE INTO fornecedores (id,data,cnpj,razao_social,updated_at) VALUES (?,?,?,?,?)',
+                    '''INSERT OR REPLACE INTO fornecedores (id,data,cnpj,razao_social,updated_at,deleted_at)
+                       VALUES (?,?,?,?,?,(SELECT deleted_at FROM fornecedores WHERE id=?))''',
                     (fid, json.dumps(f, ensure_ascii=False),
-                     f.get('cnpj'), f.get('razao_social'), f['updatedAt'])
+                     f.get('cnpj'), f.get('razao_social'), f['updatedAt'], fid)
                 )
             conn.commit()
         self._json(200, {'ok': True, 'novos': novos, 'atualizados': atualizados, 'ignorados': ignorados})
