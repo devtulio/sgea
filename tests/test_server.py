@@ -766,5 +766,48 @@ class ReconciliacaoUnitTest(unittest.TestCase):
         self.assertEqual(res['resumo']['total'], 8)
 
 
+class TestImportFrotaNaoApagaDado(SGEATestCase):
+    """Regressão do eixo perda de dado (auditoria 2026-07-24).
+
+    A planilha CONTROLE DE FROTA é atualizada aos poucos e reimportada inteira.
+    Célula vazia chegava aqui como '' e o UPDATE gravava por cima, apagando a
+    peça que já estava cadastrada.
+    """
+
+    CABECALHO = ('FROTA;PLACA;MARCA;MODELO;COMBUSTIVEL;'
+                 'FILTRO AR CABINE;FILTRO AR MOTOR;OLEO DE MOTOR')
+
+    def _importar(self, token, linha):
+        status, resp = self.request('POST', '/api/frota/import',
+                                    {'csv': f'{self.CABECALHO}\n{linha}', 'criar_centros': False},
+                                    token=token)
+        self.assertEqual(status, 200, resp)
+        return resp
+
+    def _veiculo(self, numero):
+        with server.get_db() as conn:
+            return dict(conn.execute('SELECT * FROM frota WHERE numero=?', (numero,)).fetchone())
+
+    def test_celula_em_branco_nao_apaga_valor_cadastrado(self):
+        token = self.login()
+        self._importar(token, '901;AAA1A11;VW;Gol;Gasolina;WEGA WP9014;TECFIL ARL9010;LUBRAX 15W40')
+        self._importar(token, '901;AAA1A11;VW;Gol;Gasolina;;;')          # setor ainda não preencheu
+        v = self._veiculo('901')
+        self.assertEqual(v['filtro_ar_cabine'], 'WEGA WP9014')
+        self.assertEqual(v['filtro_ar_motor'], 'TECFIL ARL9010')
+        self.assertEqual(v['oleo_motor'], 'LUBRAX 15W40')
+
+    def test_valor_novo_continua_sobrescrevendo(self):
+        # A guarda acima não pode congelar o importador: valor preenchido atualiza.
+        token = self.login()
+        self._importar(token, '902;BBB2B22;VW;Gol;Gasolina;WEGA WP9014;TECFIL ARL9010;LUBRAX 15W40')
+        self._importar(token, '902;BBB2B22;VW;Gol;Flex;WEGA WP9099;;LUBRAX 20W50')
+        v = self._veiculo('902')
+        self.assertEqual(v['combustivel'], 'Flex')
+        self.assertEqual(v['filtro_ar_cabine'], 'WEGA WP9099')
+        self.assertEqual(v['filtro_ar_motor'], 'TECFIL ARL9010')   # em branco no CSV: mantém
+        self.assertEqual(v['oleo_motor'], 'LUBRAX 20W50')
+
+
 if __name__ == '__main__':
     unittest.main()

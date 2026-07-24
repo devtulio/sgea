@@ -1,4 +1,4 @@
-# SGEA v0.26.4 — Servidor local: SQLite, autenticação, REST API, controle de estoque por lote (FEFO), backup automático
+# SGEA v0.26.5 — Servidor local: SQLite, autenticação, REST API, controle de estoque por lote (FEFO), backup automático
 import http.server
 import socketserver
 import os
@@ -37,7 +37,7 @@ for _stream in (sys.stdout, sys.stderr):
 # Versão do servidor — DEVE acompanhar o SGEA_VERSION do SGEA.html a cada release.
 # Exposta em /health para o frontend detectar quando o processo em execução está
 # desatualizado (HTML novo servido, mas server.py antigo ainda rodando em memória).
-SERVER_VERSION = '0.26.4'
+SERVER_VERSION = '0.26.5'
 
 PORT        = int(os.environ.get('SGEA_PORT', 3003))
 _BASE       = os.path.dirname(os.path.abspath(__file__))
@@ -1446,12 +1446,19 @@ class SGEAHandler(http.server.SimpleHTTPRequestHandler):
                     cur = conn.execute('INSERT INTO centros_custo (nome, ativo) VALUES (?, 1)', (cc_nome,))
                     cc_id = cur.lastrowid; cc_map[cc_nome.upper()] = cc_id; cc_criados += 1
                 vals = {c: reg[c] for c in import_cols if c in reg}
-                vals['centro_custo_id'] = cc_id
+                if cc_id is not None:
+                    vals['centro_custo_id'] = cc_id
                 existing = conn.execute('SELECT id FROM frota WHERE numero=?', (numero,)).fetchone()
                 if existing:
-                    setc = [c for c in vals if c != 'numero']
-                    conn.execute(f"UPDATE frota SET {','.join(f'{c}=?' for c in setc)},updated_at=? WHERE id=?",
-                                 [vals[c] for c in setc] + [_now(), existing['id']])
+                    # Célula em branco NÃO apaga o que já está cadastrado: a planilha é
+                    # atualizada aos poucos e reimportada inteira, e uma coluna que o
+                    # setor ainda não preencheu chegava aqui como '' zerando a peça que
+                    # já estava lá. Para limpar um campo de propósito, editar o veículo
+                    # na tela de Frota — o importador só acrescenta e corrige.
+                    setc = [c for c in vals if c != 'numero' and str(vals[c] or '').strip()]
+                    if setc:
+                        conn.execute(f"UPDATE frota SET {','.join(f'{c}=?' for c in setc)},updated_at=? WHERE id=?",
+                                     [vals[c] for c in setc] + [_now(), existing['id']])
                     atualizados += 1
                 else:
                     cols = list(vals.keys())

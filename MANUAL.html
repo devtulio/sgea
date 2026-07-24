@@ -3,7 +3,7 @@
 <head>
 <meta charset="UTF-8">
 <meta name="viewport" content="width=device-width, initial-scale=1.0">
-<title>Manual Operacional — SGEA v0.26.4</title>
+<title>Manual Operacional — SGEA v0.26.5</title>
 <style>
   * { box-sizing: border-box; margin: 0; padding: 0; }
   body { font-family: 'Times New Roman', Times, serif; font-size: 12pt; color: #000; background: #f5f5f5; }
@@ -53,7 +53,7 @@
       size: A4;
       margin: 20mm 20mm 25mm;
       @top-center {
-        content: "SGEA v0.26.4 — Manual Operacional";
+        content: "SGEA v0.26.5 — Manual Operacional";
         font-family: 'Times New Roman', serif;
         font-size: 9pt;
         color: #666;
@@ -79,7 +79,7 @@
     <div class="cover-title">Manual Operacional</div>
     <div class="cover-subtitle">SGEA — Sistema de Gestão de Estoque do Almoxarifado</div>
     <div class="cover-system">Entradas, Saídas, Lotes/Validade e cadastros de apoio</div>
-    <div class="cover-version">Versão v0.26.4</div>
+    <div class="cover-version">Versão v0.26.5</div>
     <br>
     <div style="font-size:11pt; color:#555; line-height:1.8;">
       Aplicação web multiusuário para o Almoxarifado<br>
@@ -231,6 +231,7 @@
   <h2 id="sec15">15. Histórico de Versões</h2>
   <table>
     <tr><th>Versão</th><th>Data</th><th>Resumo</th></tr>
+    <tr><td>0.26.5</td><td>24/07/2026</td><td>Corrigido: reimportar a planilha de frota com uma coluna em branco <strong>apagava a peça já cadastrada</strong> (filtro, óleo, correia) e o centro de custo do veículo. Célula vazia agora preserva o que existe; valores preenchidos continuam atualizando.</td></tr>
     <tr><td>0.26.4</td><td>23/07/2026</td><td>Reorganização interna do código compartilhado entre os quatro sistemas, com verificação automática que impede que uma correção feita em um deles se perca nos outros. Nada muda no uso do sistema.</td></tr>
     <tr><td>0.26.3</td><td>22/07/2026</td><td>Corrigidos três defeitos achados na auditoria da camada compartilhada: o envio de e-mail podia <strong>prender uma thread do servidor para sempre</strong> (conexão SMTP sem tempo limite — agora 30 s); a tecla <strong>Esc deixava a página sem rolagem</strong> ao fechar um modal; e a <strong>margem de impressão</strong> dos documentos passou a ser declarada no <code>@page</code>, padronizada em <strong>20 mm</strong> nos quatro lados, em todos os modelos — antes o rodapé saía a ~4 mm da borda.</td></tr>
     <tr><td>0.26.2</td><td>22/07/2026</td><td>Corrigidas <strong>falhas silenciosas</strong> na comunicação com o servidor: pontos que checavam a resposta sem verificar se ela existia quebravam sem mensagem quando a sessão expirava ou a rede falhava — o botão simplesmente não reagia. A <strong>sessão passou a ser renovada por qualquer requisição</strong> (antes só pelo ping, que o navegador estrangula em aba de segundo plano).</td></tr>

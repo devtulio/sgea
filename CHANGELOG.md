@@ -5,6 +5,14 @@
 
 ---
 
+## [0.26.5] — 2026-07-24
+
+### Corrigido
+- **Reimportar a planilha de frota apagava peças já cadastradas.** A planilha CONTROLE DE FROTA é atualizada aos poucos e reimportada inteira; uma coluna que o setor ainda não tinha preenchido chegava como célula vazia e **sobrescrevia com branco** o filtro, óleo ou correia que já estava no sistema. Agora célula em branco preserva o que existe — valores preenchidos continuam atualizando normalmente. Para limpar um campo de propósito, edite o veículo na tela de Frota.
+- **Centro de custo do veículo não é mais perdido** quando a planilha reimportada não traz a coluna de centro de custo.
+
+---
+
 ## [0.26.4] — 2026-07-23
 
 ### Alterado
