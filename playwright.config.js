@@ -17,6 +17,13 @@ export default defineConfig({
   // passam de 5s (default) sob carga nos runners Windows do GitHub. 10s dá folga
   // sem mascarar travamento real (o timeout do teste inteiro continua limitado acima).
   expect: { timeout: 10_000 },
+  // Só no CI: o runner Windows do GitHub é ~5x mais lento que a máquina local e
+  // ocasionalmente estoura o timeout num teste pesado, sem nada de errado no
+  // código (6 quedas em ~80 execuções, sempre verdes ao repetir o MESMO commit).
+  // Repetir não esconde problema: o Playwright reporta o que só passou na
+  // repetição como "flaky", e teste que falha nas 3 tentativas continua
+  // quebrando o build. Local segue com 0 — aqui a falha tem de doer na hora.
+  retries: process.env.CI ? 2 : 0,
   fullyParallel: false, // um único servidor/banco compartilhado entre os specs
   workers: 1,
   use: {

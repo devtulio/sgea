@@ -67,7 +67,17 @@ test('importa funcionários da folha do Fiorilli (dedup + campos novos)', async 
   await page.fill('#pin-username', 'admin');
   await page.fill('#pin-input', 'admin123');
   await page.click('#login-form button[type=submit]');
-  await page.waitForTimeout(800);
+  // Espera a tela reagir ao login em vez de dormir um tempo fixo: 800 ms bastam
+  // na máquina local, mas o runner do CI é ~5x mais lento e o `if` abaixo era
+  // avaliado antes da resposta chegar. Os três desfechos possíveis: pede troca
+  // de senha (banco novo), entra direto, ou recusa — este último é esperado
+  // quando o teste anterior já trocou a senha, e cai no segundo `else`.
+  await expect(async () => {
+    const pedeTroca = await page.locator('#overlay-force-pwd').isVisible();
+    const entrou    = !(await page.locator('#overlay-pin').isVisible());
+    const recusou   = await page.locator('#pin-erro').isVisible();
+    expect(pedeTroca || entrou || recusou).toBeTruthy();
+  }).toPass({ timeout: 15_000 });
   if (await page.locator('#overlay-force-pwd').isVisible()) {
     await page.fill('#ts-nova', 'novaSenhaE2E123');
     await page.fill('#ts-confirma', 'novaSenhaE2E123');
