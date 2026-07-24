@@ -3,7 +3,7 @@
 <head>
 <meta charset="UTF-8">
 <meta name="viewport" content="width=device-width, initial-scale=1.0">
-<title>Manual Operacional — SGEA v0.26.7</title>
+<title>Manual Operacional — SGEA v0.27.0</title>
 <style>
   * { box-sizing: border-box; margin: 0; padding: 0; }
   body { font-family: 'Times New Roman', Times, serif; font-size: 12pt; color: #000; background: #f5f5f5; }
@@ -53,7 +53,7 @@
       size: A4;
       margin: 20mm 20mm 25mm;
       @top-center {
-        content: "SGEA v0.26.7 — Manual Operacional";
+        content: "SGEA v0.27.0 — Manual Operacional";
         font-family: 'Times New Roman', serif;
         font-size: 9pt;
         color: #666;
@@ -79,7 +79,7 @@
     <div class="cover-title">Manual Operacional</div>
     <div class="cover-subtitle">SGEA — Sistema de Gestão de Estoque do Almoxarifado</div>
     <div class="cover-system">Entradas, Saídas, Lotes/Validade e cadastros de apoio</div>
-    <div class="cover-version">Versão v0.26.7</div>
+    <div class="cover-version">Versão v0.27.0</div>
     <br>
     <div style="font-size:11pt; color:#555; line-height:1.8;">
       Aplicação web multiusuário para o Almoxarifado<br>
@@ -232,6 +232,7 @@
   <h2 id="sec15">15. Histórico de Versões</h2>
   <table>
     <tr><th>Versão</th><th>Data</th><th>Resumo</th></tr>
+    <tr><td>0.27.0</td><td>24/07/2026</td><td>Corrigido: a <strong>troca da senha padrão</strong> era exigida só na tela — quem falasse direto com o sistema usava tudo com a senha de fábrica, que está no manual. Agora o servidor recusa qualquer operação até a senha ser trocada. Também deixaram de aparecer, para usuários comuns, a <strong>chave do Portal da Transparência</strong> e a conta de e-mail do órgão nas Configurações.</td></tr>
     <tr><td>0.26.7</td><td>24/07/2026</td><td>Corrigido: a <strong>senha do e-mail do sistema</strong> e a chave do Portal da Transparência saíam dentro do arquivo de backup — justamente o que se envia a outra máquina. Ficaram de fora; restaurar não as perde.</td></tr>
     <tr><td>0.26.6</td><td>24/07/2026</td><td>Corrigido: cadastrar ou importar um fornecedor <strong>ressuscitava quem estava na Lixeira</strong>. O manual passou a explicar a diferença entre o backup em JSON e o backup do banco (.db).</td></tr>
     <tr><td>0.26.5</td><td>24/07/2026</td><td>Corrigido: reimportar a planilha de frota com uma coluna em branco <strong>apagava a peça já cadastrada</strong> (filtro, óleo, correia) e o centro de custo do veículo. Célula vazia agora preserva o que existe; valores preenchidos continuam atualizando.</td></tr>

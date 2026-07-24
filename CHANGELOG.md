@@ -5,6 +5,14 @@
 
 ---
 
+## [0.27.0] — 2026-07-24
+
+### Corrigido
+- **A troca da senha padrão passou a valer no servidor.** A tela de "troque a senha no primeiro acesso" era só do navegador: quem conversasse diretamente com o sistema entrava com a senha padrão — que está no manual e no README — e usava tudo, inclusive as telas de administrador, enquanto ninguém tivesse trocado. Agora, com a troca pendente, o servidor só aceita as chamadas necessárias para exibir e concluir a própria troca; qualquer outra é recusada.
+- **A chave de API do Portal da Transparência e a conta de e-mail do órgão apareciam para qualquer usuário.** A tela de Configurações é aberta a todos (usa os dados de organização), e junto vinham a chave do Portal, o endereço da conta de e-mail e a pasta de backup. Passaram a ir só para o administrador. A senha do e-mail nunca esteve nessa lista.
+
+---
+
 ## [0.26.7] — 2026-07-24
 
 ### Corrigido

@@ -135,6 +135,22 @@ def renew_session(get_db, token, ttl):
         conn.execute('UPDATE sessions SET expires=? WHERE token=?', (time.time() + ttl, token))
 
 
+# Rotas que um usuário com troca de senha pendente ainda pode chamar: só as de
+# que o próprio front precisa para exibir a tela de troca e concluí-la.
+#
+# A troca obrigatória era imposta apenas no navegador: quem falasse direto com a
+# API entrava com a senha padrão (admin/admin123, que está no README e no manual)
+# e usava o sistema inteiro, inclusive as rotas de administrador, enquanto
+# ninguém tivesse trocado a senha. Agora o servidor recusa qualquer outra rota
+# até a senha sair do padrão.
+def rota_liberada_sem_trocar_senha(path, metodo, user_id):
+    base = (path or '').split('?')[0].rstrip('/')
+    if base in ('/api/auth/me', '/api/auth/ping', '/api/auth/logout', '/api/auth/senha'):
+        return True
+    # trocar a própria senha (PUT /api/usuarios/<eu>) — é o que a tela faz
+    return metodo == 'PUT' and base == f'/api/usuarios/{user_id}'
+
+
 def active_sessions(get_db):
     with get_db() as conn:
         return conn.execute('SELECT COUNT(*) FROM sessions WHERE expires>?', (time.time(),)).fetchone()[0]

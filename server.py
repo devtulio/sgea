@@ -1,4 +1,4 @@
-# SGEA v0.26.7 — Servidor local: SQLite, autenticação, REST API, controle de estoque por lote (FEFO), backup automático
+# SGEA v0.27.0 — Servidor local: SQLite, autenticação, REST API, controle de estoque por lote (FEFO), backup automático
 import http.server
 import socketserver
 import os
@@ -37,7 +37,7 @@ for _stream in (sys.stdout, sys.stderr):
 # Versão do servidor — DEVE acompanhar o SGEA_VERSION do SGEA.html a cada release.
 # Exposta em /health para o frontend detectar quando o processo em execução está
 # desatualizado (HTML novo servido, mas server.py antigo ainda rodando em memória).
-SERVER_VERSION = '0.26.7'
+SERVER_VERSION = '0.27.0'
 
 PORT        = int(os.environ.get('SGEA_PORT', 3003))
 _BASE       = os.path.dirname(os.path.abspath(__file__))
@@ -383,7 +383,8 @@ def get_session(token):
         return None
     with get_db() as conn:
         row = conn.execute(
-            '''SELECT s.token, s.user_id, s.expires, u.nome, u.username, u.admin, u.ativo
+            '''SELECT s.token, s.user_id, s.expires, u.nome, u.username, u.admin, u.ativo,
+                   u.must_change_password
                FROM sessions s JOIN usuarios u ON u.id=s.user_id
                WHERE s.token=? AND s.expires>? AND u.ativo=1''',
             (token, time.time())
@@ -1076,7 +1077,7 @@ class SGEAHandler(http.server.SimpleHTTPRequestHandler):
                     "('orgao','municipio','cnpj_orgao','aut_nome','aut_cargo',"
                     "'auto_backup_enabled','auto_backup_keep','portal_transparencia_key')"
                 ).fetchall()
-            self._json(200, {r['key']: r['value'] for r in rows})
+            self._json(200, _settings_para({r['key']: r['value'] for r in rows}, s))
 
         elif p in ('/api/settings/smtp', '/api/settings/smtp/'):
             if not s['admin']: self._json(403, {'error': 'Acesso restrito'}); return
@@ -1303,6 +1304,12 @@ class SGEAHandler(http.server.SimpleHTTPRequestHandler):
         if not s:
             self._json(401, {'error': 'Não autenticado'})
             return s
+        # Troca de senha obrigatória valia só no navegador — ver
+        # sgx_base.rota_liberada_sem_trocar_senha.
+        if s.get('must_change_password') and not sgx_base.rota_liberada_sem_trocar_senha(
+                self.path, self.command, s['user_id']):
+            self._json(403, {'error': 'Troque a senha padrão antes de usar o sistema.'})
+            return None
         # Sessão deslizante — ver comentário equivalente nos sistemas irmãos:
         # renovar só no ping deixava a sessão morrer com a aba em segundo plano.
         renew_session(self._token())
@@ -2646,6 +2653,22 @@ _BACKUP_TABLES = ('centros_custo', 'fornecedores', 'funcionarios', 'frota', 'pro
 # manual orienta enviá-lo a outra máquina. Restaurar não as perde — ver
 # _restore_backup, que relê e regrava esses valores em torno do DELETE.
 _CHAVES_SIGILOSAS = ('smtp_pass', 'portal_transparencia_key')
+
+def _settings_para(result, s):
+    """Recorta o que /api/settings devolve conforme quem pergunta.
+
+    A rota é aberta a qualquer usuário autenticado — a tela de Configurações usa
+    os dados de organização — e por ela saíam a chave de API do Portal da
+    Transparência e a conta de e-mail do órgão. A senha do SMTP nunca esteve
+    aqui; agora a config de e-mail inteira, a chave do Portal e o caminho de
+    backup também só vão para o administrador. O SMTP pessoal de cada usuário
+    tem endpoint próprio e não passa por aqui.
+    """
+    if s['admin']:
+        return result
+    return {k: v for k, v in result.items()
+            if not k.startswith('smtp_') and k != 'backup_path' and k not in _CHAVES_SIGILOSAS}
+
 
 def _build_backup_payload():
     with get_db() as conn:
