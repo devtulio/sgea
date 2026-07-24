@@ -1000,5 +1000,44 @@ class TestAuditoriaDeConfiguracao(SGEATestCase):
         self.assertEqual(len(novos), 1)
         self.assertEqual(novos[0]['label'], 'Brasão alterado')
 
+
+class TestSenhaPadraoMarcadaNoBoot(SGEATestCase):
+    """Regressão do eixo permissão/sigilo (auditoria 2026-07-24).
+
+    Quem instalou antes da coluna must_change_password existir recebeu 0 pelo
+    DEFAULT do ALTER TABLE: ficou com a senha do manual e sem o bloqueio do
+    servidor, porque a marca de troca só é gravada na criação do admin. O boot
+    precisa remarcar quem continua na senha padrão.
+    """
+
+    def _limpa(self):
+        with server.get_db() as conn:
+            conn.execute("DELETE FROM usuarios WHERE username='antigo'")
+            conn.execute("UPDATE usuarios SET must_change_password=0 WHERE username='admin'")
+            conn.commit()
+
+    def _cria_e_reinicia(self, senha):
+        self.addCleanup(self._limpa)
+        with server.get_db() as conn:
+            conn.execute(
+                'INSERT INTO usuarios (username,nome,senha_hash,admin,ativo,must_change_password)'
+                ' VALUES (?,?,?,0,1,0)',
+                ('antigo', 'Instalacao antiga', server._hash_password(senha)))
+            conn.commit()
+        server.init_db()   # o que acontece a cada início do servidor
+        with server.get_db() as conn:
+            return conn.execute(
+                "SELECT must_change_password FROM usuarios WHERE username='antigo'"
+            ).fetchone()['must_change_password']
+
+    def test_boot_marca_quem_ficou_na_senha_padrao(self):
+        self.assertEqual(self._cria_e_reinicia('admin123'), 1,
+                         'conta com a senha padrão seguiu sem exigir troca')
+
+    def test_boot_nao_mexe_em_quem_ja_trocou(self):
+        self.assertEqual(self._cria_e_reinicia('OutraSenha#2026'), 0,
+                         'exigiu troca de quem já tinha saído da senha padrão')
+
+
 if __name__ == '__main__':
     unittest.main()

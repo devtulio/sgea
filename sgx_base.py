@@ -106,6 +106,31 @@ def verify_password(password, stored):
         return False
 
 
+# O instalador cria o admin já com must_change_password=1, mas quem instalou
+# antes dessa coluna existir recebeu 0 pelo DEFAULT do ALTER TABLE: ficou com a
+# senha do manual e sem o bloqueio do servidor. Em vez de corrigir banco a banco,
+# o servidor confere no boot quem ainda está na senha padrão e marca a troca.
+# Pega também quem voltar à senha padrão depois e quem for cadastrado com ela.
+# ponytail: um PBKDF2 (100k iterações, ~60ms) por conta ainda não marcada, a cada
+# boot. Com dezenas de contas, restringir a checagem ao admin.
+def marcar_senha_padrao(conn, padrao='admin123', tabela='usuarios'):
+    """Marca troca obrigatória para todo usuário cuja senha ainda é a padrão.
+    Devolve quantos foram marcados. Idempotente: quem já está marcado é pulado."""
+    try:
+        pendentes = conn.execute(
+            f'SELECT id, senha_hash FROM {tabela} WHERE COALESCE(must_change_password,0)=0'
+        ).fetchall()
+    except sqlite3.OperationalError:
+        return 0   # coluna ainda não migrada neste banco
+    ids = [r[0] for r in pendentes if verify_password(padrao, r[1])]
+    if ids:
+        marcas = ','.join('?' * len(ids))
+        conn.execute(
+            f'UPDATE {tabela} SET must_change_password=1 WHERE id IN ({marcas})', ids)
+        conn.commit()
+    return len(ids)
+
+
 # ── Rate limit de tentativas de login ───────────────────────────────────────
 # ponytail: dict em memória, sem lock — pior caso é uma contagem levemente
 # imprecisa sob concorrência, não uma falha; zera a cada reinício do servidor.

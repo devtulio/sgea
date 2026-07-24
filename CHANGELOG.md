@@ -5,6 +5,13 @@
 
 ---
 
+## [0.27.4] — 2026-07-24
+
+### Corrigido
+- **Instalações anteriores à troca de senha obrigatória seguiam aceitando a senha de fábrica.** A exigência de trocar a senha só era gravada no momento em que o usuário administrador é criado; nos bancos que já existiam, a coluna nasceu desligada pelo padrão da migração. Ou seja: a proteção valia para instalação nova e deixava de fora justamente as que já estavam em uso, que continuavam abertas com a senha publicada no manual. O servidor passa a conferir a cada início se alguma conta ainda está na senha padrão e a exigir a troca — o que cobre também quem voltar a ela ou for cadastrado com ela.
+
+---
+
 ## [0.27.3] — 2026-07-24
 
 ### Corrigido
