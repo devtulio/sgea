@@ -29,6 +29,11 @@ export default defineConfig({
   use: {
     baseURL: `http://localhost:${port}`,
     screenshot: 'only-on-failure',
+    // Rastro completo (DOM a cada passo, rede, console) só quando o teste falha.
+    // Sem isto, uma queda no CI deixava apenas o log de texto — foi o que
+    // impediu de investigar as duas quedas de 2026-07-24, que não reproduzem
+    // localmente. Com o trace, a próxima é diagnosticável em vez de misteriosa.
+    trace: 'retain-on-failure',
   },
   webServer: {
     command: 'python server.py',

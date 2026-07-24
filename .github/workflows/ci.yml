@@ -42,3 +42,17 @@ jobs:
 
       - name: Testes E2E (Playwright)
         run: npx playwright test
+
+      # Só quando o E2E cai: sobe o rastro do Playwright (DOM a cada passo, rede,
+      # console) para baixar e abrir com `npx playwright show-trace`. É o que
+      # permite investigar uma queda que não reproduz na máquina local.
+      - name: Rastro do E2E (só em caso de falha)
+        if: failure()
+        uses: actions/upload-artifact@v4
+        with:
+          name: rastro-e2e
+          path: |
+            test-results/
+            playwright-report/
+          retention-days: 14
+          if-no-files-found: ignore
