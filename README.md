@@ -70,6 +70,15 @@ Funciona em rede local: um único computador executa o servidor e todos os usuá
 | Usuário | `admin`     |
 | Senha   | `admin123`  |
 
+### Menu de inicialização
+
+O `Iniciar SGEA.bat` abre um menu no terminal:
+
+| Opção | Descrição |
+|-------|-----------|
+| **[1] Diagnóstico** | Verifica e corrige automaticamente rede, porta e firewall (pede elevação de Administrador quando necessário) |
+| **[2] Iniciar Servidor** | Sobe o servidor e mantém rodando continuamente — atende uso individual e em rede. Só encerra com **Ctrl+C** no terminal ou fechando a janela |
+
 ### Acesso em rede local
 
 O sistema foi projetado para uso multiusuário em rede local (LAN): **uma única máquina executa o servidor** (e guarda o banco de dados) e as demais acessam pelo navegador, sem instalar nada.
@@ -118,6 +127,26 @@ SGEA/
 ├── CHANGELOG.md
 └── MANUAL.html
 ```
+
+---
+
+## Documentos Gerados pelo Sistema
+
+| Documento | Descrição |
+|-----------|-----------|
+| **Ficha do Veículo** | Ficha de manutenção imprimível de um veículo da frota |
+| **Relatório de Estoque** | Posição de estoque por item |
+| **Relatório de Movimentação** | Entradas e saídas por período |
+| **Curva ABC** | Classificação ABC dos itens por consumo |
+| **Relatório de Lotes / Validade** | Lotes e vencimentos (FEFO) |
+| **Relatório de Pedidos em Aberto** | Pedidos pendentes de entrega |
+| **Relatórios de Frota** | Inventário, combustível, por centro de custo e pendências |
+| **Relatório de Fornecedores** | Cadastro de fornecedores |
+| **Relatório de Sanções** | Fornecedores sancionados (CEIS/CNEP) |
+| **Relatório de Auditoria** | Trilha de eventos do sistema |
+| **Relatório de Integridade** | Estado do banco, backups e contagens |
+
+Todos os documentos abrem em janela separada com botão "🖨 Imprimir / Salvar PDF".
 
 ---
 
