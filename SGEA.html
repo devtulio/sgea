@@ -7,11 +7,7 @@
 <link rel="icon" type="image/x-icon" href="sgea.ico">
 <link rel="stylesheet" href="base.css">
 <style>
-  /* Cor institucional real do SGEA (base.css só traz um neutro de bootstrap).
-     NOTA: este valor já estava #1a3a6b (azul-marinho) antes desta migração —
-     não era #1a6b4a (verde) como o resto da documentação registra. Preservado
-     como estava; sinalizado ao usuário, não corrigido aqui (fora do escopo
-     desta migração, que só reorganiza CSS/JS existentes sem mudar aparência). */
+  /* Cor institucional da família (navy #1a3a6b, conforme DESIGN.md) — igual nos 4 sistemas. */
   :root {
     --brand:        #1a3a6b;
     --brand-light:  #e8eef7;
@@ -60,19 +56,6 @@
   .lotes-panel table { width: 100%; font-size: .78rem; border-collapse: collapse; }
   .lotes-panel th, .lotes-panel td { text-align: left; padding: 5px 8px; }
   .lotes-panel th { color: var(--gray-500); font-weight: 700; text-transform: uppercase; font-size: .65rem; }
-
-  /* Trilha de Auditoria — tabela no mesmo padrão dos sistemas irmãos (cabeçalho
-     em faixa, linhas com separador, dentro de um card). Dark usa a paleta
-     neutra do próprio SGEA, já que aqui os tokens --gray-* não mudam no dark. */
-  .audit-table-wrap { background: #fff; border-radius: var(--radius); box-shadow: var(--shadow); overflow: hidden; }
-  .audit-table { width: 100%; border-collapse: collapse; }
-  .audit-table th { background: var(--gray-50); border-bottom: 1px solid var(--gray-200); padding: 10px 14px; text-align: left; font-size: .6875rem; font-weight: 700; text-transform: uppercase; letter-spacing: .4px; color: var(--gray-500); white-space: nowrap; }
-  .audit-table td { padding: 11px 14px; border-bottom: 1px solid var(--gray-100); vertical-align: middle; font-size: .75rem; }
-  .audit-table tr:last-child td { border-bottom: none; }
-  body.dark .audit-table-wrap { background: #2a2a2a; }
-  body.dark .audit-table th { background: #323232; border-bottom-color: #383838; color: #9aa4b2; }
-  body.dark .audit-table td { border-bottom-color: #383838; }
-  body.dark .audit-table tr:hover td { background: #323232; }
 
   /* Bolinha de cor no seletor "Cor de destaque" (padrão dos sistemas irmãos) */
   .cor-swatch { display: inline-block; width: 14px; height: 14px; border-radius: 50%; flex-shrink: 0; }
@@ -5502,7 +5485,7 @@ function _reconFiltrar() {
   });
   const el = document.getElementById('recon-tabela');
   if (!lista.length) { el.innerHTML = '<div class="empty">Nenhum item nessa seleção.</div>'; return; }
-  el.innerHTML = `<div class="audit-table-wrap"><table class="audit-table">
+  el.innerHTML = `<div class="list-table-wrap"><table class="list-table">
     <thead><tr><th>Código</th><th>Item</th><th style="text-align:right">Fiorilli</th><th style="text-align:right">SGEA</th><th style="text-align:right">Δ</th><th>Situação</th><th class="col-actions">Ações</th></tr></thead>
     <tbody>${lista.map(_reconLinha).join('')}</tbody>
   </table></div>`;
@@ -5569,7 +5552,7 @@ async function _auditCarregar(append) {
   </tr>`;
   }).join('');
   const el = document.getElementById('auditoria-list');
-  const table = `<div class="audit-table-wrap"><table class="audit-table">
+  const table = `<div class="list-table-wrap"><table class="list-table">
     <thead><tr><th>Data/Hora</th><th>Usuário</th><th>Ação</th><th>Detalhes</th></tr></thead>
     <tbody id="audit-tbody">${rows}</tbody>
   </table></div>`;

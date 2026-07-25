@@ -5,6 +5,13 @@
 
 ---
 
+## [Não versionado]
+
+### Alterado
+- **Padronização visual:** as tabelas de **Auditoria** e **Reconciliação** passam a usar o mesmo estilo canônico das demais telas (cadastros, Estoque), ficando consistentes no espaçamento, cabeçalho e zebra das linhas. Sem mudança de comportamento.
+
+---
+
 ## [0.32.0] — 2026-07-25
 
 ### Adicionado
