@@ -345,11 +345,12 @@
       <div class="view-actions">
         <input type="file" id="recon-file" accept=".csv,text/csv" class="hidden" onchange="_reconImportar(this.files[0]); this.value='';">
         <button class="btn btn-primary btn-sm" onclick="document.getElementById('recon-file').click()">⬆️ Importar CSV do Fiorilli</button>
+        <button class="btn btn-outline btn-sm hidden" id="recon-btn-cadastrar" onclick="abrirCadastrarRecon()">➕ Cadastrar itens do Fiorilli</button>
         <button class="btn btn-outline btn-sm hidden" id="recon-btn-exportar" onclick="_reconExportarPendencias()">⬇️ Exportar pendências</button>
       </div>
     </div>
     <p style="font-size:.82rem;color:var(--gray-500);margin:-8px 0 4px">
-      Somente leitura — o Fiorilli é o razão oficial. Exporte a <b>Posição do Estoque</b> como <b>CSV (Dados)</b> e importe aqui. As quantidades são convertidas para a unidade de consumo do SGEA.
+      A reconciliação é <b>somente leitura</b> — o Fiorilli é o razão oficial. Exporte a <b>Posição do Estoque</b> como <b>CSV (Dados)</b> e importe aqui. As quantidades são convertidas para a unidade de consumo do SGEA. Os itens que <b>só existem no Fiorilli</b> podem ser cadastrados no SGEA (com saldo inicial) pelo administrador.
     </p>
 
     <div class="reconciliacao-inner" style="max-width:980px;margin:0 auto">
@@ -1085,6 +1086,36 @@
     <div class="modal-footer">
       <button class="btn btn-outline" id="confirm-cancel">Cancelar</button>
       <button class="btn btn-danger" id="confirm-ok">Confirmar</button>
+    </div>
+  </div>
+</div>
+
+<!-- ── Modal Cadastrar itens a partir do Fiorilli (bootstrap da reconciliação) ── -->
+<div class="overlay hidden" id="recon-cad-overlay" role="dialog" aria-modal="true" aria-labelledby="recon-cad-titulo">
+  <div class="modal" style="max-width:820px;width:96vw">
+    <div class="modal-header"><h2 id="recon-cad-titulo">Cadastrar itens do Fiorilli</h2></div>
+    <div class="modal-body">
+      <p style="font-size:.85rem;color:var(--gray-600);margin-bottom:10px">
+        Estes itens têm saldo no Fiorilli e ainda não existem no SGEA. Marque os que quer criar. A unidade é a do Fiorilli (sem conversão); ajuste depois se a licitação for por embalagem.
+      </p>
+      <label style="display:flex;align-items:center;gap:8px;font-size:.85rem;margin-bottom:10px;text-transform:none;font-weight:500">
+        <input type="checkbox" id="recon-cad-saldo" checked> Lançar o <b>saldo inicial</b> (entrada de abertura, sem validade) — desmarque para criar só o cadastro
+      </label>
+      <div style="display:flex;gap:8px;margin-bottom:8px">
+        <button class="btn btn-ghost btn-sm" onclick="_reconCadMarcar(true)">Marcar todos</button>
+        <button class="btn btn-ghost btn-sm" onclick="_reconCadMarcar(false)">Desmarcar todos</button>
+        <span id="recon-cad-contagem" style="margin-left:auto;font-size:.82rem;color:var(--gray-600)"></span>
+      </div>
+      <div style="max-height:52vh;overflow:auto;border:1px solid var(--gray-200);border-radius:8px">
+        <table class="list-table" style="margin:0"><thead><tr>
+          <th class="col-check"><input type="checkbox" id="recon-cad-all" onchange="_reconCadMarcar(this.checked)"></th>
+          <th>Código</th><th>Item</th><th>Unid.</th><th style="text-align:right">Qtd. (saldo)</th><th style="text-align:right">Valor</th>
+        </tr></thead><tbody id="recon-cad-tbody"></tbody></table>
+      </div>
+    </div>
+    <div class="modal-footer">
+      <button class="btn btn-outline" id="recon-cad-cancel" onclick="document.getElementById('recon-cad-overlay').classList.add('hidden')">Cancelar</button>
+      <button class="btn btn-primary" id="recon-cad-ok" onclick="confirmarCadastrarRecon()">Cadastrar selecionados</button>
     </div>
   </div>
 </div>
@@ -5246,6 +5277,8 @@ const _RECON_BALDE = {
 };
 const _RECON_FLAG = { valor_divergente: 'valor ≠', fiorilli_valor_negativo: 'valor −', fiorilli_estoque_negativo: 'estoque −' };
 let _reconDados = null;  // { data_corte, resumo, itens }
+let _reconCsvText = '';   // guardado para o bootstrap (cadastrar itens só do Fiorilli)
+let _reconDataCorte = '';
 
 function _hojeISO() { return new Date().toISOString().slice(0, 10); }
 
@@ -5277,6 +5310,7 @@ async function _reconImportar(file) {
   const d = await API.json(r);
   if (!r || !r.ok) { toast(d?.error || 'Falha ao processar o extrato.', 'error'); return; }
   _reconDados = d;
+  _reconCsvText = csv; _reconDataCorte = dc;
   _reconGuardaData();
   _reconRender();
   toast(`${d.resumo.total} item(ns) reconciliado(s).`, 'success');
@@ -5303,7 +5337,66 @@ function _reconRender() {
   cards.classList.remove('hidden');
   cards.innerHTML = _reconCard('confere', 'Confere') + _reconCard('diverge', 'Diverge qtd')
     + _reconCard('so_fiorilli', 'Só Fiorilli') + _reconCard('so_sgea', 'Só SGEA') + _reconCard('unidade', 'Unidade');
+  const btnCad = document.getElementById('recon-btn-cadastrar');
+  btnCad.classList.toggle('hidden', !((_reconDados.resumo.so_fiorilli || 0) > 0 && _apiUser?.admin));
+  btnCad.textContent = `➕ Cadastrar ${_reconDados.resumo.so_fiorilli} item(ns) do Fiorilli`;
   _reconFiltrar();
+}
+
+// ── Bootstrap: cadastrar no SGEA os itens que só existem no Fiorilli ──
+function _reconCadItens() { return (_reconDados?.itens || []).filter(i => i.balde === 'so_fiorilli'); }
+function _reconCadMarcar(on) {
+  document.querySelectorAll('#recon-cad-tbody .recon-cad-check').forEach(cb => cb.checked = on);
+  document.getElementById('recon-cad-all').checked = on;
+  _reconCadContagem();
+}
+function _reconCadContagem() {
+  const n = document.querySelectorAll('#recon-cad-tbody .recon-cad-check:checked').length;
+  document.getElementById('recon-cad-contagem').textContent = `${n} selecionado(s)`;
+}
+function abrirCadastrarRecon() {
+  const itens = _reconCadItens();
+  if (!itens.length) return;
+  const tb = document.getElementById('recon-cad-tbody');
+  tb.innerHTML = itens.map(i => {
+    const q = Math.round(i.fiorilli_qtd || 0);
+    const alerta = (Math.abs((i.fiorilli_qtd || 0) - q) > 1e-9) ? ' title="quantidade arredondada" ' : '';
+    return `<tr>
+      <td class="col-check"><input type="checkbox" class="recon-cad-check" data-cod="${esc(i.codigo)}" checked onchange="document.getElementById('recon-cad-all').checked=false;_reconCadContagem()"></td>
+      <td style="white-space:nowrap;color:var(--gray-500)">${esc(i.codigo)}</td>
+      <td>${esc(i.descricao || '')}</td>
+      <td>${esc(i.unidade || '')}</td>
+      <td style="text-align:right;white-space:nowrap"${alerta}>${_reconNum(q)}${alerta ? ' *' : ''}</td>
+      <td style="text-align:right;white-space:nowrap">${i.valor_fiorilli != null ? i.valor_fiorilli.toLocaleString('pt-BR', { style: 'currency', currency: 'BRL' }) : '—'}</td>
+    </tr>`;
+  }).join('');
+  document.getElementById('recon-cad-all').checked = true;
+  document.getElementById('recon-cad-saldo').checked = true;
+  _reconCadContagem();
+  document.getElementById('recon-cad-overlay').classList.remove('hidden');
+}
+async function confirmarCadastrarRecon() {
+  const codigos = [...document.querySelectorAll('#recon-cad-tbody .recon-cad-check:checked')].map(cb => cb.dataset.cod);
+  if (!codigos.length) { toast('Selecione ao menos um item.', 'error'); return; }
+  const criarSaldo = document.getElementById('recon-cad-saldo').checked;
+  const btn = document.getElementById('recon-cad-ok');
+  btn.disabled = true; btn.textContent = 'Cadastrando…';
+  const r = await API.post('/api/reconciliacao/cadastrar',
+    { csv: _reconCsvText, data_corte: _reconDataCorte, codigos, criar_saldo: criarSaldo });
+  const d = await API.json(r);
+  btn.disabled = false; btn.textContent = 'Cadastrar selecionados';
+  if (!r || !r.ok) { toast(d?.error || 'Falha ao cadastrar.', 'error', 9000); return; }
+  document.getElementById('recon-cad-overlay').classList.add('hidden');
+  await _auditEvento('RECON_ITENS_CADASTRADOS', `${d.criados} item(ns) cadastrado(s) do Fiorilli${d.com_saldo ? `, ${d.com_saldo} com saldo inicial` : ''}`, null);
+  let msg = `${d.criados} item(ns) cadastrado(s)`;
+  if (d.com_saldo) msg += `, ${d.com_saldo} com saldo inicial`;
+  if (d.ignorados) msg += `. ${d.ignorados} já existia(m)`;
+  if (d.arredondados) msg += `. ${d.arredondados} quantidade(s) arredondada(s)`;
+  toast(msg + '.', 'success', 9000);
+  // reprocessa o mesmo extrato: os itens criados saem de "Só Fiorilli" para Confere/Diverge
+  const rr = await API.post('/api/reconciliacao', { csv: _reconCsvText, data_corte: _reconDataCorte, nome: 'reprocesso' });
+  const dd = await API.json(rr);
+  if (rr && rr.ok) { _reconDados = dd; _reconRender(); }
 }
 
 function _reconLinha(i) {

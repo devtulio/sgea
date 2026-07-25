@@ -1317,6 +1317,9 @@ class SGEAHandler(http.server.SimpleHTTPRequestHandler):
             self._add_audit(data, s)
         elif p == '/api/reconciliacao':
             self._reconciliacao(data, s)
+        elif p == '/api/reconciliacao/cadastrar':
+            if not s['admin']: self._json(403, {'error': 'Acesso restrito'}); return
+            self._reconciliacao_cadastrar(data, s)
         elif p == '/send-email':
             self._send_email(data)
         elif p == '/api/backup/restore':
@@ -1835,6 +1838,70 @@ class SGEAHandler(http.server.SimpleHTTPRequestHandler):
                 (str(uuid.uuid4()), _now(), s['user_id'], s['nome'],
                  'RECONCILIACAO_IMPORTADA', 'RECONCILIACAO_IMPORTADA', detalhe, None))
         self._json(200, resultado)
+
+    def _reconciliacao_cadastrar(self, data, s):
+        """Bootstrap: cria produtos (e, opcional, o saldo inicial) a partir dos itens
+        do extrato do Fiorilli selecionados. Idempotente por codigo_fiorilli; o saldo
+        inicial é uma entrada de abertura (compra_direta, lote sem validade) —
+        reversível pela tela de Entradas. Só itens ainda não cadastrados."""
+        csv_text = data.get('csv') or ''
+        codigos = data.get('codigos') if isinstance(data.get('codigos'), list) else []
+        criar_saldo = bool(data.get('criar_saldo', True))
+        data_corte = (data.get('data_corte') or '').strip()
+        if not csv_text.strip() or not codigos:
+            self._json(400, {'error': 'Envie o CSV e ao menos um item.'}); return
+        try:
+            fiorilli = _parse_fiorilli_posicao(csv_text)
+        except ValueError as e:
+            self._json(400, {'error': str(e)}); return
+        data_ent = data_corte if re.fullmatch(r'\d{4}-\d{2}-\d{2}', data_corte) else time.strftime('%Y-%m-%d')
+        alvo = set(codigos)
+        criados = com_saldo = ignorados = arredondados = 0
+        with get_db() as conn:
+            existentes = {r['codigo_fiorilli'] for r in conn.execute('SELECT codigo_fiorilli FROM produtos').fetchall()}
+            for cod in sorted(alvo):
+                F = fiorilli.get(cod)
+                if not F or not _CADPRO_RE.match(cod):
+                    continue
+                if cod in existentes:                 # idempotente: já cadastrado, não recria nem re-lança saldo
+                    ignorados += 1; continue
+                pid = str(uuid.uuid4())
+                unid = _norm_unid(F['unidade']) or 'UN'
+                conn.execute(
+                    '''INSERT INTO produtos (id, codigo_fiorilli, nome, unidade_consumo, unidade_licitada, qtd_por_embalagem, ativo)
+                       VALUES (?,?,?,?,?,1,1)''',
+                    (pid, cod, F['descricao'] or cod, unid, unid))
+                existentes.add(cod)
+                criados += 1
+                if criar_saldo:
+                    q = int(round(F['estoque']))
+                    if abs(F['estoque'] - q) > 1e-9:
+                        arredondados += 1
+                    if q > 0:                          # estoque zero/negativo do Fiorilli: cria só o cadastro
+                        custo = round((F['valor'] or 0) / q, 4)
+                        eid = str(uuid.uuid4())
+                        conn.execute(
+                            '''INSERT INTO entradas (id, tipo, data_entrega, observacao, created_by)
+                               VALUES (?, 'compra_direta', ?, ?, ?)''',
+                            (eid, data_ent, 'Saldo inicial — importação Fiorilli', s['user_id']))
+                        cur = conn.execute(
+                            '''INSERT INTO entrada_itens
+                               (entrada_id, produto_id, quantidade_unidades, valor_unitario, valor_total, lote_numero, data_validade)
+                               VALUES (?,?,?,?,?,?,NULL)''',
+                            (eid, pid, q, custo, round(custo * q, 2), 'SALDO INICIAL'))
+                        conn.execute(
+                            '''INSERT INTO lotes
+                               (produto_id, lote_numero, data_validade, quantidade_recebida, quantidade_atual, valor_unitario_custo, entrada_item_id)
+                               VALUES (?,?,NULL,?,?,?,?)''',
+                            (pid, 'SALDO INICIAL', q, q, custo, cur.lastrowid))
+                        com_saldo += 1
+            detalhe = (f"corte {data_ent} · {criados} produto(s) criado(s), {com_saldo} com saldo inicial, "
+                       f"{ignorados} já existente(s) ignorado(s), {arredondados} quantidade(s) arredondada(s)")
+            _insert_audit_raw(conn, {'type': 'RECON_ITENS_CADASTRADOS', 'ts': _now(),
+                                     'user_id': s['user_id'], 'user_nome': s['nome'],
+                                     'label': 'Itens cadastrados do Fiorilli', 'detail': detalhe})
+        self._json(200, {'criados': criados, 'com_saldo': com_saldo,
+                         'ignorados': ignorados, 'arredondados': arredondados})
 
     def _get_produto(self, pid):
         with get_db() as conn:

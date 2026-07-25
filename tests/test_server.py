@@ -875,6 +875,54 @@ class TestExclusaoBloqueadaExplicaMotivo(SGEATestCase):
         self.assertIn('saída', data['error'])
 
 
+class TestReconciliacaoCadastrar(SGEATestCase):
+    """Bootstrap (situação 1): SGEA vazio -> importa posição -> cria produtos + saldo inicial.
+    Cada teste usa códigos próprios (o DB é compartilhado no módulo)."""
+    def _csv(self, linhas):
+        return "CADPRO;DISC1;UNID1;QUAN3;VATO3\n" + "\n".join(linhas)
+
+    def _estoque(self, cod):
+        with server.get_db() as conn:
+            r = conn.execute(
+                "SELECT COALESCE(v.estoque_fisico,0) e FROM produtos p "
+                "LEFT JOIN v_estoque v ON v.produto_id=p.id WHERE p.codigo_fiorilli=?", (cod,)).fetchone()
+            return r['e'] if r else None
+
+    def test_cria_produto_e_saldo_inicial(self):
+        token = self.login()
+        csv = self._csv(['009.001.001;PARAFUSO SEXTAVADO;UN;10;25,00',
+                         '009.001.002;CABO FLEXIVEL;M;5,4;12,00'])
+        st, d = self.request('POST', '/api/reconciliacao/cadastrar',
+                             {'csv': csv, 'codigos': ['009.001.001', '009.001.002'],
+                              'criar_saldo': True, 'data_corte': '2026-07-25'}, token=token)
+        self.assertEqual(st, 200, d)
+        self.assertEqual(d['criados'], 2)
+        self.assertEqual(d['com_saldo'], 2)
+        self.assertEqual(d['arredondados'], 1)          # 5,4 -> 5
+        self.assertEqual(self._estoque('009.001.001'), 10)
+        self.assertEqual(self._estoque('009.001.002'), 5)
+
+    def test_so_cadastro_sem_saldo(self):
+        token = self.login()
+        csv = self._csv(['009.002.001;ARRUELA;UN;7;3,00'])
+        st, d = self.request('POST', '/api/reconciliacao/cadastrar',
+                             {'csv': csv, 'codigos': ['009.002.001'], 'criar_saldo': False}, token=token)
+        self.assertEqual(d['criados'], 1)
+        self.assertEqual(d['com_saldo'], 0)
+        self.assertEqual(self._estoque('009.002.001'), 0)
+
+    def test_idempotente(self):
+        token = self.login()
+        csv = self._csv(['009.003.001;LAMPADA;UN;8;40,00', '009.003.002;FITA;RL;3;9,00'])
+        args = {'csv': csv, 'codigos': ['009.003.001', '009.003.002'], 'criar_saldo': True}
+        st1, d1 = self.request('POST', '/api/reconciliacao/cadastrar', args, token=token)
+        self.assertEqual(d1['criados'], 2)
+        st, d = self.request('POST', '/api/reconciliacao/cadastrar', args, token=token)
+        self.assertEqual(d['criados'], 0)
+        self.assertEqual(d['ignorados'], 2)
+        self.assertEqual(self._estoque('009.003.001'), 8)  # não dobrou o saldo
+
+
 class TestImportFrotaAprimorada(SGEATestCase):
     """Planilha CONTROLE DE FROTA aprimorada: colunas de identificação (Fiorilli)
     e centro de custo no formato 'N - NOME' (casado por código)."""
