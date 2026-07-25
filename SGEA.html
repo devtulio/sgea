@@ -2343,6 +2343,33 @@ function showProdutos() {
   renderProdutos();
 }
 
+// ── Ordenação clicável genérica (Estoque/Entradas/Saídas) — mesmo comportamento
+// do _sortCrud dos cadastros: clica no cabeçalho para ordenar; reclica inverte. ──
+const _tblSort = {};  // chave -> { idx, dir }
+function _tblTh(key, cols) {
+  const s = _tblSort[key] || { idx: null, dir: 1 };
+  return '<tr>' + cols.map((c, idx) => {
+    if (c.noSort) return `<th class="${c.cls || ''}">${esc(c.h)}</th>`;
+    const active = s.idx === idx;
+    const arrow = active ? (s.dir === 1 ? ' ▲' : ' ▼') : '';
+    const aria = active ? (s.dir === 1 ? 'ascending' : 'descending') : 'none';
+    return `<th onclick="_tblDoSort('${key}',${idx})" role="button" tabindex="0" aria-sort="${aria}" title="Ordenar por ${esc(c.h)}" style="cursor:pointer;user-select:none;white-space:nowrap">${esc(c.h)}<span style="opacity:.65">${arrow}</span></th>`;
+  }).join('') + '</tr>';
+}
+function _tblApply(key, cols, items) {
+  const s = _tblSort[key];
+  if (!s || s.idx == null || !cols[s.idx] || cols[s.idx].noSort) return items;
+  const c = cols[s.idx];
+  const val = i => { const v = c.get ? c.get(i) : i[c.k]; return v == null ? '' : v; };
+  return [...items].sort((a, b) => s.dir * String(val(a)).localeCompare(String(val(b)), 'pt', { numeric: true, sensitivity: 'base' }));
+}
+function _tblDoSort(key, idx) {
+  const s = _tblSort[key] || { idx: null, dir: 1 };
+  if (s.idx === idx) s.dir *= -1; else { s.idx = idx; s.dir = 1; }
+  _tblSort[key] = s;
+  ({ produtos: renderProdutos, entradas: renderEntradas, saidas: renderSaidas })[key]?.();
+}
+
 async function renderProdutos() {
   const q = document.getElementById('produtos-search').value.trim();
   const r = await API.get(`/api/produtos${q ? '?q=' + encodeURIComponent(q) : ''}`);
@@ -2352,9 +2379,18 @@ async function renderProdutos() {
   const el = document.getElementById('produtos-list');
   if (!items.length) { el.innerHTML = '<div class="empty">Nenhum produto cadastrado.</div>'; return; }
   const hoje = new Date().toISOString().slice(0, 10);
+  const cols = [
+    { h: 'Produto', get: p => p.nome },
+    { h: 'Código Fiorilli', k: 'codigo_fiorilli' },
+    { h: 'Centro de Custo', get: p => p.centro_custo_nome || '' },
+    { h: 'Estoque', get: p => p.estoque_fisico },
+    { h: 'Valor', get: p => p.estoque_financeiro },
+    { h: 'Validade', get: p => p.proxima_validade || '' },
+    { h: 'Ações', noSort: true, cls: 'col-actions' },
+  ];
   el.innerHTML = `<div class="list-table-wrap"><table class="list-table">
-    <thead><tr><th>Produto</th><th>Código Fiorilli</th><th>Centro de Custo</th><th>Estoque</th><th>Valor</th><th>Validade</th><th class="col-actions">Ações</th></tr></thead>
-    <tbody>${items.map(p => {
+    <thead>${_tblTh('produtos', cols)}</thead>
+    <tbody>${_tblApply('produtos', cols, items).map(p => {
       let validadeBadge = '<span class="badge badge-neutral">—</span>';
       if (p.proxima_validade) {
         if (p.proxima_validade < hoje) validadeBadge = `<span class="badge badge-danger">Vencido ${fmtDate(p.proxima_validade)}</span>`;
@@ -3799,9 +3835,17 @@ async function renderEntradas() {
   const items = await _fetchList('entradas');
   const el = document.getElementById('entradas-list');
   if (!items.length) { el.innerHTML = '<div class="empty">Nenhuma entrada registrada.</div>'; return; }
+  const cols = [
+    { h: 'Data Entrega', get: e => e.data_entrega || '' },
+    { h: 'Tipo', get: e => e.tipo || '' },
+    { h: 'Pedido', get: e => e.pedido_numero || '' },
+    { h: 'Fornecedor', get: e => e.fornecedor_nome || '' },
+    { h: 'NF-e', get: e => e.nfe_numero || '' },
+    { h: 'Ações', noSort: true, cls: 'col-actions' },
+  ];
   el.innerHTML = `<div class="list-table-wrap"><table class="list-table">
-    <thead><tr><th>Data Entrega</th><th>Tipo</th><th>Pedido</th><th>Fornecedor</th><th>NF-e</th><th class="col-actions">Ações</th></tr></thead>
-    <tbody>${items.map(e => `<tr>
+    <thead>${_tblTh('entradas', cols)}</thead>
+    <tbody>${_tblApply('entradas', cols, items).map(e => `<tr>
       <td>${fmtDate(e.data_entrega)}</td>
       <td>${e.tipo === 'pedido' ? '<span class="badge badge-neutral">Com pedido</span>' : '<span class="badge badge-ok">Compra direta</span>'}</td>
       <td>${esc(e.pedido_numero || '—')}</td>
@@ -3918,9 +3962,16 @@ async function renderSaidas() {
   const items = await _fetchList('saidas');
   const el = document.getElementById('saidas-list');
   if (!items.length) { el.innerHTML = '<div class="empty">Nenhuma saída registrada.</div>'; return; }
+  const cols = [
+    { h: 'Data', get: s => s.data || '' },
+    { h: 'Solicitante', get: s => s.solicitante_nome || '' },
+    { h: 'Centro de Custo', get: s => s.centro_custo_nome || '' },
+    { h: 'Veículo', get: s => s.frota_numero || '' },
+    { h: 'Ações', noSort: true, cls: 'col-actions' },
+  ];
   el.innerHTML = `<div class="list-table-wrap"><table class="list-table">
-    <thead><tr><th>Data</th><th>Solicitante</th><th>Centro de Custo</th><th>Veículo</th><th class="col-actions">Ações</th></tr></thead>
-    <tbody>${items.map(s => `<tr>
+    <thead>${_tblTh('saidas', cols)}</thead>
+    <tbody>${_tblApply('saidas', cols, items).map(s => `<tr>
       <td>${fmtDate(s.data)}</td>
       <td>${esc(s.solicitante_nome || '—')}</td>
       <td>${esc(s.centro_custo_nome || '—')}</td>
