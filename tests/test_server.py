@@ -43,15 +43,17 @@ def setUpModule():
         conn.execute("UPDATE usuarios SET must_change_password=0 WHERE username='admin'")
         conn.commit()
 
-    socketserver.ThreadingTCPServer.allow_reuse_address = True
-    _httpd = socketserver.ThreadingTCPServer(('127.0.0.1', PORT), server.SGEAHandler)
-    _thread = threading.Thread(target=_httpd.serve_forever, daemon=True)
+    # Serve via waitress (mesmo servidor do deploy) para validar o adaptador WSGI.
+    import waitress
+    app = server.sgx_base._wsgi_app(server.SGEAHandler)
+    _httpd = waitress.create_server(app, host='127.0.0.1', port=PORT, threads=8)
+    _thread = threading.Thread(target=_httpd.run, daemon=True)
     _thread.start()
 
 
 def tearDownModule():
-    _httpd.shutdown()
-    _httpd.server_close()
+    try: _httpd.close()
+    except Exception: pass
     shutil.rmtree(_tmpdir, ignore_errors=True)
 
 
