@@ -5,7 +5,7 @@
 
 ---
 
-## [Não versionado]
+## [0.33.0] — 2026-07-25
 
 ### Alterado
 - **A tela de Fornecedores virou tabela** (mesmo padrão de Funcionários/Centros de Custo), no lugar da lista de cards: colunas Razão Social, CNPJ e Situação, com **ordenação ao clicar no cabeçalho** e **seleção em massa** (excluir vários para a Lixeira). O detalhe completo do fornecedor — dados, certidões, sanções, consulta de CNPJ e CEIS/CNEP, edição — passou para uma **janela (modal)**, aberta ao clicar na linha ou em Editar.
