@@ -5,6 +5,13 @@
 
 ---
 
+## [Não versionado]
+
+### Corrigido
+- **A data do e-mail de resumo diário volta ao formato brasileiro.** Estava saindo como `2026-07-25` (ISO) no assunto e no corpo; passa a `25/07/2026`.
+
+---
+
 ## [0.30.0] — 2026-07-25
 
 ### Alterado

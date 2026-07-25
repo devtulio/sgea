@@ -2730,7 +2730,8 @@ def _send_daily_alerts():
         ).fetchall()}
     if not (cfg.get('smtp_host') and cfg.get('smtp_user') and cfg.get('smtp_pass')):
         return
-    hoje = time.strftime('%Y-%m-%d')
+    hoje = time.strftime('%Y-%m-%d')       # chave de dedup (não exibir)
+    hoje_br = time.strftime('%d/%m/%Y')    # exibição pt-BR
     if cfg.get('alert_email_last_sent') == hoje:
         return
 
@@ -2754,9 +2755,9 @@ def _send_daily_alerts():
             f"— {'vencido em' if l['vencido'] else 'vence em'} {l['data_validade']} — saldo {l['quantidade_atual']} {l['unidade_consumo']}</li>"
             for l in sorted(itens, key=lambda x: x['data_validade'])
         )
-        corpo = f"<p>Resumo automático do SGEA — {hoje}</p><p>Lotes vencidos ou vencendo nos próximos 7 dias:</p><ul>{linhas}</ul>"
+        corpo = f"<p>Resumo automático do SGEA — {hoje_br}</p><p>Lotes vencidos ou vencendo nos próximos 7 dias:</p><ul>{linhas}</ul>"
         try:
-            _send_email_raw(smtp_cfg, frm, cfg['smtp_to'], f'SGEA — Lotes vencendo ({hoje})', corpo)
+            _send_email_raw(smtp_cfg, frm, cfg['smtp_to'], f'SGEA — Lotes vencendo ({hoje_br})', corpo)
             print(f'  [ALERTAS] E-mail de validade enviado ({len(itens)} lote(s))', flush=True)
         except Exception as e:
             sgx_base.registrar_operacional(_log, 'email-alertas', f'Falha ao enviar e-mail de alertas: {e}')
