@@ -288,6 +288,12 @@ def init_db():
         for _vc in FROTA_PECAS_COLS + FROTA_DOC_COLS:
             if _vc not in cols_frota: conn.execute(f"ALTER TABLE frota ADD COLUMN {_vc} TEXT DEFAULT ''")
 
+        # Campos da entrada alinhados ao Fiorilli: nº e data da requisição, e o tipo
+        # de entrada do Fiorilli (TPREQUI, ex. "OUTRA"). Usados também pela importação.
+        cols_ent = [r[1] for r in conn.execute('PRAGMA table_info(entradas)').fetchall()]
+        for _ec in ('requisicao', 'data_requisicao', 'tipo_fiorilli'):
+            if _ec not in cols_ent: conn.execute(f"ALTER TABLE entradas ADD COLUMN {_ec} TEXT DEFAULT ''")
+
         # Responsável e e-mail do centro de custo (vêm do cadastro do Fiorilli).
         cols_cc = [r[1] for r in conn.execute('PRAGMA table_info(centros_custo)').fetchall()]
         for _cc in ('responsavel', 'email'):
@@ -481,6 +487,47 @@ def _parse_fiorilli_posicao(csv_text):
             'valor_negativo': val < 0,
         }
     return itens
+
+def _data_br_iso(s):
+    """dd/mm/aaaa -> aaaa-mm-dd (ISO). Vazio/inválido -> ''."""
+    m = re.match(r'^\s*(\d{2})/(\d{2})/(\d{4})\s*$', s or '')
+    return f'{m.group(3)}-{m.group(2)}-{m.group(1)}' if m else ''
+
+def _parse_fiorilli_entrada(csv_text):
+    """Parseia o CSV 'REQUISIÇÃO DE ENTRADA' do Fiorilli. Agrupa por REQUI
+    (uma entrada, N itens). Levanta ValueError se o cabeçalho não bater."""
+    reader = csv.DictReader(io.StringIO((csv_text or '').lstrip('﻿')), delimiter=';')
+    faltando = {'REQUI', 'DATAE', 'CADPRO', 'QUAN1'} - set(reader.fieldnames or [])
+    if faltando:
+        raise ValueError('Não parece a "REQUISIÇÃO DE ENTRADA" do Fiorilli. Faltam colunas: ' + ', '.join(sorted(faltando)))
+    def g(row, k): return (row.get(k) or '').strip()
+    reqs = {}
+    for row in reader:
+        requi = g(row, 'REQUI')
+        if not requi:
+            continue
+        if requi not in reqs:
+            reqs[requi] = {
+                'requisicao': requi,
+                'data_requisicao': _data_br_iso(g(row, 'DTLAN')),
+                'data_entrega': _data_br_iso(g(row, 'DATAE')) or _data_br_iso(g(row, 'DTLAN')),
+                'documento': g(row, 'DOCUM'),
+                'cnpj': g(row, 'INSMF'),
+                'fornecedor_nome': g(row, 'NOME'),
+                'numped': g(row, 'NUMPED'),
+                'centro_raw': g(row, 'COD_DESC_CCUSTOR') or g(row, 'CCUSTOR'),
+                'responsavel': g(row, 'RESPONSA') or g(row, 'SOLICITANTE'),
+                'proclic': g(row, 'PROCLIC'),
+                'tprequi': g(row, 'TPREQUI'),
+                'itens': [],
+            }
+        reqs[requi]['itens'].append({
+            'cadpro': g(row, 'CADPRO'), 'desc': g(row, 'DISC1'), 'desc_tec': g(row, 'DISCR1'),
+            'unid': g(row, 'UNID1'), 'qtd': _float(g(row, 'QUAN1')) or 0.0,
+            'valor': _float(g(row, 'VAUN1')) or 0.0, 'lote': g(row, 'LOTE'),
+            'validade': _data_br_iso(g(row, 'VALIDADE')), 'marca': g(row, 'MARCA'),
+        })
+    return list(reqs.values())
 
 # ── Importação da planilha "CONTROLE DE FROTA" ──────────────────────────────
 def _norm_header(h):
@@ -1301,6 +1348,9 @@ class SGEAHandler(http.server.SimpleHTTPRequestHandler):
         elif p == '/api/frota/import':
             if not s['admin']: self._json(403, {'error': 'Acesso restrito'}); return
             self._import_frota(data)
+        elif p == '/api/entradas/import':
+            if not s['admin']: self._json(403, {'error': 'Acesso restrito'}); return
+            self._import_entradas_fiorilli(data, s)
         elif p == '/api/centros-custo/import':
             if not s['admin']: self._json(403, {'error': 'Acesso restrito'}); return
             self._import_centros(data)
@@ -2429,11 +2479,13 @@ class SGEAHandler(http.server.SimpleHTTPRequestHandler):
 
                 conn.execute('''INSERT INTO entradas
                     (id,pedido_id,tipo,fornecedor_id,nfe_numero,nfe_chave_acesso,data_entrega,
-                     recebedor_id,centro_custo_id,observacao,created_by)
-                    VALUES (?,?,?,?,?,?,?,?,?,?,?)''',
+                     recebedor_id,centro_custo_id,observacao,created_by,requisicao,data_requisicao,tipo_fiorilli)
+                    VALUES (?,?,?,?,?,?,?,?,?,?,?,?,?,?)''',
                     (eid, data.get('pedido_id'), tipo, data.get('fornecedor_id'), data.get('nfe_numero'),
                      data.get('nfe_chave_acesso'), data['data_entrega'], data.get('recebedor_id'),
-                     data.get('centro_custo_id'), data.get('observacao'), s['user_id']))
+                     data.get('centro_custo_id'), data.get('observacao'), s['user_id'],
+                     (data.get('requisicao') or '').strip(), (data.get('data_requisicao') or '').strip(),
+                     (data.get('tipo_fiorilli') or '').strip()))
                 for r in resolvidos:
                     valor_total = round(r['valor_unit'] * r['qtd_un'], 2)
                     cur = conn.execute('''INSERT INTO entrada_itens
@@ -2452,6 +2504,95 @@ class SGEAHandler(http.server.SimpleHTTPRequestHandler):
         except ValueError as e:
             self._json(400, {'error': str(e)}); return
         self._json(201, self._get_entrada_dict(eid))
+
+    def _import_entradas_fiorilli(self, data, s):
+        """Importa entradas a partir do CSV 'REQUISIÇÃO DE ENTRADA' do Fiorilli:
+        cria a entrada + itens + lotes (com validade). Idempotente por nº de
+        requisição (REQUI). Produto (por codigo_fiorilli), fornecedor (por CNPJ) e
+        centro de custo (por código) que faltarem são criados a partir do próprio CSV."""
+        csv_text = data.get('csv') or ''
+        if not csv_text.strip():
+            self._json(400, {'error': 'CSV vazio.'}); return
+        criar_prod = data.get('criar_produtos', True)
+        criar_forn = data.get('criar_fornecedores', True)
+        try:
+            reqs = _parse_fiorilli_entrada(csv_text)
+        except ValueError as e:
+            self._json(400, {'error': str(e)}); return
+        r = {'entradas': 0, 'itens': 0, 'produtos_criados': 0, 'fornecedores_criados': 0,
+             'centros_criados': 0, 'ja_existentes': 0, 'itens_pulados': 0}
+        with get_db() as conn:
+            forn_by_cnpj = {re.sub(r'\D', '', (x['cnpj'] or '')): x['id']
+                            for x in conn.execute('SELECT id, cnpj FROM fornecedores WHERE deleted_at IS NULL').fetchall() if x['cnpj']}
+            prod_by_cad = {x['codigo_fiorilli']: x['id'] for x in conn.execute('SELECT id, codigo_fiorilli FROM produtos').fetchall()}
+            cc_by_cod = {str(x['codigo']).strip(): x['id'] for x in conn.execute('SELECT id, codigo FROM centros_custo').fetchall() if x['codigo']}
+            func_by_nome = {(x['nome'] or '').strip().upper(): x['id'] for x in conn.execute('SELECT id, nome FROM funcionarios').fetchall()}
+            existentes = {x['requisicao'] for x in conn.execute("SELECT requisicao FROM entradas WHERE requisicao IS NOT NULL AND requisicao<>''").fetchall()}
+            for req in reqs:
+                if req['requisicao'] in existentes:
+                    r['ja_existentes'] += 1; continue
+                # fornecedor por CNPJ
+                cnpjd = re.sub(r'\D', '', req['cnpj'])
+                fid = forn_by_cnpj.get(cnpjd)
+                if not fid and cnpjd and criar_forn:
+                    fid = str(uuid.uuid4())
+                    blob = {'id': fid, 'razao_social': req['fornecedor_nome'], 'cnpj': req['cnpj'],
+                            'cnpj_digits': cnpjd, 'updatedAt': _now_precise()}
+                    conn.execute('INSERT INTO fornecedores (id,data,cnpj,razao_social,updated_at) VALUES (?,?,?,?,?)',
+                                 (fid, json.dumps(blob, ensure_ascii=False), req['cnpj'], req['fornecedor_nome'], _now()))
+                    forn_by_cnpj[cnpjd] = fid; r['fornecedores_criados'] += 1
+                # centro por código ("N - NOME" ou "N")
+                m = re.match(r'^\s*(\d+)', req['centro_raw'])
+                cc_cod = m.group(1) if m else None
+                cc_id = cc_by_cod.get(cc_cod) if cc_cod else None
+                if not cc_id and cc_cod:
+                    nome_cc = re.sub(r'^\s*\d+\s*-\s*', '', req['centro_raw']).strip() or req['centro_raw']
+                    cur = conn.execute('INSERT INTO centros_custo (codigo,nome,ativo) VALUES (?,?,1)', (cc_cod, nome_cc))
+                    cc_id = cur.lastrowid; cc_by_cod[cc_cod] = cc_id; r['centros_criados'] += 1
+                receb_id = func_by_nome.get(req['responsavel'].upper()) if req['responsavel'] else None
+                eid = str(uuid.uuid4())
+                obs = f"Importado do Fiorilli — requisição {req['requisicao']}"
+                if req['proclic']: obs += f"; processo licitatório {req['proclic']}"
+                conn.execute('''INSERT INTO entradas
+                    (id,tipo,fornecedor_id,nfe_numero,data_entrega,recebedor_id,centro_custo_id,observacao,created_by,requisicao,data_requisicao,tipo_fiorilli)
+                    VALUES (?, 'compra_direta', ?,?,?,?,?,?,?,?,?,?)''',
+                    (eid, fid, req['documento'], req['data_entrega'], receb_id, cc_id, obs, s['user_id'],
+                     req['requisicao'], req['data_requisicao'], req['tprequi']))
+                r['entradas'] += 1
+                for it in req['itens']:
+                    cad = it['cadpro']
+                    if not _CADPRO_RE.match(cad):
+                        r['itens_pulados'] += 1; continue
+                    pid = prod_by_cad.get(cad)
+                    if not pid:
+                        if not criar_prod:
+                            r['itens_pulados'] += 1; continue
+                        pid = str(uuid.uuid4()); unid = _norm_unid(it['unid']) or 'UN'
+                        conn.execute('''INSERT INTO produtos (id,codigo_fiorilli,nome,unidade_consumo,unidade_licitada,qtd_por_embalagem,ativo)
+                                        VALUES (?,?,?,?,?,1,1)''',
+                                     (pid, cad, it['desc'] or cad, unid, unid))
+                        prod_by_cad[cad] = pid; r['produtos_criados'] += 1
+                    q = int(round(it['qtd']))
+                    if q <= 0:
+                        r['itens_pulados'] += 1; continue
+                    custo = round(it['valor'], 4)
+                    lote = it['lote'] or None
+                    val = it['validade'] or None
+                    cur = conn.execute('''INSERT INTO entrada_itens
+                        (entrada_id,produto_id,quantidade_unidades,valor_unitario,valor_total,lote_numero,data_validade)
+                        VALUES (?,?,?,?,?,?,?)''',
+                        (eid, pid, q, custo, round(custo * q, 2), lote, val))
+                    conn.execute('''INSERT INTO lotes
+                        (produto_id,lote_numero,data_validade,quantidade_recebida,quantidade_atual,valor_unitario_custo,entrada_item_id)
+                        VALUES (?,?,?,?,?,?,?)''',
+                        (pid, lote, val, q, q, custo, cur.lastrowid))
+                    r['itens'] += 1
+            _insert_audit_raw(conn, {'type': 'ENTRADA_IMPORTADA', 'ts': _now(),
+                'user_id': s['user_id'], 'user_nome': s['nome'], 'label': 'Entradas importadas do Fiorilli',
+                'detail': (f"{r['entradas']} entrada(s), {r['itens']} item(ns); "
+                           f"{r['produtos_criados']} produto(s), {r['fornecedores_criados']} fornecedor(es), "
+                           f"{r['centros_criados']} centro(s) criado(s); {r['ja_existentes']} requisição(ões) já existente(s)")})
+        self._json(200, r)
 
     def _update_entrada(self, eid, data):
         # Só campos de cabeçalho — quantidades/valores já viraram lote(s) e são imutáveis.

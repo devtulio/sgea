@@ -5,6 +5,17 @@
 
 ---
 
+## [Não versionado]
+
+### Adicionado
+- **Importar entradas do Fiorilli.** Na tela de Entradas, o administrador pode importar a **REQUISIÇÃO DE ENTRADA** exportada do Fiorilli (CSV): o sistema cria a entrada com seus itens e **lotes (com validade)** de uma vez, aproveitando o número da requisição como chave — reimportar não duplica. Produtos (por código Fiorilli), fornecedores (por CNPJ) e centros de custo (por código) que ainda não existirem são criados a partir do próprio arquivo.
+- **A entrada ganhou os campos Nº da Requisição e Data da Requisição**, alinhando o registro ao do Fiorilli.
+
+### Alterado
+- **O seletor de Tipo de Entrada (Com pedido / Compra direta) virou um botão segmentado**, mais claro e alinhado ao visual do sistema.
+
+---
+
 ## [0.33.2] — 2026-07-25
 
 ### Documentação

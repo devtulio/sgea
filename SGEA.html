@@ -50,6 +50,14 @@
   .conversao-hint { font-size: .72rem; color: var(--gray-500); grid-column: 1 / -1; margin-top: -4px; }
   @media (max-width: 760px) { .item-row { grid-template-columns: 1fr 1fr; } }
 
+  /* Seletor segmentado (pílulas) — ex.: Tipo de Entrada */
+  .seg-radio { display: inline-flex; border: 1px solid var(--gray-300); border-radius: 8px; overflow: hidden; }
+  .seg-radio label { margin: 0; padding: 7px 16px; cursor: pointer; font-size: .85rem; font-weight: 500; color: var(--gray-600); user-select: none; text-transform: none; transition: background .12s, color .12s; }
+  .seg-radio label + label { border-left: 1px solid var(--gray-300); }
+  .seg-radio input { display: none; }
+  .seg-radio label:has(input:checked) { background: var(--brand); color: #fff; }
+  body.dark .seg-radio, body.dark .seg-radio label + label { border-color: #444; }
+
   /* ── Painel de lotes (produto) ───────────────────── */
   .lotes-panel { padding: 12px 16px; background: var(--gray-50); border-top: 1px solid var(--gray-200); }
   body.dark .lotes-panel { background: #1c1c1c; border-color: #383838; }
@@ -284,6 +292,8 @@
     <div class="dash-top">
       <h2>Entradas</h2>
       <div class="view-actions">
+        <input type="file" id="entrada-import-file" accept=".csv,text/csv" class="hidden" onchange="importarEntradaFiorilli(this.files[0]); this.value='';">
+        <button class="btn btn-outline" id="btn-import-entrada" style="display:none" onclick="document.getElementById('entrada-import-file').click()" title="Importar a REQUISIÇÃO DE ENTRADA exportada do Fiorilli (CSV)">⬆️ Importar do Fiorilli</button>
         <button class="btn btn-primary" onclick="openEntradaModal()">+ Nova Entrada</button>
       </div>
     </div>
@@ -1222,17 +1232,19 @@
     <div class="modal-body">
       <div class="info-field">
         <label>Tipo de Entrada</label>
-        <div style="display:flex;gap:16px;font-size:.85rem">
-          <label style="display:flex;align-items:center;gap:6px;font-weight:400;text-transform:none"><input type="radio" name="ef-tipo" value="pedido" checked onchange="_toggleEntradaTipo()"> Com pedido</label>
-          <label style="display:flex;align-items:center;gap:6px;font-weight:400;text-transform:none"><input type="radio" name="ef-tipo" value="compra_direta" onchange="_toggleEntradaTipo()"> Compra direta</label>
+        <div class="seg-radio">
+          <label><input type="radio" name="ef-tipo" value="pedido" checked onchange="_toggleEntradaTipo()"><span>Com pedido</span></label>
+          <label><input type="radio" name="ef-tipo" value="compra_direta" onchange="_toggleEntradaTipo()"><span>Compra direta</span></label>
         </div>
       </div>
       <div class="form-grid">
+        <div class="info-field"><label for="ef-requisicao">Nº da Requisição</label><input type="text" id="ef-requisicao" placeholder="ex.: 005009/26"></div>
         <div class="info-field" id="ef-pedido-wrap"><label for="ef-pedido">Pedido</label><select id="ef-pedido"></select></div>
         <div class="info-field"><label for="ef-fornecedor">Fornecedor</label><select id="ef-fornecedor"></select></div>
         <div class="info-field"><label for="ef-nfe">Nº da NF-e</label><input type="text" id="ef-nfe"></div>
-        <div class="info-field"><label for="ef-data-entrega">Data de Entrega *</label><input type="date" id="ef-data-entrega"></div>
-        <div class="info-field"><label for="ef-recebedor">Recebedor</label><select id="ef-recebedor"></select></div>
+        <div class="info-field"><label for="ef-data-requisicao">Data da Requisição</label><input type="date" id="ef-data-requisicao"></div>
+        <div class="info-field"><label for="ef-data-entrega">Data da Entrada *</label><input type="date" id="ef-data-entrega"></div>
+        <div class="info-field"><label for="ef-recebedor">Recebedor / Responsável</label><select id="ef-recebedor"></select></div>
         <div class="info-field"><label for="ef-centro-custo">Centro de Custo</label><select id="ef-centro-custo"></select></div>
         <div class="info-field span-2"><label for="ef-observacao">Observação</label><input type="text" id="ef-observacao"></div>
       </div>
@@ -3861,7 +3873,27 @@ function showEntradas() {
   renderEntradas();
 }
 
+async function importarEntradaFiorilli(file) {
+  if (!file) return;
+  let csv;
+  try { csv = await file.text(); } catch { toast('Não consegui ler o arquivo.', 'error'); return; }
+  const r = await API.post('/api/entradas/import', { csv });
+  const d = await API.json(r);
+  if (!r || !r.ok) { toast(d?.error || 'Falha ao importar.', 'error', 9000); return; }
+  await _auditEvento('ENTRADA_IMPORTADA', `Importação de entradas do Fiorilli: ${d.entradas} entrada(s), ${d.itens} item(ns)`, null);
+  let msg = `${d.entradas} entrada(s) importada(s), ${d.itens} item(ns)`;
+  if (d.produtos_criados) msg += `; ${d.produtos_criados} produto(s) criado(s)`;
+  if (d.fornecedores_criados) msg += `; ${d.fornecedores_criados} fornecedor(es) criado(s)`;
+  if (d.centros_criados) msg += `; ${d.centros_criados} centro(s) criado(s)`;
+  if (d.ja_existentes) msg += `; ${d.ja_existentes} requisição(ões) já existia(m)`;
+  if (d.itens_pulados) msg += `; ${d.itens_pulados} item(ns) pulado(s)`;
+  toast(msg + '.', 'success', 9000);
+  renderEntradas();
+}
+
 async function renderEntradas() {
+  const btnImp = document.getElementById('btn-import-entrada');
+  if (btnImp) btnImp.style.display = _apiUser?.admin ? '' : 'none';
   const items = await _fetchList('entradas');
   const el = document.getElementById('entradas-list');
   if (!items.length) { el.innerHTML = '<div class="empty">Nenhuma entrada registrada.</div>'; return; }
@@ -3901,6 +3933,8 @@ async function openEntradaModal() {
   await _fillSelect('ef-centro-custo', 'centros-custo', 'nome');
   _entradaProdutos = await _fetchList('produtos?somente_ativos=1');
   document.getElementById('ef-nfe').value = '';
+  document.getElementById('ef-requisicao').value = '';
+  document.getElementById('ef-data-requisicao').value = '';
   document.getElementById('ef-data-entrega').value = new Date().toISOString().slice(0, 10);
   document.getElementById('ef-observacao').value = '';
   document.getElementById('ef-itens').innerHTML = '';
@@ -3954,6 +3988,8 @@ async function saveEntrada() {
     pedido_id: tipo === 'pedido' ? (document.getElementById('ef-pedido').value || null) : null,
     fornecedor_id: document.getElementById('ef-fornecedor').value || null,
     nfe_numero: document.getElementById('ef-nfe').value.trim() || null,
+    requisicao: document.getElementById('ef-requisicao').value.trim() || null,
+    data_requisicao: document.getElementById('ef-data-requisicao').value || null,
     data_entrega: dataEntrega,
     recebedor_id: document.getElementById('ef-recebedor').value || null,
     centro_custo_id: document.getElementById('ef-centro-custo').value || null,

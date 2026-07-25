@@ -875,6 +875,52 @@ class TestExclusaoBloqueadaExplicaMotivo(SGEATestCase):
         self.assertIn('saída', data['error'])
 
 
+class TestImportEntradaFiorilli(SGEATestCase):
+    HDR = ("REQUI;DTLAN;DATAE;DOCUM;INSMF;NOME;NUMPED;COD_DESC_CCUSTOR;RESPONSA;PROCLIC;"
+           "TPREQUI;ITEM;CADPRO;DISC1;DISCR1;UNID1;QUAN1;VAUN1;LOTE;VALIDADE;MARCA")
+    def _csv(self, req):
+        rows = [self.HDR]
+        for it in req['itens']:
+            rows.append(';'.join([req['REQUI'], '21/07/2026', '24/07/2026', '000000009999',
+                req.get('CNPJ', '11.222.333/0001-44'), 'TESTE FORNECEDOR LTDA', '03555/26', '9 - FUNDO TESTE',
+                'FULANO DE TAL', '000007/25', 'OUTRA', it['ITEM'], it['CADPRO'], it['DISC1'],
+                'descricao tecnica', it['UNID1'], it['QUAN1'], it['VAUN1'], it['LOTE'], it['VALIDADE'], 'MARCAX']))
+        return '\n'.join(rows)
+    def _estoque(self, cod):
+        with server.get_db() as conn:
+            row = conn.execute("SELECT COALESCE(v.estoque_fisico,0) e FROM produtos p LEFT JOIN v_estoque v ON v.produto_id=p.id WHERE p.codigo_fiorilli=?", (cod,)).fetchone()
+            return row['e'] if row else None
+
+    def test_importa_entrada_com_itens_e_lotes(self):
+        token = self.login()
+        csv = self._csv({'REQUI': '088001/26', 'CNPJ': '11.222.333/0001-44', 'itens': [
+            {'ITEM': '1', 'CADPRO': '088.001.001', 'DISC1': 'ALCOOL 70%', 'UNID1': 'LT', 'QUAN1': '120', 'VAUN1': '8,28', 'LOTE': 'LOTE1', 'VALIDADE': '30/08/2032'},
+            {'ITEM': '2', 'CADPRO': '088.001.002', 'DISC1': 'APARELHO', 'UNID1': 'UND', 'QUAN1': '3', 'VAUN1': '144,9', 'LOTE': 'LOTE2', 'VALIDADE': ''},
+        ]})
+        st, d = self.request('POST', '/api/entradas/import', {'csv': csv}, token=token)
+        self.assertEqual(st, 200, d)
+        self.assertEqual(d['entradas'], 1)
+        self.assertEqual(d['itens'], 2)
+        self.assertEqual(d['produtos_criados'], 2)
+        self.assertEqual(d['fornecedores_criados'], 1)
+        self.assertEqual(self._estoque('088.001.001'), 120)
+        self.assertEqual(self._estoque('088.001.002'), 3)
+        # validade foi para o lote
+        with server.get_db() as conn:
+            v = conn.execute("SELECT l.data_validade FROM lotes l JOIN produtos p ON p.id=l.produto_id WHERE p.codigo_fiorilli='088.001.001'").fetchone()
+            self.assertEqual(v['data_validade'], '2032-08-30')
+
+    def test_idempotente_por_requisicao(self):
+        token = self.login()
+        csv = self._csv({'REQUI': '088002/26', 'CNPJ': '55.666.777/0001-88', 'itens': [
+            {'ITEM': '1', 'CADPRO': '088.002.001', 'DISC1': 'ITEM X', 'UNID1': 'UN', 'QUAN1': '10', 'VAUN1': '2,00', 'LOTE': 'L', 'VALIDADE': ''}]})
+        self.request('POST', '/api/entradas/import', {'csv': csv}, token=token)
+        st, d = self.request('POST', '/api/entradas/import', {'csv': csv}, token=token)
+        self.assertEqual(d['entradas'], 0)
+        self.assertEqual(d['ja_existentes'], 1)
+        self.assertEqual(self._estoque('088.002.001'), 10)  # não dobrou
+
+
 class TestReconciliacaoCadastrar(SGEATestCase):
     """Bootstrap (situação 1): SGEA vazio -> importa posição -> cria produtos + saldo inicial.
     Cada teste usa códigos próprios (o DB é compartilhado no módulo)."""
