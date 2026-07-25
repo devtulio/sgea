@@ -31,6 +31,9 @@ def setUpModule():
     server.DB_PATH = os.path.join(_tmpdir, 'sgea.db')
     server.BACKUP_DIR = os.path.join(_tmpdir, 'backups')
     os.makedirs(server.BACKUP_DIR, exist_ok=True)
+    # Motor de erros: log no dir temporário (não polui o do repositório).
+    server._DATA_DIR = _tmpdir
+    server._log = server.sgx_base.configurar_log('SGEA', _tmpdir, forcar=True)
     server.init_db()
     # A suíte age como um sistema já instalado, com a senha padrão trocada: sem
     # isto todo login como admin/admin123 tomaria 403, porque o servidor passou a

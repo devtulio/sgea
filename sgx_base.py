@@ -406,15 +406,22 @@ class ErroCliente(Exception):
         self.status = status
 
 
-def configurar_log(sigla, data_dir):
+def configurar_log(sigla, data_dir, forcar=False):
     """Logger do sistema: arquivo rotativo UTF-8 (2 MB × 3) + eco no console.
-    Chamar uma vez no boot; idempotente. Devolve o logger. Substitui o basicConfig."""
+    Chamar uma vez no boot; idempotente. Devolve o logger. Substitui o basicConfig.
+    `forcar=True` recria os handlers apontando para outro data_dir — os testes usam
+    isso para o log ir ao diretório temporário, não poluir o log do repositório."""
     from logging.handlers import RotatingFileHandler
     os.makedirs(data_dir, exist_ok=True)
     logger = logging.getLogger(sigla.lower())
     logger.setLevel(logging.WARNING)          # captura WARNING (operacional) e ERROR
-    if logger.handlers:                        # já configurado — não duplica handler
-        return logger
+    if logger.handlers:
+        if not forcar:                         # já configurado — não duplica handler
+            return logger
+        for h in list(logger.handlers):        # forcar: fecha e recria (aponta p/ novo dir)
+            logger.removeHandler(h)
+            try: h.close()
+            except Exception: pass
     fmt = logging.Formatter('%(asctime)s | %(levelname)s | %(message)s', datefmt='%Y-%m-%dT%H:%M:%S')
     fh = RotatingFileHandler(os.path.join(data_dir, f'{sigla.lower()}_errors.log'),
                              maxBytes=2_000_000, backupCount=3, encoding='utf-8')
@@ -517,8 +524,13 @@ def ler_diagnostico_erros(data_dir, sigla, limite=400):
         cpath = os.path.join(data_dir, f'{sigla.lower()}_crash.log')
         if os.path.isfile(cpath):
             with open(cpath, encoding='utf-8', errors='replace') as f:
-                txt = f.read()[-4000:]
-            crash = [b.strip() for b in txt.split('=== captura armada') if b.strip()][-5:]
+                txt = f.read()[-8000:]
+            # Cada início do servidor grava "=== captura armada ===". Isso NÃO é crash.
+            # Só conta um bloco como falha fatal se ele traz traceback de verdade
+            # (Python, faulthandler/segfault, ou exceção de thread).
+            sinais = ('Traceback', 'Fatal Python error', 'Current thread 0x', 'exceção não tratada')
+            crash = [b.strip() for b in txt.split('=== captura armada')
+                     if any(s in b for s in sinais)][-5:]
     except Exception:
         pass
     return {'erros': sorted(grupos.values(), key=lambda g: -g['count']), 'crash': crash}
