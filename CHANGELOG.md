@@ -5,7 +5,7 @@
 
 ---
 
-## [Não versionado]
+## [0.32.0] — 2026-07-25
 
 ### Adicionado
 - **As tabelas de Estoque, Entradas e Saídas agora ordenam ao clicar no cabeçalho**, igual à tela de Centros de Custo (clica para ordenar, clica de novo para inverter, com seta indicando a coluna). A coluna Estoque ordena por número.
