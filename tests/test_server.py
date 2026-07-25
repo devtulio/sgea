@@ -781,7 +781,7 @@ class ReconciliacaoUnitTest(unittest.TestCase):
         self.assertEqual(res['resumo']['total'], 8)
 
 
-class TestFrotaDeleteBloqueada(SGEATestCase):
+class TestExclusaoBloqueadaExplicaMotivo(SGEATestCase):
     def test_excluir_veiculo_vinculado_a_saida_explica_o_motivo(self):
         token = self.login()
         pid = self._criar_produto(token, qtd_por_embalagem=12)
@@ -797,6 +797,36 @@ class TestFrotaDeleteBloqueada(SGEATestCase):
         }, token)
         self.assertEqual(status, 201, sai)
         status, data = self.request('DELETE', f'/api/frota/{veic["id"]}', token=token)
+        self.assertEqual(status, 409, data)
+        self.assertIn('saída', data['error'])
+
+    def test_excluir_centro_custo_vinculado_a_veiculo_explica_o_motivo(self):
+        token = self.login()
+        status, cc = self.request('POST', '/api/centros-custo', {'nome': 'CC-TEST'}, token)
+        self.assertEqual(status, 201, cc)
+        status, veic = self.request('POST', '/api/frota',
+                                    {'numero': 'V-CC', 'centro_custo_id': cc['id']}, token)
+        self.assertEqual(status, 201, veic)
+        status, data = self.request('DELETE', f'/api/centros-custo/{cc["id"]}', token=token)
+        self.assertEqual(status, 409, data)
+        self.assertIn('veículo', data['error'])
+
+    def test_excluir_funcionario_vinculado_a_saida_explica_o_motivo(self):
+        token = self.login()
+        pid = self._criar_produto(token, qtd_por_embalagem=12)
+        self.request('POST', '/api/entradas', {
+            'tipo': 'compra_direta', 'data_entrega': '2026-07-01',
+            'itens': [{'produto_id': pid, 'quantidade_embalagem': 1, 'valor_unitario': 10}]
+        }, token)
+        status, func = self.request('POST', '/api/funcionarios',
+                                    {'nome': 'F-TEST', 'matricula': 'M1'}, token)
+        self.assertEqual(status, 201, func)
+        status, sai = self.request('POST', '/api/saidas', {
+            'data': '2026-07-12', 'solicitante_id': func['id'],
+            'itens': [{'produto_id': pid, 'quantidade': 1}]
+        }, token)
+        self.assertEqual(status, 201, sai)
+        status, data = self.request('DELETE', f'/api/funcionarios/{func["id"]}', token=token)
         self.assertEqual(status, 409, data)
         self.assertIn('saída', data['error'])
 

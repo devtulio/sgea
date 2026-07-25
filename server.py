@@ -859,6 +859,32 @@ def _crud_delete(table, id_):
     with get_db() as conn:
         conn.execute(f'DELETE FROM {table} WHERE id=?', (id_,))
 
+# Quem referencia cada cadastro por FK — usado para explicar por que a exclusão
+# foi bloqueada (em vez do genérico "registro em uso"). (tabela, coluna, rótulo).
+_DEP_EXCLUSAO = {
+    'centros_custo': [('frota', 'centro_custo_id', 'veículo(s) da frota'),
+                      ('produtos', 'centro_custo_id', 'produto(s)'),
+                      ('entradas', 'centro_custo_id', 'entrada(s) de estoque'),
+                      ('saidas', 'centro_custo_id', 'saída(s) de estoque')],
+    'funcionarios': [('entradas', 'recebedor_id', 'entrada(s) de estoque'),
+                     ('saidas', 'solicitante_id', 'saída(s) de estoque')],
+    'frota': [('saidas', 'frota_id', 'saída(s) de estoque')],
+}
+
+def _motivo_em_uso(table, id_):
+    """Mensagem 409 explicando quais registros vinculados impedem a exclusão.
+    tabela/coluna vêm de _DEP_EXCLUSAO (literais nossos, não entrada do usuário)."""
+    partes = []
+    with get_db() as conn:
+        for ref_tbl, ref_col, rotulo in _DEP_EXCLUSAO.get(table, []):
+            n = conn.execute(f'SELECT COUNT(*) FROM {ref_tbl} WHERE {ref_col}=?', (id_,)).fetchone()[0]
+            if n:
+                partes.append(f'{n} {rotulo}')
+    if not partes:
+        return 'Não é possível excluir: registro em uso.'
+    return ('Não é possível excluir: vinculado a ' + ', '.join(partes)
+            + '. Remova ou reatribua esses registros antes de excluir.')
+
 # ── HTTP Handler ──────────────────────────────────────────────────────────────
 
 class SGEAHandler(http.server.SimpleHTTPRequestHandler):
@@ -1278,18 +1304,6 @@ class SGEAHandler(http.server.SimpleHTTPRequestHandler):
             self._delete_entrada(p.split('/')[-1])
         elif re.fullmatch(r'/api/saidas/[^/]+', p):
             self._delete_saida(p.split('/')[-1])
-        elif re.fullmatch(r'/api/frota/[^/]+', p):
-            fid = p.split('/')[-1]
-            try:
-                _crud_delete('frota', fid)
-                self._json(200, {'ok': True})
-            except sqlite3.IntegrityError:
-                with get_db() as conn:
-                    n = conn.execute('SELECT COUNT(*) FROM saidas WHERE frota_id=?', (fid,)).fetchone()[0]
-                if n:
-                    self._json(409, {'error': f'Não é possível excluir: este veículo está vinculado a {n} saída(s) de estoque. Exclua ou reatribua essas saídas antes de excluir o veículo.'})
-                else:
-                    self._json(409, {'error': 'Não é possível excluir: veículo em uso por outro registro.'})
         elif re.fullmatch(r'/api/usuarios/[^/]+', p):
             if not s['admin']: self._json(403, {'error': 'Acesso restrito'}); return
             uid = int(p.split('/')[-1])
@@ -1319,7 +1333,7 @@ class SGEAHandler(http.server.SimpleHTTPRequestHandler):
                         _crud_delete(table, p.split('/')[-1])
                         self._json(200, {'ok': True})
                     except sqlite3.IntegrityError:
-                        self._json(409, {'error': 'Não é possível excluir: registro em uso'})
+                        self._json(409, {'error': _motivo_em_uso(table, p.split('/')[-1])})
                     return
             self._json(404, {'error': 'Rota não encontrada'})
 
