@@ -391,6 +391,104 @@ def instalar_captura_de_falhas(log_dir, sigla):
     return caminho
 
 
+# ── Servidor WSGI (waitress) — substitui o http.server frágil ────────────────
+# O ThreadingTCPServer/http.server é servidor de brinquedo (a própria doc do
+# Python diz "não use em produção"): abre uma thread por request sem limite e o
+# loop principal morre com erro de socket, derrubando o processo (candidato nº 1
+# do bug do "servidor parou"). waitress (puro-Python, vendorizado) tem pool fixo
+# e loop endurecido. Os handlers seguem escritos como SimpleHTTPRequestHandler;
+# este adaptador expõe a MESMA interface a partir do WSGI, então o código de
+# rota/handler não muda. ponytail: resposta bufferizada (junta os wfile.write e
+# devolve de uma vez) — cabe em RAM na escala municipal; virar generator só se
+# precisar servir download de centenas de MB.
+
+class _HeadersWSGI:
+    """Imita http.client.HTTPMessage (só o .get que os handlers usam) a partir do environ."""
+    def __init__(self, environ):
+        self._e = environ
+    def get(self, nome, default=None):
+        chave = nome.upper().replace('-', '_')
+        if chave in ('CONTENT_TYPE', 'CONTENT_LENGTH'):
+            return self._e.get(chave, default)
+        return self._e.get('HTTP_' + chave, default)
+    def __getitem__(self, nome):
+        v = self.get(nome)
+        if v is None:
+            raise KeyError(nome)
+        return v
+    def __contains__(self, nome):
+        return self.get(nome) is not None
+
+
+def _wsgi_app(handler_class):
+    import http.client
+    razao = http.client.responses
+
+    class _Adaptador(handler_class):
+        # Não chama o __init__ do BaseHTTPRequestHandler (que exige um socket).
+        def __init__(self, environ):
+            self.environ = environ
+            self.command = environ['REQUEST_METHOD']
+            qs = environ.get('QUERY_STRING', '')
+            self.path = environ.get('PATH_INFO', '') + (('?' + qs) if qs else '')
+            self.request_version = 'HTTP/1.1'
+            self.protocol_version = 'HTTP/1.1'
+            self.close_connection = True
+            self.requestline = f'{self.command} {self.path}'
+            self.client_address = (environ.get('REMOTE_ADDR', ''), 0)
+            self.directory = os.getcwd()          # SimpleHTTPRequestHandler serve estático daqui
+            self.headers = _HeadersWSGI(environ)
+            self.rfile = environ['wsgi.input']
+            self._status = 500
+            self._reason = None
+            self._headers_out = []
+            self._chunks = []
+            self._headers_buffer = []             # BaseHTTPRequestHandler.end_headers escreve aqui
+        # captura de resposta (não escreve no socket)
+        def send_response(self, code, message=None):
+            self._status = code; self._reason = message
+        def send_response_only(self, code, message=None):
+            self._status = code; self._reason = message
+        def send_header(self, k, v):
+            if k.lower() == 'content-length':     # waitress calcula do corpo devolvido
+                return
+            self._headers_out.append((str(k), str(v)))
+        def flush_headers(self):                  # neutraliza o write que o end_headers herdado faria
+            self._headers_buffer = []
+        @property
+        def wfile(self):
+            return self
+        def write(self, b):
+            if isinstance(b, str):
+                b = b.encode('utf-8')
+            self._chunks.append(b); return len(b)
+        def log_message(self, *a): pass
+        def log_request(self, *a): pass
+
+        def _wsgi(self, start_response):
+            metodo = getattr(self, 'do_' + self.command, None)
+            if metodo is None:
+                self._status = 501
+                start_response('501 Not Implemented', [('Content-Type', 'text/plain; charset=utf-8')])
+                return [b'Metodo nao suportado']
+            metodo()
+            linha = f'{self._status} {self._reason or razao.get(self._status, "OK")}'
+            start_response(linha, self._headers_out)
+            return [b''.join(self._chunks)]
+
+    def app(environ, start_response):
+        return _Adaptador(environ)._wsgi(start_response)
+    return app
+
+
+def servir_wsgi(handler_class, host, port, threads=8, ident='SGx'):
+    """Sobe o servidor via waitress (puro-Python, vendorizado). Os handlers
+    continuam sendo subclasses de SimpleHTTPRequestHandler — ver _wsgi_app."""
+    import waitress
+    waitress.serve(_wsgi_app(handler_class), host=host or '0.0.0.0', port=port,
+                   threads=threads, ident=ident)
+
+
 # ── Motor de erros: logging, classificação, throttle ────────────────────────
 # Um só ponto para logar, classificar e tratar erro. Três canais convergem para
 # o mesmo arquivo <sigla>_errors.log (UTF-8, rotativo): erro de request (backend),
