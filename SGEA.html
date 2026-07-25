@@ -1824,7 +1824,7 @@ async function deleteCrudItem(id) {
   const item = _crudCache.find(i => String(i.id) === String(id));
   const r = await API.del(`/api/${_crudAtual}/${id}`);
   const d = await API.json(r);
-  if (!r || !r.ok) { toast(d?.error || 'Não foi possível excluir.', 'error'); return; }
+  if (!r || !r.ok) { toast(d?.error || 'Não foi possível excluir.', 'error', 9000); return; }
   await _auditEvento(`${_CRUD_AUDIT_PREFIX[_crudAtual]}_EXCLUIDO`, `${CRUD_MODULES[_crudAtual].titulo.replace(/s$/, '')} "${item ? _crudNome(item) : id}" excluído`, id);
   toast('Excluído.', 'success');
   renderCrud();
@@ -2238,7 +2238,7 @@ async function deleteProduto(id) {
   const item = _produtosCache.find(p => p.id === id);
   const r = await API.del(`/api/produtos/${id}`);
   const d = await API.json(r);
-  if (!r || !r.ok) { toast(d?.error || 'Não foi possível excluir.', 'error'); return; }
+  if (!r || !r.ok) { toast(d?.error || 'Não foi possível excluir.', 'error', 9000); return; }
   await _auditEvento('PRODUTO_EXCLUIDO', `Produto "${item?.nome || id}" excluído`, id);
   toast('Produto excluído.', 'success');
   renderProdutos();
@@ -3671,7 +3671,7 @@ async function deleteEntrada(id) {
   if (!ok) return;
   const r = await API.del(`/api/entradas/${id}`);
   const d = await API.json(r);
-  if (!r || !r.ok) { toast(d?.error || 'Não foi possível excluir.', 'error'); return; }
+  if (!r || !r.ok) { toast(d?.error || 'Não foi possível excluir.', 'error', 9000); return; }
   await _auditEvento('ENTRADA_EXCLUIDA', 'Entrada excluída (movida para a lixeira)', id);
   toast('Entrada excluída.', 'success');
   renderEntradas();
@@ -3771,7 +3771,7 @@ async function deleteSaida(id) {
   if (!ok) return;
   const r = await API.del(`/api/saidas/${id}`);
   const d = await API.json(r);
-  if (!r || !r.ok) { toast(d?.error || 'Não foi possível excluir.', 'error'); return; }
+  if (!r || !r.ok) { toast(d?.error || 'Não foi possível excluir.', 'error', 9000); return; }
   await _auditEvento('SAIDA_EXCLUIDA', 'Saída excluída (movida para a lixeira, estoque revertido)', id);
   toast('Saída excluída e estoque revertido.', 'success');
   renderSaidas();
@@ -3876,7 +3876,7 @@ async function deleteUsuario(id) {
   const item = _usuariosCache.find(u => u.id === id);
   const r = await API.del(`/api/usuarios/${id}`);
   const d = await API.json(r);
-  if (!r || !r.ok) { toast(d?.error || 'Não foi possível excluir.', 'error'); return; }
+  if (!r || !r.ok) { toast(d?.error || 'Não foi possível excluir.', 'error', 9000); return; }
   await _auditEvento('USUARIO_EXCLUIDO', `Usuário "${item?.nome || id}" excluído`, id);
   toast('Usuário excluído.', 'success');
   renderUsuarios();

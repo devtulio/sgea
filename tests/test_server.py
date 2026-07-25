@@ -781,6 +781,26 @@ class ReconciliacaoUnitTest(unittest.TestCase):
         self.assertEqual(res['resumo']['total'], 8)
 
 
+class TestFrotaDeleteBloqueada(SGEATestCase):
+    def test_excluir_veiculo_vinculado_a_saida_explica_o_motivo(self):
+        token = self.login()
+        pid = self._criar_produto(token, qtd_por_embalagem=12)
+        self.request('POST', '/api/entradas', {
+            'tipo': 'compra_direta', 'data_entrega': '2026-07-01',
+            'itens': [{'produto_id': pid, 'quantidade_embalagem': 1, 'valor_unitario': 10}]
+        }, token)
+        status, veic = self.request('POST', '/api/frota', {'numero': 'V-TEST'}, token)
+        self.assertEqual(status, 201, veic)
+        status, sai = self.request('POST', '/api/saidas', {
+            'data': '2026-07-12', 'frota_id': veic['id'],
+            'itens': [{'produto_id': pid, 'quantidade': 1}]
+        }, token)
+        self.assertEqual(status, 201, sai)
+        status, data = self.request('DELETE', f'/api/frota/{veic["id"]}', token=token)
+        self.assertEqual(status, 409, data)
+        self.assertIn('saída', data['error'])
+
+
 class TestImportFrotaNaoApagaDado(SGEATestCase):
     """Regressão do eixo perda de dado (auditoria 2026-07-24).
 

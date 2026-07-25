@@ -83,12 +83,12 @@ function _apiLogout(motivo) {
 // redefinia toast() inteiro — e como declaração de função posterior sobrescreve
 // a anterior, esta aqui nunca executava, dando a falsa impressão de que corrigir
 // o toast no esqueleto valia para os quatro.
-function toast(msg, type = '') {
+function toast(msg, type = '', ms = 3500) {
   const el = document.createElement('div');
   el.className = 'toast-msg ' + type;
   el.textContent = msg;
   document.getElementById('toast')?.appendChild(el);
-  setTimeout(() => el.remove(), 3500);
+  setTimeout(() => el.remove(), ms);
   if (typeof _toastSom === 'function') _toastSom(type);
 }
 

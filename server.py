@@ -1278,6 +1278,18 @@ class SGEAHandler(http.server.SimpleHTTPRequestHandler):
             self._delete_entrada(p.split('/')[-1])
         elif re.fullmatch(r'/api/saidas/[^/]+', p):
             self._delete_saida(p.split('/')[-1])
+        elif re.fullmatch(r'/api/frota/[^/]+', p):
+            fid = p.split('/')[-1]
+            try:
+                _crud_delete('frota', fid)
+                self._json(200, {'ok': True})
+            except sqlite3.IntegrityError:
+                with get_db() as conn:
+                    n = conn.execute('SELECT COUNT(*) FROM saidas WHERE frota_id=?', (fid,)).fetchone()[0]
+                if n:
+                    self._json(409, {'error': f'Não é possível excluir: este veículo está vinculado a {n} saída(s) de estoque. Exclua ou reatribua essas saídas antes de excluir o veículo.'})
+                else:
+                    self._json(409, {'error': 'Não é possível excluir: veículo em uso por outro registro.'})
         elif re.fullmatch(r'/api/usuarios/[^/]+', p):
             if not s['admin']: self._json(403, {'error': 'Acesso restrito'}); return
             uid = int(p.split('/')[-1])

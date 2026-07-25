@@ -9,6 +9,7 @@
 
 ### Corrigido
 - **A data do e-mail de resumo diário volta ao formato brasileiro.** Estava saindo como `2026-07-25` (ISO) no assunto e no corpo; passa a `25/07/2026`.
+- **Ao tentar excluir um veículo da Frota que não pode ser removido, o aviso agora diz o porquê.** Antes aparecia só "registro em uso"; agora informa que o veículo está vinculado a saída(s) de estoque e quantas. O aviso também fica mais tempo na tela para dar tempo de ler.
 
 ---
 
