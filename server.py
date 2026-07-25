@@ -81,6 +81,14 @@ FROTA_PECAS_COLS = (
     'oleo_motor', 'oleo_transmissao', 'bateria', 'pneu_dianteiro', 'pneu_traseiro',
 )
 
+# Identificação oficial do veículo (vinda do Fiorilli, consolidada na planilha
+# CONTROLE DE FROTA). Também TEXT/valor livre. Separada das peças de propósito:
+# os relatórios de pendência olham só as peças, não estes campos.
+FROTA_DOC_COLS = (
+    'renavam', 'chassi', 'cor', 'km_atual', 'categoria_cnh',
+    'especie_tce', 'potencia_cilindrada', 'lotacao', 'situacao', 'observacao',
+)
+
 def init_db():
     with get_db() as conn:
         conn.executescript('''
@@ -274,7 +282,7 @@ def init_db():
         # Ficha de manutenção do veículo (ano + catálogo de peças por veículo:
         # filtros, óleos, bateria, pneus — referências cruzadas entre marcas).
         cols_frota = [r[1] for r in conn.execute('PRAGMA table_info(frota)').fetchall()]
-        for _vc in FROTA_PECAS_COLS:
+        for _vc in FROTA_PECAS_COLS + FROTA_DOC_COLS:
             if _vc not in cols_frota: conn.execute(f"ALTER TABLE frota ADD COLUMN {_vc} TEXT DEFAULT ''")
 
         # Responsável e e-mail do centro de custo (vêm do cadastro do Fiorilli).
@@ -490,6 +498,14 @@ _FROTA_HEADER_MAP = {
     'FILTRO UREIA': 'filtro_ureia', 'OLEO DE MOTOR': 'oleo_motor',
     'OLEO DA TRANSMISSAO': 'oleo_transmissao', 'BATERIA': 'bateria',
     'PNEU DIANTEIRO': 'pneu_dianteiro', 'PNEU TRASEIRO': 'pneu_traseiro',
+    # Identificação oficial (planilha aprimorada / Fiorilli)
+    'RENAVAM': 'renavam', 'CHASSI': 'chassi', 'COR': 'cor',
+    'KM ATUAL FIORILLI': 'km_atual', 'KM ATUAL': 'km_atual',
+    'CATEGORIA CNH': 'categoria_cnh', 'ESPECIE TCE': 'especie_tce',
+    'POTENCIA/CILINDRADA': 'potencia_cilindrada', 'POTENCIA / CILINDRADA': 'potencia_cilindrada',
+    'LOTACAO FIORILLI': 'lotacao', 'LOTACAO': 'lotacao',
+    'SITUACAO FIORILLI': 'situacao', 'SITUACAO': 'situacao',
+    'OBSERVACAO DE QUALIDADE': 'observacao', 'OBSERVACAO': 'observacao',
 }
 
 def _parse_frota_csv(csv_text):
@@ -795,8 +811,8 @@ CRUD_TABLES = {
     },
     'frota': {
         'id_type': 'int',
-        'fields': ['numero', 'placa', 'marca', 'modelo', 'combustivel', 'centro_custo_id', 'ativo', *FROTA_PECAS_COLS],
-        'required': ['numero'], 'order': 'numero ASC', 'search_fields': ['numero', 'placa', 'modelo'],
+        'fields': ['numero', 'placa', 'marca', 'modelo', 'combustivel', 'centro_custo_id', 'ativo', *FROTA_PECAS_COLS, *FROTA_DOC_COLS],
+        'required': ['numero'], 'order': 'numero ASC', 'search_fields': ['numero', 'placa', 'modelo', 'renavam', 'chassi'],
     },
 }
 _USER_SMTP_COLS = ('smtp_host', 'smtp_port', 'smtp_secure', 'smtp_require_tls',
@@ -1524,20 +1540,37 @@ class SGEAHandler(http.server.SimpleHTTPRequestHandler):
             registros = _parse_frota_csv(csv_text)
         except ValueError as e:
             self._json(400, {'error': str(e)}); return
-        import_cols = ('numero', 'placa', 'marca', 'modelo', 'combustivel') + FROTA_PECAS_COLS
+        import_cols = ('numero', 'placa', 'marca', 'modelo', 'combustivel') + FROTA_PECAS_COLS + FROTA_DOC_COLS
         inseridos = atualizados = ignorados = cc_criados = 0
         with get_db() as conn:
-            cc_map = {(r['nome'] or '').strip().upper(): r['id']
-                      for r in conn.execute('SELECT id, nome FROM centros_custo').fetchall()}
+            # A planilha traz o centro como "N - NOME" (código + descrição). Casa
+            # primeiro pelo CÓDIGO (robusto a variações de grafia do nome) e só
+            # depois pelo nome, evitando duplicar centros com o prefixo "N - ".
+            cc_by_cod, cc_by_nome = {}, {}
+            for r in conn.execute('SELECT id, codigo, nome FROM centros_custo').fetchall():
+                if r['codigo'] is not None and str(r['codigo']).strip():
+                    cc_by_cod[str(r['codigo']).strip()] = r['id']
+                cc_by_nome[(r['nome'] or '').strip().upper()] = r['id']
             for reg in registros:
                 numero = (reg.get('numero') or '').strip()
                 if not numero:
                     ignorados += 1; continue
-                cc_nome = (reg.pop('_centro_custo_nome', '') or '').strip()
-                cc_id = cc_map.get(cc_nome.upper()) if cc_nome else None
-                if cc_nome and cc_id is None and criar_cc:
-                    cur = conn.execute('INSERT INTO centros_custo (nome, ativo) VALUES (?, 1)', (cc_nome,))
-                    cc_id = cur.lastrowid; cc_map[cc_nome.upper()] = cc_id; cc_criados += 1
+                raw_cc = (reg.pop('_centro_custo_nome', '') or '').strip()
+                m = re.match(r'^\s*(\d+)\s*-\s*(.*)$', raw_cc)
+                cc_cod = m.group(1) if m else None
+                cc_nome = (m.group(2).strip() if m else raw_cc)
+                cc_id = None
+                if cc_cod and cc_cod in cc_by_cod:
+                    cc_id = cc_by_cod[cc_cod]
+                elif cc_nome and cc_nome.upper() in cc_by_nome:
+                    cc_id = cc_by_nome[cc_nome.upper()]
+                if cc_id is None and (cc_cod or cc_nome) and criar_cc:
+                    cur = conn.execute('INSERT INTO centros_custo (codigo, nome, ativo) VALUES (?, ?, 1)',
+                                       (cc_cod, cc_nome or raw_cc))
+                    cc_id = cur.lastrowid
+                    if cc_cod: cc_by_cod[cc_cod] = cc_id
+                    cc_by_nome[(cc_nome or raw_cc).upper()] = cc_id
+                    cc_criados += 1
                 vals = {c: reg[c] for c in import_cols if c in reg}
                 if cc_id is not None:
                     vals['centro_custo_id'] = cc_id

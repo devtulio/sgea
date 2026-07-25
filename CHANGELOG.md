@@ -5,6 +5,19 @@
 
 ---
 
+## [Não versionado]
+
+### Adicionado
+- **O cadastro de frota ganhou os dados oficiais do veículo (do Fiorilli).** Novos campos: RENAVAM, chassi, cor, KM atual, categoria da CNH, espécie (TCE), potência/cilindrada, lotação, situação e observação — aparecem na edição do veículo e na Ficha do Veículo, e alimentam a busca (por RENAVAM/chassi também).
+
+### Alterado
+- **A importação da planilha CONTROLE DE FROTA foi atualizada para a versão aprimorada.** Passa a importar os campos de identificação acima e a casar o **centro de custo pelo código** (formato "N - NOME") — antes casava pelo nome inteiro e criava centros duplicados quando a grafia variava. A reimportação continua sem apagar o que já está preenchido (célula em branco não zera).
+
+### Corrigido
+- **O relatório de pendências de peças reconhece "PENDENTE - …"** (além de vazio e "FALTA INFORMAÇÃO") como peça a definir; "NÃO APLICÁVEL"/"NÃO UTILIZA" seguem contando como resolvidas.
+
+---
+
 ## [0.31.0] — 2026-07-25
 
 ### Adicionado

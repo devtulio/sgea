@@ -875,6 +875,56 @@ class TestExclusaoBloqueadaExplicaMotivo(SGEATestCase):
         self.assertIn('saída', data['error'])
 
 
+class TestImportFrotaAprimorada(SGEATestCase):
+    """Planilha CONTROLE DE FROTA aprimorada: colunas de identificação (Fiorilli)
+    e centro de custo no formato 'N - NOME' (casado por código)."""
+
+    def _veiculo(self, numero):
+        with server.get_db() as conn:
+            return dict(conn.execute('SELECT * FROM frota WHERE numero=?', (numero,)).fetchone())
+
+    def test_importa_campos_de_identificacao(self):
+        token = self.login()
+        csv = ('FROTA;PLACA;RENAVAM;CHASSI;COR;KM ATUAL FIORILLI;CATEGORIA CNH;'
+               'ESPECIE TCE;POTENCIA/CILINDRADA;LOTACAO FIORILLI;SITUACAO FIORILLI;OBSERVACAO DE QUALIDADE\n'
+               '1;GJL6D26;01284762677;9BRB33BE4N2088582;PRETA;141818;B;PASSAGEIRO AUTOMOVEL;'
+               '**/177CV/1987;5;ATIVO;revisado')
+        status, resp = self.request('POST', '/api/frota/import', {'csv': csv, 'criar_centros': True}, token=token)
+        self.assertEqual(status, 200, resp)
+        v = self._veiculo('1')
+        self.assertEqual(v['renavam'], '01284762677')
+        self.assertEqual(v['chassi'], '9BRB33BE4N2088582')
+        self.assertEqual(v['cor'], 'PRETA')
+        self.assertEqual(v['situacao'], 'ATIVO')
+        self.assertEqual(v['observacao'], 'revisado')
+
+    def test_centro_casa_por_codigo_sem_duplicar(self):
+        token = self.login()
+        # centro já cadastrado com código 3 e nome curto (como vem do import de centros)
+        status, cc = self.request('POST', '/api/centros-custo',
+                                   {'codigo': '3', 'nome': 'GABINETE DO PREFEITO'}, token)
+        self.assertEqual(status, 201, cc)
+        antes = len(self.request('GET', '/api/centros-custo', token=token)[1]['items'])
+        # planilha traz "3 - GABINETE DO PREFEITO E DEPENDENCIA" (nome diferente)
+        csv = 'FROTA;PLACA;CENTRO DE CUSTO\n7;ABC1D23;3 - GABINETE DO PREFEITO E DEPENDENCIA'
+        status, resp = self.request('POST', '/api/frota/import', {'csv': csv, 'criar_centros': True}, token=token)
+        self.assertEqual(status, 200, resp)
+        self.assertEqual(resp['centros_criados'], 0, 'nao deve duplicar: casou pelo codigo')
+        depois = len(self.request('GET', '/api/centros-custo', token=token)[1]['items'])
+        self.assertEqual(antes, depois)
+        self.assertEqual(self._veiculo('7')['centro_custo_id'], cc['id'])
+
+    def test_centro_sem_prefixo_cria_com_codigo(self):
+        token = self.login()
+        csv = 'FROTA;PLACA;CENTRO DE CUSTO\n8;XYZ9K88;10 - TRANSPORTE RODOVIARIO'
+        status, resp = self.request('POST', '/api/frota/import', {'csv': csv, 'criar_centros': True}, token=token)
+        self.assertEqual(status, 200, resp)
+        self.assertEqual(resp['centros_criados'], 1)
+        with server.get_db() as conn:
+            cc = dict(conn.execute("SELECT codigo, nome FROM centros_custo WHERE nome='TRANSPORTE RODOVIARIO'").fetchone())
+        self.assertEqual(cc['codigo'], '10')  # código extraído do prefixo
+
+
 class TestImportFrotaNaoApagaDado(SGEATestCase):
     """Regressão do eixo perda de dado (auditoria 2026-07-24).
 
