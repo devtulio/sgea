@@ -1631,7 +1631,10 @@ const CRUD_MODULES = {
     fields: [
       { key: 'codigo', label: 'Código' },
       { key: 'nome', label: 'Nome', required: true },
-      { key: 'responsavel', label: 'Responsável' },
+      // Sugere nomes do cadastro de Funcionários, mas aceita texto livre (compat.
+      // com a importação do Fiorilli). Evolução futura (B): vínculo real por
+      // responsavel_id -> funcionarios(id), exibindo o nome atual e sobrevivendo a rename.
+      { key: 'responsavel', label: 'Responsável', type: 'datalist', source: 'funcionarios', optLabel: 'nome' },
       { key: 'email', label: 'E-mail', type: 'email' },
       { key: 'ativo', label: 'Ativo', type: 'checkbox', default: true },
     ],
@@ -1926,6 +1929,15 @@ async function openCrudModal(id) {
       if (val && !opts.includes(val)) opts.unshift(val);  // preserva valor importado fora da lista
       const optHtml = opts.map(o => `<option value="${esc(o)}" ${val === o ? 'selected' : ''}>${esc(o)}</option>`).join('');
       parts.push(`<div class="info-field ${span}"><label for="cf-${f.key}">${esc(f.label)}</label><select id="cf-${f.key}"><option value=""${val ? '' : ' selected'}>—</option>${optHtml}</select></div>`);
+    } else if (f.type === 'datalist') {
+      // Input de texto com sugestões vindas de um cadastro (ex.: Responsável do
+      // Centro de Custo sugerindo nomes de Funcionários). Aceita valor livre —
+      // mantém compatível com o que a importação grava (nomes fora do cadastro).
+      const opts = f.source ? await _fetchList(f.source) : [];
+      const nomes = [...new Set(opts.map(o => (f.optLabel ? o[f.optLabel] : o) || '').filter(Boolean))];
+      const dlId = `dl-${f.key}`;
+      const optHtml = nomes.map(n => `<option value="${esc(n)}"></option>`).join('');
+      parts.push(`<div class="info-field ${span}"><label for="cf-${f.key}">${esc(f.label)}${f.required ? ' *' : ''}</label><input type="text" id="cf-${f.key}" list="${dlId}" value="${esc(val ?? '')}" placeholder="${esc(f.placeholder || 'Escolha um funcionário ou digite')}" autocomplete="off"><datalist id="${dlId}">${optHtml}</datalist></div>`);
     } else if (f.type === 'textarea') {
       parts.push(`<div class="info-field span-2"><label for="cf-${f.key}">${esc(f.label)}</label><textarea id="cf-${f.key}" rows="2" placeholder="${esc(f.placeholder || '')}" style="width:100%;resize:vertical">${esc(val ?? '')}</textarea></div>`);
     } else {

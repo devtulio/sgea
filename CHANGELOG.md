@@ -8,6 +8,7 @@
 ## [Não versionado]
 
 ### Adicionado
+- **O campo Responsável do Centro de Custo agora sugere nomes do cadastro de Funcionários.** Ao editar, o campo mostra uma lista com os funcionários cadastrados (é só começar a digitar); ainda é possível digitar um nome livre, então os responsáveis vindos da importação do Fiorilli continuam intactos.
 - **Ações em massa nos cadastros (Frota, Centros de Custo e Funcionários).** Cada tela ganhou uma coluna de seleção com "selecionar todos" (respeita a busca ativa) e uma barra de ações: **Excluir** vários de uma vez (com resumo do que foi excluído e do que ficou bloqueado, e por quê), **Ativar/Inativar** em massa, **Exportar CSV** os selecionados e — só na Frota — **Reatribuir centro de custo** de vários veículos de uma vez.
 
 ### Corrigido
