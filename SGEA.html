@@ -2429,9 +2429,10 @@ async function openProdutoModal(id) {
   document.getElementById('produto-modal-overlay').dataset.id = id || '';
   document.getElementById('produto-modal-overlay').classList.remove('hidden');
 }
-function closeProdutoModal() { document.getElementById('produto-modal-overlay').classList.add('hidden'); }
+function closeProdutoModal() { _reconEditando = false; document.getElementById('produto-modal-overlay').classList.add('hidden'); }
 
 async function saveProduto() {
+  const fromRecon = _reconEditando;  // capturado antes de closeProdutoModal limpar a flag
   const id = document.getElementById('produto-modal-overlay').dataset.id;
   const data = {
     nome: document.getElementById('pf-nome').value.trim(),
@@ -2457,6 +2458,7 @@ async function saveProduto() {
   closeProdutoModal();
   toast('Produto salvo.', 'success');
   renderProdutos();
+  if (fromRecon) await _reconReprocessar();  // volta pra recon com o item já reclassificado
 }
 
 async function deleteProduto(id) {
@@ -5279,6 +5281,25 @@ const _RECON_FLAG = { valor_divergente: 'valor ≠', fiorilli_valor_negativo: 'v
 let _reconDados = null;  // { data_corte, resumo, itens }
 let _reconCsvText = '';   // guardado para o bootstrap (cadastrar itens só do Fiorilli)
 let _reconDataCorte = '';
+let _reconEditando = false;  // produto aberto a partir da reconciliação → reprocessa ao salvar
+
+async function _reconReprocessar() {
+  if (!_reconCsvText) return;
+  const rr = await API.post('/api/reconciliacao', { csv: _reconCsvText, data_corte: _reconDataCorte, nome: 'reprocesso' });
+  const dd = await API.json(rr);
+  if (rr && rr.ok) { _reconDados = dd; _reconRender(); }
+}
+
+async function editarProdutoRecon(codigo) {
+  const r = await API.get('/api/produtos');
+  const d = await API.json(r);
+  const items = d?.items || [];
+  const prod = items.find(p => (p.codigo_fiorilli || '') === codigo);
+  if (!prod) { toast('Item não encontrado no cadastro do SGEA.', 'error'); return; }
+  _produtosCache = items;      // openProdutoModal lê daqui
+  _reconEditando = true;
+  await openProdutoModal(prod.id);
+}
 
 function _hojeISO() { return new Date().toISOString().slice(0, 10); }
 
@@ -5394,9 +5415,7 @@ async function confirmarCadastrarRecon() {
   if (d.arredondados) msg += `. ${d.arredondados} quantidade(s) arredondada(s)`;
   toast(msg + '.', 'success', 9000);
   // reprocessa o mesmo extrato: os itens criados saem de "Só Fiorilli" para Confere/Diverge
-  const rr = await API.post('/api/reconciliacao', { csv: _reconCsvText, data_corte: _reconDataCorte, nome: 'reprocesso' });
-  const dd = await API.json(rr);
-  if (rr && rr.ok) { _reconDados = dd; _reconRender(); }
+  await _reconReprocessar();
 }
 
 function _reconLinha(i) {
@@ -5408,6 +5427,8 @@ function _reconLinha(i) {
   const cel = v => (v === null || v === undefined) ? '—' : `${_reconNum(v)} ${un}`;
   const deltaTxt = (i.delta === null || i.delta === undefined) ? '—' : (i.delta === 0 ? '0' : `${i.delta > 0 ? '+' : ''}${_reconNum(i.delta)}`);
   const deltaCor = (i.delta && i.delta !== 0) ? (i.balde === 'diverge' ? '#A32D2D' : '#854F0B') : 'var(--gray-400)';
+  const acao = i.balde === 'so_fiorilli' ? ''
+    : `<button class="btn btn-ghost btn-sm" onclick="editarProdutoRecon('${esc(i.codigo)}')" title="Abrir o cadastro do item para corrigir">Editar</button>`;
   return `<tr>
     <td style="white-space:nowrap;color:var(--gray-500)">${esc(i.codigo)}</td>
     <td>${esc(i.descricao || '')}</td>
@@ -5415,6 +5436,7 @@ function _reconLinha(i) {
     <td style="text-align:right;white-space:nowrap">${cel(i.sgea_qtd)}</td>
     <td style="text-align:right;white-space:nowrap;color:${deltaCor};font-weight:600">${deltaTxt}</td>
     <td>${badge}${flags}</td>
+    <td class="col-actions">${acao}</td>
   </tr>`;
 }
 
@@ -5430,7 +5452,7 @@ function _reconFiltrar() {
   const el = document.getElementById('recon-tabela');
   if (!lista.length) { el.innerHTML = '<div class="empty">Nenhum item nessa seleção.</div>'; return; }
   el.innerHTML = `<div class="audit-table-wrap"><table class="audit-table">
-    <thead><tr><th>Código</th><th>Item</th><th style="text-align:right">Fiorilli</th><th style="text-align:right">SGEA</th><th style="text-align:right">Δ</th><th>Situação</th></tr></thead>
+    <thead><tr><th>Código</th><th>Item</th><th style="text-align:right">Fiorilli</th><th style="text-align:right">SGEA</th><th style="text-align:right">Δ</th><th>Situação</th><th class="col-actions">Ações</th></tr></thead>
     <tbody>${lista.map(_reconLinha).join('')}</tbody>
   </table></div>`;
 }
