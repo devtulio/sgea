@@ -51,12 +51,18 @@
   @media (max-width: 760px) { .item-row { grid-template-columns: 1fr 1fr; } }
 
   /* Seletor segmentado (pílulas) — ex.: Tipo de Entrada */
-  .seg-radio { display: inline-flex; border: 1px solid var(--gray-300); border-radius: 8px; overflow: hidden; }
-  .seg-radio label { margin: 0; padding: 7px 16px; cursor: pointer; font-size: .85rem; font-weight: 500; color: var(--gray-600); user-select: none; text-transform: none; transition: background .12s, color .12s; }
-  .seg-radio label + label { border-left: 1px solid var(--gray-300); }
-  .seg-radio input { display: none; }
-  .seg-radio label:has(input:checked) { background: var(--brand); color: #fff; }
-  body.dark .seg-radio, body.dark .seg-radio label + label { border-color: #444; }
+  .seg-radio { position: relative; display: inline-flex; border: 1px solid var(--gray-300); border-radius: 8px; overflow: hidden; }
+  .seg-radio label { margin: 0; display: flex; }
+  .seg-radio span { padding: 7px 16px; cursor: pointer; font-size: .85rem; font-weight: 500; color: var(--gray-600); user-select: none; text-transform: none; transition: background .12s, color .12s; }
+  .seg-radio label + label span { border-left: 1px solid var(--gray-300); }
+  /* O radio some da vista mas continua no fluxo de foco — display:none tiraria
+     o controle do Tab e das setas, quebrando o uso por teclado (WCAG 2.1 AA). */
+  .seg-radio input { position: absolute; width: 1px; height: 1px; margin: 0; opacity: 0; pointer-events: none; }
+  /* Irmão adjacente em vez de :has(input:checked): com :has() o pill ficava preso
+     no estado inicial: o clique marcava o radio mas o realce não acompanhava. */
+  .seg-radio input:checked + span { background: var(--brand); color: #fff; }
+  .seg-radio input:focus-visible + span { outline: 2px solid var(--brand-dark); outline-offset: -2px; }
+  body.dark .seg-radio, body.dark .seg-radio label + label span { border-color: #444; }
   /* Badge de origem "Reconciliação" na lista de entradas */
   .badge-recon { background: #ede9fe; color: #5b21b6; }
   body.dark .badge-recon { background: #2e1065; color: #c4b5fd; }

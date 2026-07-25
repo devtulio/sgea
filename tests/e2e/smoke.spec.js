@@ -29,7 +29,15 @@ test('login, entrada em caixa, saída fracionada e alerta de validade', async ({
   // Entrada: compra direta de 5 caixas (= 60 unidades), lote com validade próxima
   await page.click('#nav-entradas');
   await page.click('#view-entradas button:has-text("+ Nova Entrada")');
-  await page.check('input[name="ef-tipo"][value="compra_direta"]');
+  // O tipo é um botão segmentado: o radio fica visualmente oculto (só focável),
+  // então clica-se no rótulo, como faz o usuário
+  await page.click('.seg-radio label:has(input[value="compra_direta"])');
+  await expect(page.locator('input[name="ef-tipo"][value="compra_direta"]')).toBeChecked();
+  // o realce tem de acompanhar a escolha (o pill já ficou preso no estado inicial)
+  await expect(page.locator('.seg-radio input[value="compra_direta"] + span'))
+    .toHaveCSS('background-color', 'rgb(26, 58, 107)');
+  await expect(page.locator('.seg-radio input[value="pedido"] + span'))
+    .toHaveCSS('background-color', 'rgba(0, 0, 0, 0)');
   await page.fill('#ef-data-entrega', '2026-07-01');
   await page.selectOption('.item-row .ei-produto', { index: 1 });
   await page.fill('.item-row .ei-qtd', '5');

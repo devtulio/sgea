@@ -22,7 +22,7 @@
 - **A entrada ganhou os campos Nº da Requisição e Data da Requisição**, alinhando o registro ao do Fiorilli.
 
 ### Alterado
-- **O seletor de Tipo de Entrada (Com pedido / Compra direta) virou um botão segmentado**, mais claro e alinhado ao visual do sistema.
+- **O seletor de Tipo de Entrada (Com pedido / Compra direta) virou um botão segmentado**, mais claro e alinhado ao visual do sistema — navegável por teclado (Tab e setas), com realce de foco visível.
 
 ### Corrigido
 - **Dois controles de importação apareciam lado a lado** ("Escolher arquivo" e o botão do sistema) nas telas de Entradas e Reconciliação — o seletor de arquivo, que deveria ficar oculto, estava visível. Agora só o botão do sistema aparece.
