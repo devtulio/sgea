@@ -5,6 +5,13 @@
 
 ---
 
+## [0.33.2] — 2026-07-25
+
+### Documentação
+- Badges de **DOI (Zenodo)** e **CI** adicionados ao README, em paridade com os demais sistemas (o SGEA agora é público).
+
+---
+
 ## [0.33.1] — 2026-07-25
 
 ### Documentação
