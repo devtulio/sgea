@@ -38,7 +38,13 @@
   #app:not(.layout-expanded) #view-fornecedores,
   #app:not(.layout-expanded) #view-crud,
   #app:not(.layout-expanded) #view-auditoria,
+  #app:not(.layout-expanded) #view-reconciliacao,
   #app:not(.layout-expanded) #view-config { max-width: 1100px; margin: 0 auto; }
+  /* Auditoria e Reconciliação têm wrapper interno com max-width inline; no modo
+     expandido é preciso soltá-lo (o inline vence regra normal → !important),
+     senão a tela fica estreita mesmo com "Expandida" selecionada. */
+  #app.layout-expanded #audit-inner,
+  #app.layout-expanded .reconciliacao-inner { max-width: none !important; }
 
   /* ── Itens repetíveis (entrada/saída) ────────────── */
   .item-rows { display: flex; flex-direction: column; gap: 8px; margin: 8px 0 14px; }

@@ -15,6 +15,7 @@
 - **A importação da planilha CONTROLE DE FROTA foi atualizada para a versão aprimorada.** Passa a importar os campos de identificação acima e a casar o **centro de custo pelo código** (formato "N - NOME") — antes casava pelo nome inteiro e criava centros duplicados quando a grafia variava. A reimportação continua sem apagar o que já está preenchido (célula em branco não zera).
 
 ### Corrigido
+- **As telas de Auditoria e Reconciliação agora respeitam a largura "Expandida".** Elas continuavam estreitas (centralizadas) mesmo com o layout expandido selecionado, porque tinham um limite de largura interno que não era liberado no modo expandido.
 - **O relatório de pendências de peças reconhece "PENDENTE - …"** (além de vazio e "FALTA INFORMAÇÃO") como peça a definir; "NÃO APLICÁVEL"/"NÃO UTILIZA" seguem contando como resolvidas.
 
 ---
