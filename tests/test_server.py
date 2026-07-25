@@ -781,6 +781,50 @@ class ReconciliacaoUnitTest(unittest.TestCase):
         self.assertEqual(res['resumo']['total'], 8)
 
 
+class TestAcoesEmMassa(SGEATestCase):
+    def test_bulk_delete_parcial_reporta_bloqueados_com_motivo(self):
+        token = self.login()
+        # 2 centros livres + 1 em uso por um veículo
+        ids = []
+        for nome in ('CC-A', 'CC-B', 'CC-USADO'):
+            status, cc = self.request('POST', '/api/centros-custo', {'nome': nome}, token)
+            self.assertEqual(status, 201, cc); ids.append(cc['id'])
+        status, veic = self.request('POST', '/api/frota',
+                                    {'numero': 'V1', 'centro_custo_id': ids[2]}, token)
+        self.assertEqual(status, 201, veic)
+        status, d = self.request('POST', '/api/centros-custo/bulk-delete', {'ids': ids}, token)
+        self.assertEqual(status, 200, d)
+        self.assertEqual(len(d['excluidos']), 2)
+        self.assertEqual(len(d['bloqueados']), 1)
+        self.assertEqual(d['bloqueados'][0]['id'], ids[2])
+        self.assertIn('veículo', d['bloqueados'][0]['motivo'])
+
+    def test_bulk_update_ativo(self):
+        token = self.login()
+        ids = []
+        for m in ('M1', 'M2'):
+            status, f = self.request('POST', '/api/funcionarios', {'nome': f'F{m}', 'matricula': m}, token)
+            self.assertEqual(status, 201, f); ids.append(f['id'])
+        status, d = self.request('POST', '/api/funcionarios/bulk-update',
+                                 {'ids': ids, 'patch': {'ativo': 0}}, token)
+        self.assertEqual(status, 200, d)
+        self.assertEqual(d['atualizados'], 2)
+        status, lst = self.request('GET', '/api/funcionarios', token=token)
+        for f in lst['items']:
+            if f['id'] in ids:
+                self.assertEqual(f['ativo'], 0)
+
+    def test_bulk_update_ignora_coluna_desconhecida(self):
+        token = self.login()
+        status, f = self.request('POST', '/api/funcionarios', {'nome': 'X', 'matricula': 'Z'}, token)
+        self.assertEqual(status, 201, f)
+        # 'nao_existe' deve ser ignorada; sem colunas válidas => 0 atualizados
+        status, d = self.request('POST', '/api/funcionarios/bulk-update',
+                                 {'ids': [f['id']], 'patch': {'nao_existe': 1}}, token)
+        self.assertEqual(status, 200, d)
+        self.assertEqual(d['atualizados'], 0)
+
+
 class TestExclusaoBloqueadaExplicaMotivo(SGEATestCase):
     def test_excluir_veiculo_vinculado_a_saida_explica_o_motivo(self):
         token = self.login()

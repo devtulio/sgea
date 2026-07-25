@@ -164,6 +164,12 @@
   body.dark .forn-inline-body { border-color: #444; }
   body.dark .forn-inline-edit-header { background: #333; border-color: #444; }
   body.dark .forn-cert-item { background: #1c1c1c; border-color: #383838; }
+  /* Ações em massa dos cadastros */
+  .bulk-bar { display: flex; gap: 8px; align-items: center; flex-wrap: wrap; padding: 10px 12px; margin-bottom: 10px; background: var(--gray-50); border: 1px solid var(--gray-200); border-radius: 8px; }
+  .bulk-count { font-weight: 600; margin-right: 4px; }
+  .col-check { width: 1%; text-align: center; white-space: nowrap; }
+  .col-check input { cursor: pointer; }
+  body.dark .bulk-bar { background: #2a2a2a; border-color: #383838; }
 </style>
 </head>
 <body>
@@ -640,6 +646,15 @@
         <button class="btn btn-primary" id="crud-btn-novo" onclick="openCrudModal()">+ Novo</button>
       </div>
     </div>
+    <div id="crud-bulk-bar" class="bulk-bar" style="display:none" role="region" aria-label="Ações em massa">
+      <span id="crud-bulk-count" class="bulk-count"></span>
+      <button class="btn btn-danger btn-sm" onclick="bulkDelete()">Excluir</button>
+      <button class="btn btn-outline btn-sm" onclick="bulkAtivo(true)">Ativar</button>
+      <button class="btn btn-outline btn-sm" onclick="bulkAtivo(false)">Inativar</button>
+      <button class="btn btn-outline btn-sm" onclick="bulkExport()">Exportar CSV</button>
+      <button class="btn btn-outline btn-sm" id="crud-bulk-cc" onclick="bulkReatribuirCC()" style="display:none">Reatribuir centro de custo</button>
+      <button class="btn btn-ghost btn-sm" onclick="bulkLimpar()">Limpar seleção</button>
+    </div>
     <div id="crud-list"></div>
   </div>
 
@@ -1063,6 +1078,22 @@
     <div class="modal-footer">
       <button class="btn btn-outline" id="confirm-cancel">Cancelar</button>
       <button class="btn btn-danger" id="confirm-ok">Confirmar</button>
+    </div>
+  </div>
+</div>
+
+<!-- ── Modal Reatribuir Centro de Custo (ação em massa) ── -->
+<div class="overlay hidden" id="bulkcc-overlay" role="dialog" aria-modal="true" aria-labelledby="bulkcc-titulo">
+  <div class="modal" style="max-width:440px">
+    <div class="modal-header"><h2 id="bulkcc-titulo">Reatribuir centro de custo</h2></div>
+    <div class="modal-body">
+      <p id="bulkcc-msg" style="margin-bottom:12px"></p>
+      <label for="bulkcc-select" style="display:block;font-size:.8rem;font-weight:600;margin-bottom:4px">Novo centro de custo</label>
+      <select id="bulkcc-select" class="input" style="width:100%"></select>
+    </div>
+    <div class="modal-footer">
+      <button class="btn btn-outline" id="bulkcc-cancel">Cancelar</button>
+      <button class="btn btn-primary" id="bulkcc-ok">Aplicar</button>
     </div>
   </div>
 </div>
@@ -1664,6 +1695,7 @@ const CRUD_MODULES = {
 let _crudAtual = null;
 let _crudCache = [];
 let _crudSort = { idx: null, dir: 1 };
+let _crudSel = new Set();  // ids selecionados para ações em massa (só os visíveis)
 // Nome do centro de custo por id — preenchido no renderCrud dos módulos que
 // declaram `usaCentroCusto`, já que a lista crua traz apenas o centro_custo_id.
 let _ccNomes = {};
@@ -1686,6 +1718,10 @@ function showCrud(modKey) {
   // Import do cadastro de centros de custo do Fiorilli, idem
   document.getElementById('crud-btn-import-cc').style.display =
     (modKey === 'centros-custo' && _apiUser?.admin) ? '' : 'none';
+  // Ações em massa: zera seleção ao trocar de módulo; "Reatribuir CC" só onde há centro de custo
+  _crudSel = new Set();
+  document.getElementById('crud-bulk-cc').style.display = cfg.usaCentroCusto ? '' : 'none';
+  _updateBulkBar();
   renderCrud();
 }
 
@@ -1709,8 +1745,11 @@ async function renderCrud() {
   }
   const _busca = i => (JSON.stringify(i) + (cfg.usaCentroCusto ? ' ' + _ccNome(i) : '')).toLowerCase();
   const filtrados = q ? items.filter(i => _busca(i).includes(q)) : items;
+  // Seleção acompanha só o que está visível (busca/ordenação): poda os ids que sumiram.
+  const visiveis = new Set(filtrados.map(i => String(i.id)));
+  _crudSel = new Set([..._crudSel].filter(id => visiveis.has(id)));
   const el = document.getElementById('crud-list');
-  if (!filtrados.length) { el.innerHTML = '<div class="empty">Nenhum registro encontrado.</div>'; return; }
+  if (!filtrados.length) { el.innerHTML = '<div class="empty">Nenhum registro encontrado.</div>'; _updateBulkBar(); return; }
   const cols = cfg.columns;
   if (_crudSort.idx != null && cols[_crudSort.idx]) {
     const col = cols[_crudSort.idx];
@@ -1718,13 +1757,14 @@ async function renderCrud() {
     filtrados.sort((a, b) => _crudSort.dir * String(val(a)).localeCompare(String(val(b)), 'pt', { numeric: true, sensitivity: 'base' }));
   }
   el.innerHTML = `<div class="list-table-wrap"><table class="list-table">
-    <thead><tr>${cols.map((c, idx) => {
+    <thead><tr><th class="col-check"><input type="checkbox" id="crud-check-all" onchange="_crudSelAll(this.checked)" aria-label="Selecionar todos os registros visíveis"></th>${cols.map((c, idx) => {
       const active = _crudSort.idx === idx;
       const arrow = active ? (_crudSort.dir === 1 ? ' ▲' : ' ▼') : '';
       const aria = active ? (_crudSort.dir === 1 ? 'ascending' : 'descending') : 'none';
       return `<th onclick="_sortCrud(${idx})" role="button" tabindex="0" aria-sort="${aria}" title="Ordenar por ${esc(c.h)}" style="cursor:pointer;user-select:none;white-space:nowrap">${esc(c.h)}<span style="opacity:.65">${arrow}</span></th>`;
     }).join('')}<th class="col-actions">Ações</th></tr></thead>
     <tbody>${filtrados.map(i => `<tr>
+      <td class="col-check"><input type="checkbox" class="crud-row-check" data-id="${i.id}" ${_crudSel.has(String(i.id)) ? 'checked' : ''} onchange="_crudSelToggle('${i.id}', this.checked)" aria-label="Selecionar registro"></td>
       ${cols.map(c => `<td>${_crudCell(c, i)}</td>`).join('')}
       <td class="col-actions">
         ${_crudAtual === 'frota' ? `<button class="btn btn-ghost btn-sm" onclick="gerarFichaVeiculo('${i.id}')" title="Gerar ficha do veículo (imprimir)">Ficha</button>` : ''}
@@ -1733,6 +1773,115 @@ async function renderCrud() {
       </td>
     </tr>`).join('')}</tbody>
   </table></div>`;
+  _updateBulkBar();
+}
+
+// ── Ações em massa dos cadastros (Frota / Centros de Custo / Funcionários) ──
+function _crudSelToggle(id, on) {
+  if (on) _crudSel.add(String(id)); else _crudSel.delete(String(id));
+  _updateBulkBar();
+}
+function _crudSelAll(on) {
+  document.querySelectorAll('#crud-list .crud-row-check').forEach(cb => {
+    cb.checked = on;
+    if (on) _crudSel.add(String(cb.dataset.id)); else _crudSel.delete(String(cb.dataset.id));
+  });
+  _updateBulkBar();
+}
+function _updateBulkBar() {
+  const bar = document.getElementById('crud-bulk-bar');
+  const n = _crudSel.size;
+  bar.style.display = n ? 'flex' : 'none';
+  document.getElementById('crud-bulk-count').textContent = `${n} selecionado${n === 1 ? '' : 's'}`;
+  const all = document.getElementById('crud-check-all');
+  if (all) {
+    const total = document.querySelectorAll('#crud-list .crud-row-check').length;
+    all.checked = n > 0 && n === total;
+    all.indeterminate = n > 0 && n < total;
+  }
+}
+function bulkLimpar() { _crudSel = new Set(); renderCrud(); }
+const _crudSelIds = () => [..._crudSel];
+const _crudSelItens = () => _crudCache.filter(i => _crudSel.has(String(i.id)));
+
+async function bulkDelete() {
+  const ids = _crudSelIds();
+  if (!ids.length) return;
+  const cfg = CRUD_MODULES[_crudAtual];
+  const ok = await customConfirm(
+    `Excluir ${ids.length} registro(s) de ${cfg.titulo}? Esta ação é permanente (não vai para a Lixeira).`,
+    { okLabel: 'Excluir tudo' });
+  if (!ok) return;
+  const r = await API.post(`/api/${_crudAtual}/bulk-delete`, { ids });
+  const d = await API.json(r);
+  if (!r || !r.ok) { toast(d?.error || 'Falha na exclusão em massa.', 'error', 9000); return; }
+  const nExc = (d.excluidos || []).length, bloq = d.bloqueados || [];
+  _crudSel = new Set();
+  await renderCrud();
+  if (!bloq.length) {
+    toast(`${nExc} registro(s) excluído(s).`, 'success');
+  } else {
+    const nomeDe = id => { const it = _crudCache.find(i => String(i.id) === String(id)); return it ? _crudNome(it) : id; };
+    const lista = bloq.map(b => `• ${nomeDe(b.id)}: ${b.motivo}`).join('\n');
+    await customConfirm(
+      `${nExc} excluído(s). ${bloq.length} não pôde(ram) ser excluído(s):\n\n${lista}`,
+      { title: 'Exclusão parcial', icon: 'ℹ️', okLabel: 'Entendi', cancelLabel: 'Fechar' });
+  }
+}
+
+async function bulkAtivo(v) {
+  const ids = _crudSelIds();
+  if (!ids.length) return;
+  const r = await API.post(`/api/${_crudAtual}/bulk-update`, { ids, patch: { ativo: v ? 1 : 0 } });
+  const d = await API.json(r);
+  if (!r || !r.ok) { toast(d?.error || 'Falha ao atualizar.', 'error', 9000); return; }
+  _crudSel = new Set();
+  await renderCrud();
+  toast(`${d.atualizados || 0} registro(s) ${v ? 'ativado(s)' : 'inativado(s)'}.`, 'success');
+}
+
+function bulkExport() {
+  const itens = _crudSelItens();
+  if (!itens.length) return;
+  const cfg = CRUD_MODULES[_crudAtual];
+  const cols = cfg.columns;
+  const val = (c, i) => c.kfn ? c.kfn(i) : (i[c.k] ?? '');
+  const escCsv = s => { s = String(s ?? ''); return /[";\n]/.test(s) ? `"${s.replace(/"/g, '""')}"` : s; };
+  const linhas = [cols.map(c => escCsv(c.h)).join(';')];
+  itens.forEach(i => linhas.push(cols.map(c => escCsv(val(c, i))).join(';')));
+  const blob = new Blob(['﻿' + linhas.join('\r\n')], { type: 'text/csv;charset=utf-8' });
+  const a = document.createElement('a');
+  a.href = URL.createObjectURL(blob);
+  a.download = `${cfg.titulo.replace(/\s+/g, '_')}_selecionados.csv`;
+  a.click();
+  URL.revokeObjectURL(a.href);
+  toast(`${itens.length} registro(s) exportado(s).`, 'success');
+}
+
+async function bulkReatribuirCC() {
+  const ids = _crudSelIds();
+  if (!ids.length) return;
+  const cc = await _fetchList('centros-custo');
+  const sel = document.getElementById('bulkcc-select');
+  sel.innerHTML = cc.map(c => `<option value="${c.id}">${esc(c.nome || ('#' + c.id))}</option>`).join('');
+  if (!cc.length) { toast('Nenhum centro de custo cadastrado.', 'error', 9000); return; }
+  document.getElementById('bulkcc-msg').textContent =
+    `Definir o centro de custo de ${ids.length} registro(s) selecionado(s):`;
+  const overlay = document.getElementById('bulkcc-overlay');
+  overlay.classList.remove('hidden');
+  const novoId = await new Promise(res => {
+    const okBtn = document.getElementById('bulkcc-ok'), cancelBtn = document.getElementById('bulkcc-cancel');
+    const fim = v => { overlay.classList.add('hidden'); okBtn.onclick = cancelBtn.onclick = null; res(v); };
+    okBtn.onclick = () => fim(sel.value);
+    cancelBtn.onclick = () => fim(null);
+  });
+  if (novoId == null) return;
+  const r = await API.post(`/api/${_crudAtual}/bulk-update`, { ids, patch: { centro_custo_id: Number(novoId) } });
+  const d = await API.json(r);
+  if (!r || !r.ok) { toast(d?.error || 'Falha ao reatribuir.', 'error', 9000); return; }
+  _crudSel = new Set();
+  await renderCrud();
+  toast(`${d.atualizados || 0} registro(s) reatribuído(s).`, 'success');
 }
 function _sortCrud(idx) {
   if (_crudSort.idx === idx) _crudSort.dir *= -1;

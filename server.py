@@ -855,6 +855,35 @@ def _crud_update(table, id_, data):
         row = conn.execute(f'SELECT * FROM {table} WHERE id=?', (id_,)).fetchone()
     return dict(row) if row else None
 
+def _crud_bulk_delete(table, ids):
+    """Exclui em lote. Sucesso parcial: o que dá é excluído; o que a FK barra vai
+    para 'bloqueados' com o motivo (mesmo texto do delete individual)."""
+    excluidos, bloqueados = [], []
+    for id_ in ids:
+        try:
+            with get_db() as conn:
+                cur = conn.execute(f'DELETE FROM {table} WHERE id=?', (id_,))
+            if cur.rowcount:
+                excluidos.append(id_)
+        except sqlite3.IntegrityError:
+            bloqueados.append({'id': id_, 'motivo': _motivo_em_uso(table, id_)})
+    return {'excluidos': excluidos, 'bloqueados': bloqueados}
+
+def _crud_bulk_update(table, ids, patch):
+    """Aplica o mesmo patch (só colunas conhecidas do módulo) a vários ids."""
+    cfg = CRUD_TABLES[table]
+    fields = {k: patch[k] for k in cfg['fields'] if k in patch}
+    if not fields or not ids:
+        return {'atualizados': 0}
+    fields['updated_at'] = _now()
+    sets = ','.join(f'{k}=?' for k in fields)
+    n = 0
+    with get_db() as conn:
+        for id_ in ids:
+            cur = conn.execute(f'UPDATE {table} SET {sets} WHERE id=?', list(fields.values()) + [id_])
+            n += cur.rowcount
+    return {'atualizados': n}
+
 def _crud_delete(table, id_):
     with get_db() as conn:
         conn.execute(f'DELETE FROM {table} WHERE id=?', (id_,))
@@ -1151,6 +1180,15 @@ class SGEAHandler(http.server.SimpleHTTPRequestHandler):
             return
 
         data = self._parse_json(body)
+
+        for seg, table in CRUD_ROUTES.items():
+            if p == f'/api/{seg}/bulk-delete':
+                ids = data.get('ids') if isinstance(data.get('ids'), list) else []
+                self._json(200, _crud_bulk_delete(table, ids)); return
+            if p == f'/api/{seg}/bulk-update':
+                ids = data.get('ids') if isinstance(data.get('ids'), list) else []
+                patch = data.get('patch') if isinstance(data.get('patch'), dict) else {}
+                self._json(200, _crud_bulk_update(table, ids, patch)); return
 
         if p == '/api/produtos':
             self._create_produto(data)
