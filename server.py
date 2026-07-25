@@ -13,7 +13,6 @@ import subprocess
 import sys
 import urllib.request
 import urllib.error
-import logging
 import uuid
 import re
 import csv
@@ -48,17 +47,11 @@ _DATA_DIR   = os.environ.get('SGEA_DATA_DIR', _BASE)
 DB_PATH     = os.path.join(_DATA_DIR, 'sgea.db')
 BACKUP_DIR  = os.path.join(_DATA_DIR, 'backups')
 PROFILE_DIR = os.path.join(_DATA_DIR, 'browser-profile')
-LOG_PATH    = os.path.join(_DATA_DIR, 'sgea_errors.log')
 BACKUP_KEEP = 7      # número de backups automáticos mantidos
 SESSION_TTL = 60     # renovado pelo ping a cada 5s (ver comentário em _watchdog mais abaixo)
 
-os.makedirs(_DATA_DIR, exist_ok=True)
-logging.basicConfig(
-    filename=LOG_PATH, level=logging.ERROR,
-    format='%(asctime)s %(levelname)s %(message)s',
-    datefmt='%Y-%m-%dT%H:%M:%S'
-)
-_log = logging.getLogger('sgea')
+# Motor de erros da família (log rotativo UTF-8 + classificação) — ver sgx_base.
+_log = sgx_base.configurar_log('SGEA', _DATA_DIR)
 
 os.chdir(_BASE)
 
@@ -890,9 +883,9 @@ class SGEAHandler(http.server.SimpleHTTPRequestHandler):
         try:
             inner()
         except Exception as e:
-            _log.error('Erro não tratado em %s %s: %s', self.command, self.path, e)
+            status, corpo = sgx_base.tratar_excecao_request(_log, self.command, self.path, e)
             try:
-                self._json(500, {'error': 'Erro interno no servidor.'})
+                self._json(status, corpo)
             except Exception:
                 pass
 
@@ -944,6 +937,14 @@ class SGEAHandler(http.server.SimpleHTTPRequestHandler):
             self._json(200, {'ok': True})
             threading.Thread(target=_check_shutdown, daemon=True).start()
             return
+
+        # Erro de JavaScript reportado pelo navegador (sem auth, throttled no motor).
+        if p == '/api/log/client':
+            try:
+                sgx_base.registrar_erro_cliente_js(_log, json.loads(self._body() or '{}'))
+            except Exception:
+                pass
+            self._json(204, {}); return
 
         s = self._auth()
         if not s:
@@ -1059,6 +1060,10 @@ class SGEAHandler(http.server.SimpleHTTPRequestHandler):
         elif p == '/api/relatorio/integridade':
             if not s['admin']: self._json(403, {'error': 'Acesso restrito'}); return
             self._relatorio_integridade()
+
+        elif p == '/api/diagnostico/erros':
+            if not s['admin']: self._json(403, {'error': 'Acesso restrito'}); return
+            self._json(200, sgx_base.ler_diagnostico_erros(_DATA_DIR, 'SGEA'))
 
         elif p == '/api/settings':
             with get_db() as conn:
@@ -1577,7 +1582,7 @@ class SGEAHandler(http.server.SimpleHTTPRequestHandler):
         def qp(k, d=None):
             v = qs.get(k)
             return v[0] if v else d
-        page = int(qp('page', 1)); per = min(int(qp('per', 50)), 2000)
+        page = sgx_base.int_param(qs, 'page', 1, minimo=1); per = sgx_base.int_param(qs, 'per', 50, minimo=1, maximo=2000)
         q, tipo, de, ate = (qp('q') or '').strip(), qp('tipo') or '', qp('de') or '', qp('ate') or ''
         process_id = qp('processId') or qp('process_id') or ''
         where, params = [], []
@@ -1735,8 +1740,8 @@ class SGEAHandler(http.server.SimpleHTTPRequestHandler):
     def _list_fornecedores(self, qs):
         def qp(k, d=None): v = qs.get(k); return v[0] if v else d
         q = (qp('q', '') or '').strip()
-        page = int(qp('page', 1))
-        per = min(int(qp('per', 500)), 2000)
+        page = sgx_base.int_param(qs, 'page', 1, minimo=1)
+        per = sgx_base.int_param(qs, 'per', 500, minimo=1, maximo=2000)
         trash = qp('trash') == '1'
 
         where, params = [], []
@@ -2755,7 +2760,7 @@ def _send_daily_alerts():
             _send_email_raw(smtp_cfg, frm, cfg['smtp_to'], f'SGEA — Lotes vencendo ({hoje})', corpo)
             print(f'  [ALERTAS] E-mail de validade enviado ({len(itens)} lote(s))', flush=True)
         except Exception as e:
-            _log.error('Falha ao enviar e-mail de alertas: %s', e)
+            sgx_base.registrar_operacional(_log, 'email-alertas', f'Falha ao enviar e-mail de alertas: {e}')
 
     with get_db() as conn:
         conn.execute("INSERT OR REPLACE INTO sys_settings (key,value) VALUES ('alert_email_last_sent',?)", (hoje,))
@@ -2837,7 +2842,7 @@ def _rotate_backups(cfg=None):
                     break
                 except PermissionError:
                     if attempt < 5: time.sleep(2)
-                    else: _log.error('Falha ao remover backup %s: arquivo bloqueado (OneDrive/antivírus).', old)
+                    else: sgx_base.registrar_operacional(_log, 'backup-bloqueado', f'Falha ao remover backup {old}: arquivo bloqueado (OneDrive/antivírus).')
                 except Exception as e:
                     _log.error('Falha ao remover backup %s: %s', old, e)
                     break

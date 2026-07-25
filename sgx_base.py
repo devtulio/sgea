@@ -16,6 +16,7 @@
 #   token = sgx_base.create_session(get_db, user_id, SESSION_TTL)
 
 import hashlib
+import logging
 import os
 import re
 import secrets
@@ -388,6 +389,139 @@ def instalar_captura_de_falhas(log_dir, sigla):
         fh.flush()
     threading.excepthook = _hook
     return caminho
+
+
+# ── Motor de erros: logging, classificação, throttle ────────────────────────
+# Um só ponto para logar, classificar e tratar erro. Três canais convergem para
+# o mesmo arquivo <sigla>_errors.log (UTF-8, rotativo): erro de request (backend),
+# erro de cliente (browser, via /api/log/client) e operacional recorrente. Falha
+# fatal continua no <sigla>_crash.log (instalar_captura_de_falhas).
+# Formato da linha: "<ts> | <NIVEL> | <categoria> | <detalhe...>".
+
+class ErroCliente(Exception):
+    """Erro por input inválido do cliente — NÃO é bug do servidor. Vira HTTP 400
+    (ou `status`) + WARNING sem stack trace. Handlers levantam isto para dados ruins."""
+    def __init__(self, msg, status=400):
+        super().__init__(msg)
+        self.status = status
+
+
+def configurar_log(sigla, data_dir):
+    """Logger do sistema: arquivo rotativo UTF-8 (2 MB × 3) + eco no console.
+    Chamar uma vez no boot; idempotente. Devolve o logger. Substitui o basicConfig."""
+    from logging.handlers import RotatingFileHandler
+    os.makedirs(data_dir, exist_ok=True)
+    logger = logging.getLogger(sigla.lower())
+    logger.setLevel(logging.WARNING)          # captura WARNING (operacional) e ERROR
+    if logger.handlers:                        # já configurado — não duplica handler
+        return logger
+    fmt = logging.Formatter('%(asctime)s | %(levelname)s | %(message)s', datefmt='%Y-%m-%dT%H:%M:%S')
+    fh = RotatingFileHandler(os.path.join(data_dir, f'{sigla.lower()}_errors.log'),
+                             maxBytes=2_000_000, backupCount=3, encoding='utf-8')
+    fh.setFormatter(fmt)
+    logger.addHandler(fh)
+    ch = logging.StreamHandler()               # console, para desenvolvimento
+    ch.setFormatter(fmt)
+    logger.addHandler(ch)
+    logger.propagate = False
+    return logger
+
+
+def caminho_log_erros(data_dir, sigla):
+    return os.path.join(data_dir, f'{sigla.lower()}_errors.log')
+
+
+def tratar_excecao_request(logger, metodo, path, exc):
+    """Classifica uma exceção de request e devolve (status, corpo_json). O
+    _safe_dispatch chama no except. ErroCliente -> 400 + WARNING sem stack;
+    qualquer outra -> 500 + ERROR com traceback completo."""
+    import traceback
+    if isinstance(exc, ErroCliente):
+        logger.warning('cliente | %s %s | %s', metodo, path, exc)
+        return exc.status, {'error': str(exc)}
+    logger.error('servidor | %s %s | %s\n%s', metodo, path, repr(exc), traceback.format_exc())
+    return 500, {'error': 'Erro interno no servidor.'}
+
+
+_throttle_ops = {}   # chave -> (ultimo_ts_logado, repeticoes_desde_entao)
+
+def registrar_operacional(logger, chave, msg, janela=300):
+    """Erro operacional recorrente (SMTP fora, OneDrive travando, rede): loga 1×
+    por `janela` segundos, acumulando o contador — evita afogar o log (ex.: os
+    375× 'getaddrinfo failed' viram 1 linha periódica com a contagem)."""
+    agora = time.time()
+    ultimo, cont = _throttle_ops.get(chave, (0.0, 0))
+    if agora - ultimo >= janela:
+        extra = f' (repetido {cont}x desde o último registro)' if cont else ''
+        logger.warning('operacional | %s%s', msg, extra)
+        _throttle_ops[chave] = (agora, 0)
+    else:
+        _throttle_ops[chave] = (ultimo, cont + 1)
+
+
+def registrar_erro_cliente_js(logger, dados):
+    """Erro de JavaScript reportado pelo navegador (/api/log/client). Throttled
+    por (view+msg) para um browser em loop não floodar."""
+    view = str(dados.get('view') or '?')[:40]
+    msg  = str(dados.get('msg')  or 'erro')[:200]
+    stack = str(dados.get('stack') or '')[:500].replace('\n', ' | ')
+    registrar_operacional(logger, f'js|{view}|{msg}', f'cliente-js | {view} | {msg} | {stack}', janela=60)
+
+
+def int_param(qs, nome, default=None, minimo=None, maximo=None):
+    """Lê um parâmetro numérico do dict de query string (parse_qs -> listas).
+    Input inválido levanta ErroCliente (-> 400) em vez de estourar int() (-> 500)."""
+    v = qs.get(nome)
+    if isinstance(v, (list, tuple)):
+        v = v[0] if v else None
+    if v is None or v == '':
+        return default
+    try:
+        n = int(v)
+    except (TypeError, ValueError):
+        raise ErroCliente(f'Parâmetro "{nome}" deve ser um número inteiro.')
+    if minimo is not None and n < minimo:
+        n = minimo
+    if maximo is not None and n > maximo:
+        n = maximo
+    return n
+
+
+def ler_diagnostico_erros(data_dir, sigla, limite=400):
+    """Lê o final do <sigla>_errors.log + o <sigla>_crash.log e devolve os erros
+    agrupados por (nível + categoria + rota), com contagem e último exemplo —
+    para a tela admin de diagnóstico. Não levanta: em qualquer falha, devolve vazio."""
+    grupos = {}   # chave -> {nivel, tipo, count, ultimo, exemplo}
+    try:
+        caminho = caminho_log_erros(data_dir, sigla)
+        if os.path.isfile(caminho):
+            with open(caminho, encoding='utf-8', errors='replace') as f:
+                linhas = f.readlines()[-limite:]
+            for linha in linhas:
+                partes = linha.rstrip('\n').split(' | ')
+                if len(partes) < 3:
+                    continue   # linha de continuação (traceback) — ignora no agrupamento
+                ts, nivel, resto = partes[0], partes[1], ' | '.join(partes[2:])
+                chave_partes = resto.split(' | ')[:2]   # categoria + rota/detalhe
+                chave = f'{nivel} | ' + ' | '.join(chave_partes)
+                g = grupos.get(chave)
+                if g:
+                    g['count'] += 1; g['ultimo'] = ts
+                else:
+                    grupos[chave] = {'nivel': nivel, 'tipo': ' | '.join(chave_partes),
+                                     'count': 1, 'ultimo': ts, 'exemplo': resto[:300]}
+    except Exception:
+        pass
+    crash = []
+    try:
+        cpath = os.path.join(data_dir, f'{sigla.lower()}_crash.log')
+        if os.path.isfile(cpath):
+            with open(cpath, encoding='utf-8', errors='replace') as f:
+                txt = f.read()[-4000:]
+            crash = [b.strip() for b in txt.split('=== captura armada') if b.strip()][-5:]
+    except Exception:
+        pass
+    return {'erros': sorted(grupos.values(), key=lambda g: -g['count']), 'crash': crash}
 
 
 # ── Configurações genéricas (sys_settings key/value) ────────────────────────

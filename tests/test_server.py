@@ -1107,6 +1107,45 @@ class TestSyncFornecedor(SGEATestCase):
         self.assertEqual(self.request('POST', '/api/fornecedores/sync/preview', {'foo': 1}, token=tok)[0], 400)
 
 
+class TestMotorErros(SGEATestCase):
+    """Motor de captura e tratamento de erros (portado do piloto SGCD)."""
+
+    def _raw(self, method, path, data, token=None):
+        conn = http.client.HTTPConnection('127.0.0.1', PORT, timeout=10)
+        hdrs = {'Content-Type': 'application/json'}
+        if token: hdrs['Authorization'] = f'Bearer {token}'
+        conn.request(method, path, body=data, headers=hdrs)
+        resp = conn.getresponse(); body = resp.read(); conn.close()
+        try: return resp.status, json.loads(body) if body else None
+        except ValueError: return resp.status, body
+
+    def test_param_invalido_400(self):
+        tok = self.login()
+        self.assertEqual(self.request('GET', '/api/fornecedores?per=abc', token=tok)[0], 400)
+
+    def test_log_client_sem_auth_204(self):
+        st, _ = self._raw('POST', '/api/log/client',
+                          json.dumps({'msg': 'boom teste', 'view': 'view-x'}).encode())
+        self.assertEqual(st, 204)
+
+    def test_log_client_chega_no_log_e_diagnostico(self):
+        tok = self.login()
+        marca = f'erro-teste-{uuid.uuid4().hex[:8]}'
+        self._raw('POST', '/api/log/client', json.dumps({'msg': marca, 'view': 'view-y'}).encode())
+        caminho = server.sgx_base.caminho_log_erros(server._DATA_DIR, 'SGEA')
+        with open(caminho, encoding='utf-8', errors='replace') as f:
+            self.assertIn(marca, f.read())
+        st, d = self.request('GET', '/api/diagnostico/erros', token=tok)
+        self.assertEqual(st, 200)
+        self.assertTrue(any('cliente-js' in g.get('tipo', '') for g in d['erros']))
+
+    def test_diagnostico_so_admin(self):
+        admin = self.login()
+        self.request('POST', '/api/usuarios', {'username': 'u_diag_ea', 'nome': 'U', 'password': 'senha123'}, token=admin)
+        comum = self.request('POST', '/api/auth/login', {'username': 'u_diag_ea', 'password': 'senha123'})[1]['token']
+        self.assertEqual(self.request('GET', '/api/diagnostico/erros', token=comum)[0], 403)
+
+
 class TestBackupCofre(SGEATestCase):
     """Padronização do backup (2026-07): envelope único e Cofre .zip via sgx_base.
     SGEA não tem anexos, então o Cofre é um .zip só com banco.db. O restore aceita

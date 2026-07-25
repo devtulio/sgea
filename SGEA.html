@@ -904,6 +904,18 @@
       <p style="font-size:.82rem;color:var(--gray-600);margin-bottom:10px">Checagens de consistência entre estoque, lotes, entradas e saídas.</p>
       <button class="btn btn-outline btn-sm" onclick="runDiagnostico()">↻ Reanalisar</button>
       <div id="diagnostico-resultado" style="margin-top:16px">Clique em Reanalisar para rodar as checagens.</div>
+
+      <hr style="border:none;border-top:1px solid var(--gray-100);margin:18px 0">
+      <div style="display:flex;justify-content:space-between;align-items:center;margin-bottom:8px">
+        <div>
+          <strong style="font-size:.85rem">Erros recentes do sistema</strong>
+          <p style="font-size:.72rem;color:var(--gray-500);margin:2px 0 0">Registrados no log (agrupados por tipo e contagem). Inclui erros do navegador reportados pelos usuários.</p>
+        </div>
+        <button class="btn btn-outline btn-sm" onclick="carregarErros()">↻ Atualizar</button>
+      </div>
+      <div id="erros-resultado" style="font-size:.8rem">
+        <p style="color:var(--gray-400);font-style:italic">Clique em "Atualizar" para ver os erros registrados.</p>
+      </div>
     </div>
 
     <div class="cfg-panel" id="cfg-panel-usuarios">
@@ -4884,6 +4896,35 @@ async function _wipeConfirmarFrase() {
 }
 
 // ── Diagnóstico ──────────────────────────────────────────────────
+async function carregarErros() {
+  const el = document.getElementById('erros-resultado');
+  el.innerHTML = '<p style="color:var(--gray-400)">Carregando…</p>';
+  const r = await API.get('/api/diagnostico/erros');
+  const d = await API.json(r);
+  if (!r?.ok) { el.innerHTML = '<p style="color:#dc2626">Erro ao carregar os registros.</p>'; return; }
+  const erros = d.erros || [];
+  const cor = n => n === 'ERROR' ? '#dc2626' : '#b45309';
+  if (!erros.length) {
+    el.innerHTML = '<p style="color:var(--gray-400);font-style:italic">Nenhum erro registrado. 🎉</p>';
+  } else {
+    const rows = erros.map(g => `
+      <tr>
+        <td style="padding:6px;border-bottom:1px solid var(--gray-100);white-space:nowrap"><span style="color:${cor(g.nivel)};font-weight:600">${esc(g.nivel)}</span></td>
+        <td style="padding:6px;border-bottom:1px solid var(--gray-100);text-align:center;font-weight:600">${g.count}</td>
+        <td style="padding:6px;border-bottom:1px solid var(--gray-100);font-size:.75rem">${esc(g.tipo)}<div style="color:var(--gray-400)">último: ${esc(g.ultimo || '')}</div></td>
+      </tr>`).join('');
+    el.innerHTML = `<table style="width:100%;border-collapse:collapse">
+      <thead><tr>
+        <th style="text-align:left;padding:6px;font-size:.7rem;color:var(--gray-500)">Nível</th>
+        <th style="padding:6px;font-size:.7rem;color:var(--gray-500)">Qtd</th>
+        <th style="text-align:left;padding:6px;font-size:.7rem;color:var(--gray-500)">Tipo</th>
+      </tr></thead><tbody>${rows}</tbody></table>`;
+  }
+  if ((d.crash || []).length) {
+    el.innerHTML += `<div style="margin-top:10px;padding:8px 10px;background:#fef2f2;border:1px solid #fecaca;border-radius:6px;font-size:.72rem;color:#991b1b"><strong>⚠ ${d.crash.length} falha(s) fatal(is) do servidor</strong> — o processo caiu. Detalhe no arquivo <code>SGEA_crash.log</code>.</div>`;
+  }
+}
+
 async function runDiagnostico() {
   const el = document.getElementById('diagnostico-resultado');
   el.innerHTML = 'Analisando...';
@@ -5321,14 +5362,38 @@ document.addEventListener('keydown', e => {
   if ((e.ctrlKey || e.metaKey) && e.key.toLowerCase() === 'k') { e.preventDefault(); abrirGlobalSearch(); }
 });
 
-window.onerror = function (msg, src, line) {
+// Reporta erro de JS ao motor de erros do servidor — fire-and-forget, ignora rede.
+let _globalErrorCount = 0;
+function _reportErroCliente(msg, stack) {
+  try {
+    const body = JSON.stringify({
+      msg: String(msg).slice(0, 300),
+      stack: String(stack || '').slice(0, 1000),
+      url: location.pathname,
+      view: document.querySelector('.view.active')?.id || '?',
+      userAgent: navigator.userAgent.slice(0, 200),
+    });
+    fetch('/api/log/client', { method: 'POST', headers: { 'Content-Type': 'application/json' }, body, keepalive: true }).catch(() => {});
+  } catch (_) {}
+}
+window.onerror = function (msg, src, line, col, err) {
+  _globalErrorCount++;
+  if (_globalErrorCount > 3) return true;
   console.error('[SGEA] Erro não tratado:', msg, src, line);
+  if (src && !src.includes('localhost') && !src.includes('SGEA')) return false;
+  _reportErroCliente(msg, err?.stack || `${src}:${line}`);
   if (typeof toast === 'function') toast(`Erro inesperado: ${String(msg).slice(0, 120)}`, 'error');
   return false;
 };
 window.addEventListener('unhandledrejection', e => {
-  console.error('[SGEA] Promise não tratada:', e.reason);
+  _globalErrorCount++;
+  if (_globalErrorCount > 3) return;
+  const msg = e.reason?.message || String(e.reason) || 'Erro assíncrono desconhecido';
+  console.error('[SGEA] Promise não tratada:', msg, e.reason?.stack || '');
+  if (/fetch|network|timeout|abort/i.test(msg)) return;
+  _reportErroCliente(msg, e.reason?.stack);
 });
+setInterval(() => { _globalErrorCount = 0; }, 30000);
 </script>
 </body>
 </html>
