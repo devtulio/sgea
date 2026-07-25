@@ -10,6 +10,9 @@
 ### Alterado
 - **Padronização visual:** as tabelas de **Auditoria** e **Reconciliação** passam a usar o mesmo estilo canônico das demais telas (cadastros, Estoque), ficando consistentes no espaçamento, cabeçalho e zebra das linhas. Sem mudança de comportamento.
 
+### Corrigido
+- **Modo escuro:** os selos de situação do fornecedor (ativa/inativa/outra) ganharam cores próprias para o tema escuro, em vez das cores claras que destoavam do fundo escuro.
+
 ---
 
 ## [0.32.0] — 2026-07-25
