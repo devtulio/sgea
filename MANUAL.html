@@ -3,7 +3,7 @@
 <head>
 <meta charset="UTF-8">
 <meta name="viewport" content="width=device-width, initial-scale=1.0">
-<title>Manual Operacional — SGEA v0.33.2</title>
+<title>Manual Operacional — SGEA v0.34.0</title>
 <style>
   * { box-sizing: border-box; margin: 0; padding: 0; }
   body { font-family: 'Times New Roman', Times, serif; font-size: 12pt; color: #000; background: #f5f5f5; }
@@ -53,7 +53,7 @@
       size: A4;
       margin: 20mm 20mm 25mm;
       @top-center {
-        content: "SGEA v0.33.2 — Manual Operacional";
+        content: "SGEA v0.34.0 — Manual Operacional";
         font-family: 'Times New Roman', serif;
         font-size: 9pt;
         color: #666;
@@ -79,7 +79,7 @@
     <div class="cover-title">Manual Operacional</div>
     <div class="cover-subtitle">SGEA — Sistema de Gestão de Estoque do Almoxarifado</div>
     <div class="cover-system">Entradas, Saídas, Lotes/Validade e cadastros de apoio</div>
-    <div class="cover-version">Versão v0.33.2</div>
+    <div class="cover-version">Versão v0.34.0</div>
     <br>
     <div style="font-size:11pt; color:#555; line-height:1.8;">
       Aplicação web multiusuário para o Almoxarifado<br>
@@ -101,7 +101,9 @@
     <div class="toc-item h2"><a href="#sec4">4. Dashboard e Relatórios</a></div>
     <div class="toc-item h2"><a href="#sec5">5. Cadastro de Produtos e Estoque</a></div>
     <div class="toc-item h2"><a href="#sec6">6. Entradas</a></div>
+    <div class="toc-item h2"><a href="#sec6">6.1. Importar a requisição de entrada do Fiorilli</a></div>
     <div class="toc-item h2"><a href="#sec7">7. Saídas e Consumo por Lote (FEFO)</a></div>
+    <div class="toc-item h2"><a href="#sec7">7.1. Importar a requisição de saída do Fiorilli</a></div>
     <div class="toc-item h2"><a href="#sec8">8. Alertas de Validade</a></div>
     <div class="toc-item h2"><a href="#sec9">9. Cadastros de Apoio</a></div>
     <div class="toc-item h2"><a href="#sec10">10. Fornecedores</a></div>
@@ -165,6 +167,11 @@
     <li><strong>Compra direta</strong> — sem vínculo com pedido algum, usada para compras avulsas; exige apenas nota fiscal, fornecedor e os itens recebidos</li>
   </ul>
   <p>Cada item da entrada informa a quantidade em <strong>embalagens</strong> (ex.: 5 caixas) — o sistema converte automaticamente para unidades usando o fator cadastrado no produto, e mostra essa conversão em tempo real no formulário. Cada item também pode receber um número de lote e uma data de validade, que passam a valer para o lote gerado.</p>
+  <p>No cabeçalho, além do <strong>Nº da NF-e</strong>, a entrada guarda a <strong>Chave de Acesso da NF-e</strong> (44 dígitos) e o <strong>Nº e a Data da Requisição</strong> do Fiorilli — todos disponíveis nos dois fluxos, com pedido ou compra direta.</p>
+  <p>A coluna <strong>Tipo</strong> da lista mostra como cada lançamento nasceu: <strong>Com pedido</strong>, <strong>Compra direta</strong>, <strong>Reconciliação</strong> (saldo inicial criado pela tela de Reconciliação) ou <strong>Import Fiorilli</strong>.</p>
+  <h3>6.1. Importar a requisição de entrada do Fiorilli</h3>
+  <p>O administrador pode lançar uma entrada inteira a partir do arquivo <strong>REQUISIÇÃO DE ENTRADA</strong> exportado do Fiorilli (CSV). Na tela de Entradas, use <strong>⬆️ Importar do Fiorilli</strong> e escolha o arquivo: o sistema cria a entrada, seus itens e os <strong>lotes com validade</strong> de uma só vez. Produtos (pelo código Fiorilli), fornecedores (pelo CNPJ) e centros de custo (pelo código) que ainda não existirem são criados a partir do próprio arquivo.</p>
+  <div class="dica">O número da requisição é a chave: importar o mesmo arquivo de novo não duplica nada — as requisições já lançadas são apenas contadas como existentes.</div>
   <div class="nota">Depois de criada, uma entrada só permite editar os dados de cabeçalho (NF, observação, recebedor) — quantidades e valores dos itens são imutáveis, porque já viraram saldo de lote. Para corrigir uma quantidade errada, exclua a entrada (se ainda não tiver sido consumida por nenhuma saída) e registre novamente.</div>
 
   <h2 id="sec7">7. Saídas e Consumo por Lote (FEFO)</h2>
@@ -172,6 +179,12 @@
   <p>Ao salvar, o sistema decide automaticamente de qual lote tirar a quantidade pedida, seguindo a regra <strong>FEFO</strong>: primeiro os lotes com validade mais próxima, depois os lotes sem validade cadastrada (na ordem em que entraram no estoque). Se um único lote não tiver saldo suficiente, o sistema divide o consumo entre dois ou mais lotes automaticamente — o usuário não precisa se preocupar com isso.</p>
   <div class="aviso">Se o estoque total do produto for menor que a quantidade pedida, a saída é recusada por inteiro (nenhum lote é alterado) e o sistema informa o saldo disponível.</div>
   <div class="dica">Excluir uma saída devolve exatamente as quantidades consumidas aos mesmos lotes de origem — é seguro reverter um lançamento feito por engano.</div>
+  <p>A lista de Saídas mostra o <strong>nº da requisição</strong> e a <strong>origem</strong> de cada lançamento (<strong>Manual</strong> ou <strong>Import Fiorilli</strong>), além de data, solicitante, centro de custo e veículo. Clicar no título de qualquer coluna ordena por ela.</p>
+
+  <h3>7.1. Importar a requisição de saída do Fiorilli</h3>
+  <p>Do mesmo modo que nas entradas, o administrador pode lançar uma saída inteira a partir do arquivo <strong>REQUISIÇÃO DE SAÍDA</strong> exportado do Fiorilli (CSV), pelo botão <strong>⬆️ Importar do Fiorilli</strong> na tela de Saídas. O sistema lê a data, o centro de custo de destino, o solicitante e todos os itens da requisição, e faz a baixa de estoque item a item. O nº da requisição é a chave: reimportar o mesmo arquivo não baixa o estoque duas vezes. O centro de custo de destino que ainda não existir é criado a partir do próprio arquivo.</p>
+  <p>Quando o Fiorilli informa <strong>de qual lote</strong> o item saiu, o SGEA baixa desse mesmo lote, desde que ele exista aqui — assim os dois sistemas ficam iguais lote a lote. Não existindo o lote indicado, vale a regra normal do FEFO.</p>
+  <div class="aviso">A importação é <strong>toda-ou-nada</strong>: antes de gravar qualquer coisa, o sistema confere se todos os itens têm produto cadastrado e saldo suficiente. Faltando qualquer um, <strong>nada</strong> é importado e a tela lista o que impediu (produto não cadastrado, ou o saldo disponível contra o pedido). Lance as entradas que faltam e importe o arquivo de novo.</div>
 
   <h2 id="sec8">8. Alertas de Validade</h2>
   <p>Esta tela lista todos os lotes com saldo que estão vencidos ou vencendo dentro de uma janela configurável (30, 60 ou 90 dias), mostrando o produto, o lote, a data de validade, o saldo restante e o centro de custo de origem do produto. Use-a periodicamente para priorizar o consumo de itens perto do vencimento.</p>
@@ -234,6 +247,7 @@
   <h2 id="sec15">15. Histórico de Versões</h2>
   <table>
     <tr><th>Versão</th><th>Data</th><th>Resumo</th></tr>
+    <tr><td>0.34.0</td><td>25/07/2026</td><td><strong>Importar do Fiorilli as requisições de entrada e de saída</strong> (CSV). A entrada cria itens e lotes com validade, criando produto, fornecedor e centro de custo que faltarem; a saída baixa o estoque honrando o lote que o Fiorilli indicou e é <strong>toda-ou-nada</strong> — faltando produto ou saldo, nada é importado e o sistema lista o que impediu. As listas passam a mostrar a <strong>origem</strong> de cada lançamento (Manual, Reconciliação, Import Fiorilli) e, nas saídas, o nº da requisição. A entrada ganhou <strong>Chave de Acesso da NF-e</strong>, Nº e Data da Requisição, e o seletor de tipo virou botão segmentado.</td></tr>
         <tr><td>0.33.2</td><td>25/07/2026</td><td>Badges de DOI (Zenodo) e CI no README, em paridade com os demais sistemas.</td></tr>
     <tr><td>0.33.1</td><td>25/07/2026</td><td>Repositório arquivado no <strong>Zenodo</strong> (DOI permanente de citação), como os demais sistemas da família.</td></tr>
     <tr><td>0.33.0</td><td>25/07/2026</td><td><strong>A tela de Fornecedores virou tabela</strong> (colunas ordenáveis, seleção em massa para a Lixeira; o detalhe completo — dados, certidões, sanções, CNPJ/CEIS-CNEP, edição — em janela/modal). As tabelas de <strong>Auditoria e Reconciliação</strong> passam a usar o estilo canônico das demais telas. Corrigido: selos de situação do fornecedor no modo escuro.</td></tr>

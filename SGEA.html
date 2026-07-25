@@ -165,6 +165,9 @@
   .col-check { width: 1%; text-align: center; white-space: nowrap; }
   .col-check input { cursor: pointer; }
   body.dark .bulk-bar { background: #2a2a2a; border-color: #383838; }
+  /* Recusa de import lista um item por linha — o toast é textContent, então
+     sem pre-line as quebras somem e vira um parágrafo ilegível. */
+  .toast-msg { white-space: pre-line; }
 </style>
 </head>
 <body>
@@ -295,7 +298,7 @@
     <div class="dash-top">
       <h2>Entradas</h2>
       <div class="view-actions">
-        <input type="file" id="entrada-import-file" accept=".csv,text/csv" class="hidden" onchange="importarEntradaFiorilli(this.files[0]); this.value='';">
+        <input type="file" id="entrada-import-file" accept=".csv,text/csv" style="display:none" onchange="importarEntradaFiorilli(this.files[0]); this.value='';">
         <button class="btn btn-outline" id="btn-import-entrada" style="display:none" onclick="document.getElementById('entrada-import-file').click()" title="Importar a REQUISIÇÃO DE ENTRADA exportada do Fiorilli (CSV)">⬆️ Importar do Fiorilli</button>
         <button class="btn btn-primary" onclick="openEntradaModal()">+ Nova Entrada</button>
       </div>
@@ -308,6 +311,8 @@
     <div class="dash-top">
       <h2>Saídas</h2>
       <div class="view-actions">
+        <input type="file" id="saida-import-file" accept=".csv,text/csv" style="display:none" onchange="importarSaidaFiorilli(this.files[0]); this.value='';">
+        <button class="btn btn-ghost" id="btn-import-saida" style="display:none" onclick="document.getElementById('saida-import-file').click()">⬆️ Importar do Fiorilli</button>
         <button class="btn btn-primary" onclick="openSaidaModal()">+ Nova Saída</button>
       </div>
     </div>
@@ -334,7 +339,7 @@
     <div class="dash-top">
       <h2>Reconciliação com o Fiorilli</h2>
       <div class="view-actions">
-        <input type="file" id="recon-file" accept=".csv,text/csv" class="hidden" onchange="_reconImportar(this.files[0]); this.value='';">
+        <input type="file" id="recon-file" accept=".csv,text/csv" style="display:none" onchange="_reconImportar(this.files[0]); this.value='';">
         <button class="btn btn-primary btn-sm" onclick="document.getElementById('recon-file').click()">⬆️ Importar CSV do Fiorilli</button>
         <button class="btn btn-outline btn-sm hidden" id="recon-btn-cadastrar" onclick="abrirCadastrarRecon()">➕ Cadastrar itens do Fiorilli</button>
         <button class="btn btn-outline btn-sm hidden" id="recon-btn-exportar" onclick="_reconExportarPendencias()">⬇️ Exportar pendências</button>
@@ -1245,6 +1250,7 @@
         <div class="info-field" id="ef-pedido-wrap"><label for="ef-pedido">Pedido</label><select id="ef-pedido"></select></div>
         <div class="info-field"><label for="ef-fornecedor">Fornecedor</label><select id="ef-fornecedor"></select></div>
         <div class="info-field"><label for="ef-nfe">Nº da NF-e</label><input type="text" id="ef-nfe"></div>
+        <div class="info-field span-2"><label for="ef-nfe-chave">Chave de Acesso da NF-e</label><input type="text" id="ef-nfe-chave" placeholder="44 dígitos" maxlength="44"></div>
         <div class="info-field"><label for="ef-data-requisicao">Data da Requisição</label><input type="date" id="ef-data-requisicao"></div>
         <div class="info-field"><label for="ef-data-entrega">Data da Entrada *</label><input type="date" id="ef-data-entrega"></div>
         <div class="info-field"><label for="ef-recebedor">Recebedor / Responsável</label><select id="ef-recebedor"></select></div>
@@ -1322,7 +1328,7 @@
 // ══════════════════════════════════════════════════════════════
 // API / SESSÃO
 // ══════════════════════════════════════════════════════════════
-const SGEA_VERSION = '0.33.2';
+const SGEA_VERSION = '0.34.0';
 document.title = `SGEA v${SGEA_VERSION}`;
 
 let _apiToken = localStorage.getItem('sgea-token') || null;
@@ -3947,6 +3953,7 @@ async function openEntradaModal() {
   await _fillSelect('ef-centro-custo', 'centros-custo', 'nome');
   _entradaProdutos = await _fetchList('produtos?somente_ativos=1');
   document.getElementById('ef-nfe').value = '';
+  document.getElementById('ef-nfe-chave').value = '';
   document.getElementById('ef-requisicao').value = '';
   document.getElementById('ef-data-requisicao').value = '';
   document.getElementById('ef-data-entrega').value = new Date().toISOString().slice(0, 10);
@@ -4002,6 +4009,7 @@ async function saveEntrada() {
     pedido_id: tipo === 'pedido' ? (document.getElementById('ef-pedido').value || null) : null,
     fornecedor_id: document.getElementById('ef-fornecedor').value || null,
     nfe_numero: document.getElementById('ef-nfe').value.trim() || null,
+    nfe_chave_acesso: document.getElementById('ef-nfe-chave').value.trim() || null,
     requisicao: document.getElementById('ef-requisicao').value.trim() || null,
     data_requisicao: document.getElementById('ef-data-requisicao').value || null,
     data_entrega: dataEntrega,
@@ -4038,24 +4046,56 @@ function showSaidas() {
   renderSaidas();
 }
 
+function _saidaOrigemLabel(s) { return s.origem === 'fiorilli' ? 'Import Fiorilli' : 'Manual'; }
+function _saidaOrigemBadge(s) {
+  return s.origem === 'fiorilli'
+    ? '<span class="badge badge-neutral">Import Fiorilli</span>'
+    : '<span class="badge badge-ok">Manual</span>';
+}
+
+async function importarSaidaFiorilli(file) {
+  if (!file) return;
+  let csv;
+  try { csv = await file.text(); } catch { toast('Não consegui ler o arquivo.', 'error'); return; }
+  const r = await API.post('/api/saidas/import', { csv });
+  const d = await API.json(r);
+  if (!r || !r.ok) {
+    // recusa toda-ou-nada: o servidor manda a lista do que falta em estoque
+    const faltas = (d?.faltantes || []).slice(0, 12).join('\n');
+    toast((d?.error || 'Falha ao importar.') + (faltas ? '\n' + faltas : ''), 'error', 15000);
+    return;
+  }
+  await _auditEvento('SAIDA_IMPORTADA', `Importação de saídas do Fiorilli: ${d.saidas} saída(s), ${d.itens} item(ns)`, null);
+  let msg = `${d.saidas} saída(s) importada(s), ${d.itens} item(ns)`;
+  if (d.centros_criados) msg += `; ${d.centros_criados} centro(s) criado(s)`;
+  if (d.ja_existentes) msg += `; ${d.ja_existentes} requisição(ões) já existia(m)`;
+  toast(msg + '.', 'success', 9000);
+  renderSaidas();
+}
+
 async function renderSaidas() {
   const items = await _fetchList('saidas');
   const el = document.getElementById('saidas-list');
   if (!items.length) { el.innerHTML = '<div class="empty">Nenhuma saída registrada.</div>'; return; }
+  document.getElementById('btn-import-saida').style.display = _apiUser?.admin ? '' : 'none';
   const cols = [
     { h: 'Data', get: s => s.data || '' },
+    { h: 'Requisição', get: s => s.numero_solicitacao || '' },
     { h: 'Solicitante', get: s => s.solicitante_nome || '' },
     { h: 'Centro de Custo', get: s => s.centro_custo_nome || '' },
     { h: 'Veículo', get: s => s.frota_numero || '' },
+    { h: 'Origem', get: s => _saidaOrigemLabel(s) },
     { h: 'Ações', noSort: true, cls: 'col-actions' },
   ];
   el.innerHTML = `<div class="list-table-wrap"><table class="list-table">
     <thead>${_tblTh('saidas', cols)}</thead>
     <tbody>${_tblApply('saidas', cols, items).map(s => `<tr>
       <td>${fmtDate(s.data)}</td>
+      <td>${esc(s.numero_solicitacao || '—')}</td>
       <td>${esc(s.solicitante_nome || '—')}</td>
       <td>${esc(s.centro_custo_nome || '—')}</td>
       <td>${esc(s.frota_numero || '—')}</td>
+      <td>${_saidaOrigemBadge(s)}</td>
       <td class="col-actions"><button class="btn btn-ghost btn-sm" onclick="deleteSaida('${s.id}')">Excluir</button></td>
     </tr>`).join('')}</tbody>
   </table></div>`;

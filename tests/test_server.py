@@ -921,6 +921,99 @@ class TestImportEntradaFiorilli(SGEATestCase):
         self.assertEqual(self._estoque('088.002.001'), 10)  # não dobrou
 
 
+class TestImportSaidaFiorilli(SGEATestCase):
+    """Requisição de SAÍDA do Fiorilli: quantidade em QUAN2, sem fornecedor/NF.
+    Cada teste usa códigos próprios (o DB é compartilhado no módulo)."""
+    HDR_ENT = ("REQUI;DTLAN;DATAE;DOCUM;INSMF;NOME;COD_DESC_CCUSTOR;RESPONSA;"
+               "ITEM;CADPRO;DISC1;UNID1;QUAN1;VAUN1;LOTE;VALIDADE")
+    HDR_SAI = ("REQUI;DTLAN;DTPAG;COD_DESC_CCUSTOR;RESPONSA;NUMORC;"
+               "ITEM;CADPRO;DISC1;UNID1;QUAN2;VAUN2;LOTE;VALIDADE")
+
+    def _abastece(self, token, requi, cnpj, itens):
+        rows = [self.HDR_ENT] + [';'.join([requi, '01/07/2026', '02/07/2026', '000000001',
+            cnpj, 'FORN SAIDA LTDA', '9 - FUNDO TESTE', 'FULANO DE TAL',
+            str(i + 1), it[0], it[1], 'UN', it[2], it[3], it[4], it[5]])
+            for i, it in enumerate(itens)]
+        st, d = self.request('POST', '/api/entradas/import', {'csv': '\n'.join(rows)}, token=token)
+        self.assertEqual(st, 200, d)
+
+    def _csv_saida(self, requi, itens):
+        rows = [self.HDR_SAI] + [';'.join([requi, '23/07/2026', '23/07/2026',
+            '20 - JOAQUIM MENDONCA', 'EDNALVA MARIA NOGUEIRA', '00627/26',
+            str(i + 1), it[0], it[1], 'UN', it[2], it[3], it[4], it[5]])
+            for i, it in enumerate(itens)]
+        return '\n'.join(rows)
+
+    def _estoque(self, cod):
+        with server.get_db() as conn:
+            r = conn.execute("SELECT COALESCE(v.estoque_fisico,0) e FROM produtos p "
+                             "LEFT JOIN v_estoque v ON v.produto_id=p.id WHERE p.codigo_fiorilli=?", (cod,)).fetchone()
+            return r['e'] if r else None
+
+    def test_importa_saida_baixa_estoque(self):
+        token = self.login()
+        self._abastece(token, '077001/26', '22.333.444/0001-55',
+                       [('077.001.001', 'AGUA SANITARIA 2L', '50', '13,71', '00000002', '30/05/2030')])
+        csv = self._csv_saida('077101/26', [('077.001.001', 'AGUA SANITARIA 2L', '18', '13,71', '00000002', '30/05/2030')])
+        st, d = self.request('POST', '/api/saidas/import', {'csv': csv}, token=token)
+        self.assertEqual(st, 200, d)
+        self.assertEqual((d['saidas'], d['itens']), (1, 1))
+        self.assertEqual(self._estoque('077.001.001'), 32)
+        with server.get_db() as conn:
+            r = conn.execute("SELECT data, numero_solicitacao, origem, solicitante_nome FROM saidas "
+                             "WHERE numero_solicitacao='077101/26'").fetchone()
+            self.assertEqual((r['data'], r['origem']), ('2026-07-23', 'fiorilli'))
+            self.assertEqual(r['solicitante_nome'], 'EDNALVA MARIA NOGUEIRA')
+
+    def test_honra_lote_do_fiorilli_contra_o_fefo(self):
+        """Dois lotes: o do Fiorilli vence depois, então o FEFO puro pegaria o outro."""
+        token = self.login()
+        self._abastece(token, '077002/26', '33.444.555/0001-66', [
+            ('077.002.001', 'ITEM DOIS LOTES', '10', '1,00', '00000001', '01/01/2030'),
+        ])
+        self._abastece(token, '077003/26', '33.444.555/0001-66', [
+            ('077.002.001', 'ITEM DOIS LOTES', '10', '2,00', '00000009', '01/01/2040'),
+        ])
+        csv = self._csv_saida('077103/26', [('077.002.001', 'ITEM DOIS LOTES', '4', '2,00', '00000009', '01/01/2040')])
+        st, d = self.request('POST', '/api/saidas/import', {'csv': csv}, token=token)
+        self.assertEqual(st, 200, d)
+        with server.get_db() as conn:
+            rows = {r['lote_numero']: r['quantidade_atual'] for r in conn.execute(
+                "SELECT l.lote_numero, l.quantidade_atual FROM lotes l JOIN produtos p ON p.id=l.produto_id "
+                "WHERE p.codigo_fiorilli='077.002.001'").fetchall()}
+            self.assertEqual(rows['00000009'], 6)   # baixou do lote que o Fiorilli indicou
+            self.assertEqual(rows['00000001'], 10)  # o de validade mais próxima ficou intacto
+
+    def test_recusa_tudo_quando_falta_estoque(self):
+        token = self.login()
+        self._abastece(token, '077004/26', '44.555.666/0001-77',
+                       [('077.004.001', 'ITEM POUCO', '3', '1,00', '', '')])
+        csv = self._csv_saida('077104/26', [
+            ('077.004.001', 'ITEM POUCO', '18', '1,00', '', ''),
+            ('077.004.999', 'ITEM INEXISTENTE', '1', '1,00', '', ''),
+        ])
+        st, d = self.request('POST', '/api/saidas/import', {'csv': csv}, token=token)
+        self.assertEqual(st, 400, d)
+        self.assertEqual(len(d['faltantes']), 2)
+        self.assertTrue(any('produto não cadastrado' in f for f in d['faltantes']))
+        self.assertTrue(any('saldo 3 de 18' in f for f in d['faltantes']))
+        self.assertEqual(self._estoque('077.004.001'), 3)  # nada foi baixado
+        with server.get_db() as conn:
+            n = conn.execute("SELECT COUNT(*) c FROM saidas WHERE numero_solicitacao='077104/26'").fetchone()['c']
+            self.assertEqual(n, 0)
+
+    def test_idempotente_por_requisicao(self):
+        token = self.login()
+        self._abastece(token, '077005/26', '55.666.777/0001-88',
+                       [('077.005.001', 'ITEM IDEM', '20', '1,00', '', '')])
+        csv = self._csv_saida('077105/26', [('077.005.001', 'ITEM IDEM', '5', '1,00', '', '')])
+        self.request('POST', '/api/saidas/import', {'csv': csv}, token=token)
+        st, d = self.request('POST', '/api/saidas/import', {'csv': csv}, token=token)
+        self.assertEqual(st, 200, d)
+        self.assertEqual((d['saidas'], d['ja_existentes']), (0, 1))
+        self.assertEqual(self._estoque('077.005.001'), 15)  # não baixou de novo
+
+
 class TestReconciliacaoCadastrar(SGEATestCase):
     """Bootstrap (situação 1): SGEA vazio -> importa posição -> cria produtos + saldo inicial.
     Cada teste usa códigos próprios (o DB é compartilhado no módulo)."""

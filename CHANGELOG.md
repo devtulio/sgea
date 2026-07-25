@@ -7,13 +7,25 @@
 
 ## [Não versionado]
 
+---
+
+## [0.34.0] — 2026-07-25
+
 ### Adicionado
+- **Importar saídas do Fiorilli.** Na tela de Saídas, o administrador pode importar a **REQUISIÇÃO DE SAÍDA** exportada do Fiorilli (CSV): o sistema lê data, centro de custo de destino, solicitante e itens, e faz a baixa de estoque de uma vez. O número da requisição é a chave — reimportar não baixa o estoque de novo. O centro de custo que ainda não existir é criado a partir do próprio arquivo.
+- **A baixa honra o lote que o Fiorilli indicou**, quando esse lote existe no SGEA — assim os dois sistemas ficam iguais lote a lote. Não existindo, vale a regra normal do FEFO.
+- **A importação de saída é toda-ou-nada:** antes de gravar, o sistema confere produto cadastrado e saldo de todos os itens; faltando qualquer um, **nada** é importado e a tela lista o que impediu (produto não cadastrado ou saldo disponível contra o pedido).
+- **A lista de Saídas ganhou as colunas Requisição e Origem** (Manual / Import Fiorilli), ambas ordenáveis.
+- **A entrada ganhou o campo Chave de Acesso da NF-e** (44 dígitos), disponível nos dois fluxos — com pedido e compra direta.
 - **A lista de Entradas distingue a origem de cada lançamento.** As entradas geradas pela **reconciliação** (saldo inicial) aparecem com o selo **"Reconciliação"** e as vindas do **import do Fiorilli** com "Import Fiorilli", em vez de todas caírem como "Compra direta". Entradas antigas já criadas são reclassificadas automaticamente.
 - **Importar entradas do Fiorilli.** Na tela de Entradas, o administrador pode importar a **REQUISIÇÃO DE ENTRADA** exportada do Fiorilli (CSV): o sistema cria a entrada com seus itens e **lotes (com validade)** de uma vez, aproveitando o número da requisição como chave — reimportar não duplica. Produtos (por código Fiorilli), fornecedores (por CNPJ) e centros de custo (por código) que ainda não existirem são criados a partir do próprio arquivo.
 - **A entrada ganhou os campos Nº da Requisição e Data da Requisição**, alinhando o registro ao do Fiorilli.
 
 ### Alterado
 - **O seletor de Tipo de Entrada (Com pedido / Compra direta) virou um botão segmentado**, mais claro e alinhado ao visual do sistema.
+
+### Corrigido
+- **Dois controles de importação apareciam lado a lado** ("Escolher arquivo" e o botão do sistema) nas telas de Entradas e Reconciliação — o seletor de arquivo, que deveria ficar oculto, estava visível. Agora só o botão do sistema aparece.
 
 ---
 

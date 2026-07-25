@@ -38,7 +38,7 @@ for _stream in (sys.stdout, sys.stderr):
 # Versão do servidor — DEVE acompanhar o SGEA_VERSION do SGEA.html a cada release.
 # Exposta em /health para o frontend detectar quando o processo em execução está
 # desatualizado (HTML novo servido, mas server.py antigo ainda rodando em memória).
-SERVER_VERSION = '0.33.2'
+SERVER_VERSION = '0.34.0'
 
 PORT        = int(os.environ.get('SGEA_PORT', 3003))
 _BASE       = os.path.dirname(os.path.abspath(__file__))
@@ -302,6 +302,11 @@ def init_db():
             conn.execute("UPDATE entradas SET origem='reconciliacao' WHERE (origem IS NULL OR origem='') AND observacao LIKE 'Saldo inicial%'")
             conn.execute("UPDATE entradas SET origem='fiorilli' WHERE (origem IS NULL OR origem='') AND observacao LIKE 'Importado do Fiorilli%'")
 
+        # Origem da saída: '' (manual) ou 'fiorilli' (import de requisições de saída).
+        cols_sai = [r[1] for r in conn.execute('PRAGMA table_info(saidas)').fetchall()]
+        if 'origem' not in cols_sai:
+            conn.execute("ALTER TABLE saidas ADD COLUMN origem TEXT DEFAULT ''")
+
         # Responsável e e-mail do centro de custo (vêm do cadastro do Fiorilli).
         cols_cc = [r[1] for r in conn.execute('PRAGMA table_info(centros_custo)').fetchall()]
         for _cc in ('responsavel', 'email'):
@@ -534,6 +539,36 @@ def _parse_fiorilli_entrada(csv_text):
             'unid': g(row, 'UNID1'), 'qtd': _float(g(row, 'QUAN1')) or 0.0,
             'valor': _float(g(row, 'VAUN1')) or 0.0, 'lote': g(row, 'LOTE'),
             'validade': _data_br_iso(g(row, 'VALIDADE')), 'marca': g(row, 'MARCA'),
+        })
+    return list(reqs.values())
+
+def _parse_fiorilli_saida(csv_text):
+    """Parseia o CSV 'REQUISIÇÃO DE SAÍDA' do Fiorilli. Mesmo layout de colunas da
+    entrada, mas é o outro lado do razão: quantidade em QUAN2, valor unitário em
+    VAUN2 (QUAN1/VAUN1 vêm zerados), sem fornecedor nem NF. Agrupa por REQUI."""
+    reader = csv.DictReader(io.StringIO((csv_text or '').lstrip('﻿')), delimiter=';')
+    faltando = {'REQUI', 'DTLAN', 'CADPRO', 'QUAN2'} - set(reader.fieldnames or [])
+    if faltando:
+        raise ValueError('Não parece a "REQUISIÇÃO DE SAÍDA" do Fiorilli. Faltam colunas: ' + ', '.join(sorted(faltando)))
+    def g(row, k): return (row.get(k) or '').strip()
+    reqs = {}
+    for row in reader:
+        requi = g(row, 'REQUI')
+        if not requi:
+            continue
+        if requi not in reqs:
+            reqs[requi] = {
+                'requisicao': requi,
+                'data': _data_br_iso(g(row, 'DTLAN')) or _data_br_iso(g(row, 'DTPAG')),
+                'centro_raw': g(row, 'COD_DESC_CCUSTOR') or g(row, 'CCUSTOR'),
+                'solicitante': g(row, 'RESPONSA') or g(row, 'SOLICITANTE'),
+                'numorc': g(row, 'NUMORC'),
+                'itens': [],
+            }
+        reqs[requi]['itens'].append({
+            'cadpro': g(row, 'CADPRO'), 'desc': g(row, 'DISC1'), 'unid': g(row, 'UNID1'),
+            'qtd': _float(g(row, 'QUAN2')) or 0.0, 'valor': _float(g(row, 'VAUN2')) or 0.0,
+            'lote': g(row, 'LOTE'), 'validade': _data_br_iso(g(row, 'VALIDADE')),
         })
     return list(reqs.values())
 
@@ -827,19 +862,35 @@ def _pedido_status_agregado(status_coluna, itens):
         return 'atendido'
     return 'encerrado_parcial'
 
-def _consumir_fefo(conn, produto_id, quantidade_solicitada):
+def _lote_norm(x):
+    """Normaliza nº de lote para comparação: o Fiorilli exporta zero-padded
+    ('00000001'), a digitação manual não ('1'). '00000000'/'' = sem lote."""
+    return (x or '').strip().lstrip('0').upper()
+
+def _consumir_fefo(conn, produto_id, quantidade_solicitada, preferir_lote=None):
     """Consome `quantidade_solicitada` unidades do produto, priorizando o lote
     com validade mais próxima (FEFO); lotes sem validade (incl. saldo inicial)
-    são consumidos por último, em ordem de chegada. Levanta EstoqueInsuficiente
-    sem alterar nenhuma linha se o total disponível não cobrir o pedido — quem
-    chama roda isso dentro do mesmo `with get_db()` do resto da operação, então
-    qualquer exceção desfaz tudo via _ConnAutoClose."""
+    são consumidos por último, em ordem de chegada. `preferir_lote` (nº, validade)
+    põe na frente o lote que o Fiorilli baixou, quando ele existe aqui — o resto
+    da fila segue FEFO. Levanta EstoqueInsuficiente sem alterar nenhuma linha se o
+    total disponível não cobrir o pedido — quem chama roda isso dentro do mesmo
+    `with get_db()` do resto da operação, então qualquer exceção desfaz tudo via
+    _ConnAutoClose."""
     lotes = conn.execute('''
-        SELECT id, quantidade_atual, valor_unitario_custo
+        SELECT id, quantidade_atual, valor_unitario_custo, lote_numero, data_validade
         FROM lotes
         WHERE produto_id = ? AND quantidade_atual > 0
         ORDER BY (data_validade IS NULL) ASC, data_validade ASC, id ASC
     ''', (produto_id,)).fetchall()
+
+    if preferir_lote:
+        _num, _val = preferir_lote
+        _num = _lote_norm(_num)
+        if _num or _val:
+            # sorted é estável: o que não casa mantém a ordem FEFO acima
+            lotes = sorted(lotes, key=lambda l: 0 if (
+                _lote_norm(l['lote_numero']) == _num if _num else l['data_validade'] == _val
+            ) else 1)
 
     disponivel = sum(l['quantidade_atual'] for l in lotes)
     if disponivel < quantidade_solicitada:
@@ -1359,6 +1410,9 @@ class SGEAHandler(http.server.SimpleHTTPRequestHandler):
         elif p == '/api/entradas/import':
             if not s['admin']: self._json(403, {'error': 'Acesso restrito'}); return
             self._import_entradas_fiorilli(data, s)
+        elif p == '/api/saidas/import':
+            if not s['admin']: self._json(403, {'error': 'Acesso restrito'}); return
+            self._import_saidas_fiorilli(data, s)
         elif p == '/api/centros-custo/import':
             if not s['admin']: self._json(403, {'error': 'Acesso restrito'}); return
             self._import_centros(data)
@@ -2735,6 +2789,95 @@ class SGEAHandler(http.server.SimpleHTTPRequestHandler):
         except ValueError as e:
             self._json(400, {'error': str(e)}); return
         self._json(201, self._get_saida_dict(sid))
+
+    def _import_saidas_fiorilli(self, data, s):
+        """Importa saídas do CSV 'REQUISIÇÃO DE SAÍDA' do Fiorilli. Idempotente por
+        nº de requisição (REQUI). Ao contrário da entrada, produto não é criado: sem
+        produto cadastrado e sem saldo em lote não há o que baixar, então a
+        importação é toda-ou-nada e devolve a lista do que falta (400). O lote que o
+        Fiorilli baixou é honrado quando existe aqui; senão vale o FEFO."""
+        csv_text = data.get('csv') or ''
+        if not csv_text.strip():
+            self._json(400, {'error': 'CSV vazio.'}); return
+        try:
+            reqs = _parse_fiorilli_saida(csv_text)
+        except ValueError as e:
+            self._json(400, {'error': str(e)}); return
+
+        r = {'saidas': 0, 'itens': 0, 'centros_criados': 0, 'ja_existentes': 0}
+        faltantes, pendentes = [], []
+        with get_db() as conn:  # passe 1: só leitura — resolve e valida antes de gravar
+            prod_by_cad = {x['codigo_fiorilli']: x['id'] for x in conn.execute('SELECT id, codigo_fiorilli FROM produtos').fetchall()}
+            cc_by_cod = {str(x['codigo']).strip(): x['id'] for x in conn.execute('SELECT id, codigo FROM centros_custo').fetchall() if x['codigo']}
+            func_by_nome = {(x['nome'] or '').strip().upper(): x['id'] for x in conn.execute('SELECT id, nome FROM funcionarios').fetchall()}
+            existentes = {x['numero_solicitacao'] for x in conn.execute(
+                "SELECT numero_solicitacao FROM saidas WHERE deleted_at IS NULL AND numero_solicitacao IS NOT NULL AND numero_solicitacao<>''").fetchall()}
+            precisa = {}  # produto_id -> total pedido no CSV inteiro (o mesmo produto pode repetir)
+            for req in reqs:
+                if req['requisicao'] in existentes:
+                    r['ja_existentes'] += 1; continue
+                pendentes.append(req)
+                for it in req['itens']:
+                    q = int(round(it['qtd']))
+                    if q <= 0:
+                        continue
+                    pid = prod_by_cad.get(it['cadpro'])
+                    if not pid:
+                        faltantes.append(f"{it['cadpro']} {it['desc']} — produto não cadastrado")
+                        continue
+                    precisa[pid] = precisa.get(pid, 0) + q
+            for pid, q in precisa.items():
+                row = conn.execute('SELECT COALESCE(SUM(quantidade_atual),0) t FROM lotes WHERE produto_id=?', (pid,)).fetchone()
+                if row['t'] < q:
+                    p = conn.execute('SELECT codigo_fiorilli, nome FROM produtos WHERE id=?', (pid,)).fetchone()
+                    faltantes.append(f"{p['codigo_fiorilli']} {p['nome']} — saldo {row['t']} de {q}")
+        if faltantes:
+            self._json(400, {'error': 'Nada foi importado: itens sem estoque no SGEA.', 'faltantes': sorted(faltantes)}); return
+        if not pendentes:
+            self._json(200, r); return
+
+        with get_db() as conn:  # passe 2: escrita
+            for req in pendentes:
+                # centro por código ("N - NOME"): é o destino da saída, então criar o que
+                # falta (mesma regra do import de entrada) em vez de perder o destino
+                m = re.match(r'^\s*(\d+)', req['centro_raw'])
+                cc_cod = m.group(1) if m else None
+                cc_id = cc_by_cod.get(cc_cod) if cc_cod else None
+                if not cc_id and cc_cod:
+                    nome_cc = re.sub(r'^\s*\d+\s*-\s*', '', req['centro_raw']).strip() or req['centro_raw']
+                    cur = conn.execute('INSERT INTO centros_custo (codigo,nome,ativo) VALUES (?,?,1)', (cc_cod, nome_cc))
+                    cc_id = cur.lastrowid; cc_by_cod[cc_cod] = cc_id; r['centros_criados'] += 1
+                sol_nome = req['solicitante'] or None
+                sol_id = func_by_nome.get(sol_nome.upper()) if sol_nome else None
+                sid = str(uuid.uuid4())
+                obs = f"Importado do Fiorilli — requisição {req['requisicao']}"
+                if req['numorc']: obs += f"; orçamento {req['numorc']}"
+                conn.execute('''INSERT INTO saidas
+                    (id,data,solicitante_id,solicitante_nome,centro_custo_id,numero_solicitacao,observacao,created_by,origem)
+                    VALUES (?,?,?,?,?,?,?,?,'fiorilli')''',
+                    (sid, req['data'], sol_id, sol_nome, cc_id, req['requisicao'], obs, s['user_id']))
+                r['saidas'] += 1
+                for it in req['itens']:
+                    q = int(round(it['qtd']))
+                    pid = prod_by_cad.get(it['cadpro'])
+                    if q <= 0 or not pid:
+                        continue
+                    consumos, valor_medio, valor_total = _consumir_fefo(
+                        conn, pid, q, preferir_lote=(it['lote'], it['validade']))
+                    cur = conn.execute('''INSERT INTO saida_itens
+                        (saida_id,produto_id,quantidade,valor_unitario_medio,valor_total)
+                        VALUES (?,?,?,?,?)''', (sid, pid, q, valor_medio, valor_total))
+                    for lote_id, qtd_consumida, custo in consumos:
+                        conn.execute('''INSERT INTO saida_item_lotes
+                            (saida_item_id,lote_id,quantidade,valor_unitario_custo)
+                            VALUES (?,?,?,?)''', (cur.lastrowid, lote_id, qtd_consumida, custo))
+                    r['itens'] += 1
+            _insert_audit_raw(conn, {'type': 'SAIDA_IMPORTADA', 'ts': _now(),
+                'user_id': s['user_id'], 'user_nome': s['nome'], 'label': 'Saídas importadas do Fiorilli',
+                'detail': (f"{r['saidas']} saída(s), {r['itens']} item(ns), "
+                           f"{r['centros_criados']} centro(s) criado(s); "
+                           f"{r['ja_existentes']} requisição(ões) já existente(s)")})
+        self._json(200, r)
 
     def _delete_saida(self, sid):
         with get_db() as conn:
