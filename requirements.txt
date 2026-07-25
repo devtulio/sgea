@@ -1,2 +1,4 @@
-# SGEA roda inteiramente com a biblioteca padrão do Python — nenhuma
-# dependência externa é necessária para o servidor funcionar.
+# O SGEA não precisa de `pip install`: além da biblioteca padrão do Python, o
+# servidor usa o waitress (WSGI puro-Python), que vem vendorizado na pasta
+# waitress/ do próprio projeto. Este arquivo existe só para deixar isso
+# explícito a quem inspeciona o repositório.
