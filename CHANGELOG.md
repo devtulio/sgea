@@ -5,6 +5,13 @@
 
 ---
 
+## [Não versionado]
+
+### Documentação
+- Padronização do **README** e do **LICENSE** entre os sistemas da família (não altera o sistema): subseção "Menu de inicialização" unificada e igual ao código, referência aos sistemas irmãos na Descrição, seção "Documentos Gerados pelo Sistema" (antes ausente) e topics do repositório preenchidos no GitHub, e LICENSE normalizado para o template MIT canônico (LF) — o GitHub voltou a classificar o repositório como MIT.
+
+---
+
 ## [0.29.0] — 2026-07-24
 
 ### Adicionado
