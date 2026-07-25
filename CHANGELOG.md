@@ -5,7 +5,7 @@
 
 ---
 
-## [Não versionado]
+## [0.31.0] — 2026-07-25
 
 ### Adicionado
 - **O campo Responsável do Centro de Custo agora sugere nomes do cadastro de Funcionários.** Ao editar, o campo mostra uma lista com os funcionários cadastrados (é só começar a digitar); ainda é possível digitar um nome livre, então os responsáveis vindos da importação do Fiorilli continuam intactos.
