@@ -5,6 +5,13 @@
 
 ---
 
+## [0.33.1] — 2026-07-25
+
+### Documentação
+- **Repositório arquivado no Zenodo (DOI).** O SGEA passa a ter um identificador permanente de citação (concept-DOI), como os demais sistemas da família.
+
+---
+
 ## [0.33.0] — 2026-07-25
 
 ### Alterado

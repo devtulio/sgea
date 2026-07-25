@@ -3,7 +3,7 @@
 <head>
 <meta charset="UTF-8">
 <meta name="viewport" content="width=device-width, initial-scale=1.0">
-<title>Manual Operacional — SGEA v0.33.0</title>
+<title>Manual Operacional — SGEA v0.33.1</title>
 <style>
   * { box-sizing: border-box; margin: 0; padding: 0; }
   body { font-family: 'Times New Roman', Times, serif; font-size: 12pt; color: #000; background: #f5f5f5; }
@@ -53,7 +53,7 @@
       size: A4;
       margin: 20mm 20mm 25mm;
       @top-center {
-        content: "SGEA v0.33.0 — Manual Operacional";
+        content: "SGEA v0.33.1 — Manual Operacional";
         font-family: 'Times New Roman', serif;
         font-size: 9pt;
         color: #666;
@@ -79,7 +79,7 @@
     <div class="cover-title">Manual Operacional</div>
     <div class="cover-subtitle">SGEA — Sistema de Gestão de Estoque do Almoxarifado</div>
     <div class="cover-system">Entradas, Saídas, Lotes/Validade e cadastros de apoio</div>
-    <div class="cover-version">Versão v0.33.0</div>
+    <div class="cover-version">Versão v0.33.1</div>
     <br>
     <div style="font-size:11pt; color:#555; line-height:1.8;">
       Aplicação web multiusuário para o Almoxarifado<br>
@@ -234,7 +234,8 @@
   <h2 id="sec15">15. Histórico de Versões</h2>
   <table>
     <tr><th>Versão</th><th>Data</th><th>Resumo</th></tr>
-        <tr><td>0.33.0</td><td>25/07/2026</td><td><strong>A tela de Fornecedores virou tabela</strong> (colunas ordenáveis, seleção em massa para a Lixeira; o detalhe completo — dados, certidões, sanções, CNPJ/CEIS-CNEP, edição — em janela/modal). As tabelas de <strong>Auditoria e Reconciliação</strong> passam a usar o estilo canônico das demais telas. Corrigido: selos de situação do fornecedor no modo escuro.</td></tr>
+        <tr><td>0.33.1</td><td>25/07/2026</td><td>Repositório arquivado no <strong>Zenodo</strong> (DOI permanente de citação), como os demais sistemas da família.</td></tr>
+    <tr><td>0.33.0</td><td>25/07/2026</td><td><strong>A tela de Fornecedores virou tabela</strong> (colunas ordenáveis, seleção em massa para a Lixeira; o detalhe completo — dados, certidões, sanções, CNPJ/CEIS-CNEP, edição — em janela/modal). As tabelas de <strong>Auditoria e Reconciliação</strong> passam a usar o estilo canônico das demais telas. Corrigido: selos de situação do fornecedor no modo escuro.</td></tr>
 <tr><td>0.32.0</td><td>25/07/2026</td><td><strong>Reconciliação:</strong> cadastrar no SGEA os itens que só existem no Fiorilli, com saldo inicial opcional (bootstrap do almoxarifado a partir da posição), e botão <strong>Editar</strong> por linha que abre o cadastro do produto e reprocessa o extrato. <strong>Frota:</strong> dados oficiais do veículo (RENAVAM, chassi, cor, KM, CNH, espécie, potência/cilindrada, lotação, situação) e importação aceitando <strong>.xlsx</strong> direto (lê a aba DADOS), casando o centro de custo pelo código. As listas de <strong>Estoque, Entradas e Saídas</strong> passam a ordenar por coluna; a <strong>Auditoria e a Reconciliação</strong> respeitam a largura Expandida.</td></tr>
     <tr><td>0.31.0</td><td>25/07/2026</td><td><strong>Ações em massa nos cadastros</strong> (Frota/Centros de Custo/Funcionários): seleção múltipla com "selecionar todos" + excluir em lote (com resumo do que foi bloqueado e por quê), ativar/inativar, exportar CSV e — só na Frota — reatribuir centro de custo. <strong>Responsável do Centro de Custo</strong> passa a sugerir nomes de Funcionários (aceita texto livre, compatível com a importação). Corrigido: data do e-mail de resumo em formato brasileiro; aviso de exclusão bloqueada explica o motivo.</td></tr>
     <tr><td>0.30.0</td><td>25/07/2026</td><td><strong>Servidor interno trocado pelo waitress</strong>, mais robusto sob uso simultâneo — acaba com as paradas espontâneas do servidor. <strong>Motor de captura e tratamento de erros</strong> (log rotativo, erros do navegador, tela "Erros recentes" no Diagnóstico, <code>*_crash.log</code>). Corrigido: a aba de <strong>Auditoria</strong> volta a acompanhar o modo Compacto/Expandido.</td></tr>
