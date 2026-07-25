@@ -142,18 +142,10 @@
   .csv-preview-table th { background: var(--gray-100); padding: 4px 8px; text-align: left; border: 1px solid var(--gray-200); font-weight: 600; }
   .csv-preview-table td { padding: 4px 8px; border: 1px solid var(--gray-200); }
   .csv-preview-table tr:nth-child(even) { background: var(--gray-50); }
-  .forn-list-item { background: var(--gray-50); border: 1px solid var(--gray-200); border-radius: var(--radius); padding: 12px 14px; margin-bottom: 10px; cursor: pointer; transition: border-color .15s; }
-  .forn-list-item.expanded { border-color: var(--gray-400); cursor: default; }
-  .forn-list-item.editing  { border-color: var(--brand-text); cursor: default; }
-  .forn-inline-body { border-top: 1px solid var(--gray-200); padding: 14px; margin: 8px -14px -12px; }
-  .forn-inline-edit-header { background: var(--gray-100); border-radius: var(--radius) var(--radius) 0 0; padding: 8px 14px; margin: 8px -14px 0; border-top: 1px solid var(--gray-200); }
-  .forn-list-header { display: flex; justify-content: space-between; align-items: flex-start; gap: 8px; margin-bottom: 8px; }
+  .forn-inline-edit-header { background: var(--gray-100); border-radius: var(--radius); padding: 8px 14px; margin-bottom: 10px; }
   body.dark .forn-card, body.dark .forn-lookup { background: #2a2a2a; border-color: #383838; }
   body.dark .forn-card-header { border-color: #383838; }
   body.dark .forn-input-row input { background: #1e1e1e; color: #e0e0e0; border-color: #444; }
-  body.dark .forn-list-item { background: #2a2a2a; border-color: #383838; }
-  body.dark .forn-list-item.expanded { border-color: #666; }
-  body.dark .forn-inline-body { border-color: #444; }
   body.dark .forn-inline-edit-header { background: #333; border-color: #444; }
   body.dark .forn-cert-item { background: #1c1c1c; border-color: #383838; }
   /* Ações em massa dos cadastros */
@@ -418,12 +410,6 @@
         <input type="text" id="forn-search" class="search-inp" placeholder="Buscar por CNPJ, razão social…" oninput="_debouncedRenderForn()" aria-label="Buscar fornecedor" style="width:100%;padding-right:28px">
         <button onclick="limparBuscaForn()" id="forn-search-clear" title="Limpar busca" style="display:none;position:absolute;right:7px;top:50%;transform:translateY(-50%);background:none;border:none;cursor:pointer;color:var(--gray-400);font-size:.85rem;padding:0;line-height:1">✕</button>
       </div>
-      <select id="forn-sort" onchange="renderFornecedores()" title="Ordenar fornecedores" style="flex:0 0 auto;width:170px">
-        <option value="recent">↓ Mais recente</option>
-        <option value="oldest">↑ Mais antigo</option>
-        <option value="az">A → Z</option>
-        <option value="za">Z → A</option>
-      </select>
     </div>
     <div id="forn-filtro-buttons" style="display:flex;gap:8px;margin:10px 0;flex-wrap:wrap">
       <button class="btn btn-outline btn-sm forn-filtro-btn active" data-filtro="" onclick="setFornFiltro('')">Todos</button>
@@ -433,6 +419,17 @@
     </div>
     <div id="forn-results-info" style="display:none;font-size:.75rem;color:var(--gray-500);margin-bottom:8px;padding:0 2px"></div>
     <div id="forn-list"></div>
+  </div>
+
+  <!-- ── Fornecedor: detalhe (ver/editar/certidões/sanções) ── -->
+  <div class="overlay hidden" id="forn-detail-overlay" role="dialog" aria-modal="true" aria-labelledby="forn-detail-titulo">
+    <div class="modal" style="max-width:840px;width:96vw;max-height:88vh;display:flex;flex-direction:column">
+      <div class="modal-header">
+        <h2 id="forn-detail-titulo">Fornecedor</h2>
+        <button class="btn btn-ghost btn-icon" onclick="_collapseFornCard(_expandedFornId)" aria-label="Fechar">✕</button>
+      </div>
+      <div class="modal-body" id="forn-detail-body" style="overflow:auto"></div>
+    </div>
   </div>
 
   <!-- ── Fornecedor: novo (consulta CNPJ) ── -->
@@ -2353,7 +2350,7 @@ function _tblDoSort(key, idx) {
   const s = _tblSort[key] || { idx: null, dir: 1 };
   if (s.idx === idx) s.dir *= -1; else { s.idx = idx; s.dir = 1; }
   _tblSort[key] = s;
-  ({ produtos: renderProdutos, entradas: renderEntradas, saidas: renderSaidas })[key]?.();
+  ({ produtos: renderProdutos, entradas: renderEntradas, saidas: renderSaidas, forn: renderFornecedores })[key]?.();
 }
 
 async function renderProdutos() {
@@ -2666,23 +2663,23 @@ function _fornecedorPassaFiltro(f, filtro, cnpjDupSet) {
   return true;
 }
 
+let _fornSel = new Set();   // ids selecionados (ações em massa)
+let _fornCache = [];        // fornecedores visíveis (para lookup de nome)
+
 async function renderFornecedores() {
   const all = await listarFornecedores();
   const cnpjDupSet = _cnpjDuplicadosSet(all);
   const q = (document.getElementById('forn-search')?.value || '').toLowerCase();
-  const sort = document.getElementById('forn-sort')?.value || 'recent';
-
   const clearBtn = document.getElementById('forn-search-clear');
   if (clearBtn) clearBtn.style.display = q ? '' : 'none';
 
   const _ts = f => { const t = f.updatedAt || f.createdAt || f.addedAt || 0; return typeof t === 'string' ? (Date.parse(t) || 0) : t; };
-  const lista = all
+  let lista = all
     .filter(f => _fornecedorPassaFiltro(f, _fornFiltro, cnpjDupSet) && (!q || f.razao_social?.toLowerCase().includes(q) || f.cnpj?.includes(q) || f.nome_fantasia?.toLowerCase().includes(q)))
-    .sort((a, b) => {
-      if (sort === 'az') return (a.razao_social || '').localeCompare(b.razao_social || '', 'pt-BR');
-      if (sort === 'za') return (b.razao_social || '').localeCompare(a.razao_social || '', 'pt-BR');
-      return sort === 'oldest' ? _ts(a) - _ts(b) : _ts(b) - _ts(a);
-    });
+    .sort((a, b) => _ts(b) - _ts(a));  // base: mais recente (colunas reordenam por cima)
+  _fornCache = lista;
+  const vis = new Set(lista.map(f => String(f.id)));
+  _fornSel = new Set([..._fornSel].filter(id => vis.has(id)));
 
   const info = document.getElementById('forn-results-info');
   if (info) {
@@ -2693,32 +2690,85 @@ async function renderFornecedores() {
   const el = document.getElementById('forn-list');
   if (!lista.length) {
     el.innerHTML = `<div class="empty">${(q || _fornFiltro) ? 'Nenhum fornecedor encontrado.' : 'Nenhum fornecedor cadastrado ainda.'}</div>`;
+    _fornUpdateBulk();
     return;
   }
-  el.innerHTML = lista.map(f => {
-    const sitCls = cnpjSitClass(f.situacao);
-    return `<div class="forn-list-item" data-forn-id="${f.id}" onclick="toggleFornCard('${f.id}')" role="button" tabindex="0">
-      <div class="forn-list-header">
-        <div>
-          <div class="forn-razao">${esc(f.razao_social)}</div>
-          ${f.nome_fantasia ? `<div class="forn-fantasia">${esc(f.nome_fantasia)}</div>` : ''}
-          <div class="forn-cnpj-row">
-            <span class="forn-cnpj-txt">${esc(f.cnpj)}</span>
-            <button class="copy-btn" onclick="event.stopPropagation();navigator.clipboard.writeText('${f.cnpj_digits || ''}');toast('CNPJ copiado!','success')">📋 copiar</button>
-          </div>
-        </div>
-        <div style="display:flex;flex-direction:column;align-items:flex-end;gap:6px">
-          <span class="forn-sit ${sitCls}">${esc(f.situacao || '—')}</span>
-          <button class="btn btn-outline btn-sm" style="font-size:.68rem;padding:2px 10px" onclick="event.stopPropagation();toggleFornCard('${f.id}',true)">✏ Editar</button>
-        </div>
-      </div>
-    </div>`;
+  const cols = [
+    { h: 'Razão Social', get: f => f.razao_social || '' },
+    { h: 'CNPJ', get: f => f.cnpj || '' },
+    { h: 'Situação', get: f => f.situacao || '' },
+  ];
+  const s = _tblSort.forn || { idx: null, dir: 1 };
+  const thCols = cols.map((c, idx) => {
+    const active = s.idx === idx;
+    const arrow = active ? (s.dir === 1 ? ' ▲' : ' ▼') : '';
+    return `<th onclick="_tblDoSort('forn',${idx})" role="button" tabindex="0" aria-sort="${active ? (s.dir === 1 ? 'ascending' : 'descending') : 'none'}" title="Ordenar por ${esc(c.h)}" style="cursor:pointer;user-select:none;white-space:nowrap">${esc(c.h)}<span style="opacity:.65">${arrow}</span></th>`;
   }).join('');
+  const linhas = _tblApply('forn', cols, lista);
+  el.innerHTML = `
+    <div id="forn-bulk-bar" class="bulk-bar" style="display:none" role="region" aria-label="Ações em massa">
+      <span id="forn-bulk-count" class="bulk-count"></span>
+      <button class="btn btn-danger btn-sm" onclick="_fornBulkExcluir()">Excluir (Lixeira)</button>
+      <button class="btn btn-ghost btn-sm" onclick="_fornSel=new Set();renderFornecedores()">Limpar seleção</button>
+    </div>
+    <div class="list-table-wrap"><table class="list-table">
+    <thead><tr>
+      <th class="col-check"><input type="checkbox" id="forn-check-all" onchange="_fornSelAll(this.checked)" aria-label="Selecionar todos"></th>
+      ${thCols}<th class="col-actions">Ações</th>
+    </tr></thead>
+    <tbody>${linhas.map(f => {
+      const sitCls = cnpjSitClass(f.situacao);
+      const dup = f.cnpj_digits && cnpjDupSet.has(f.cnpj_digits) ? ` <span class="badge badge-danger" style="font-size:10px">CNPJ duplicado</span>` : '';
+      return `<tr class="clickable" onclick="toggleFornCard('${f.id}')" role="button" tabindex="0">
+        <td class="col-check"><input type="checkbox" class="forn-row-check" data-id="${f.id}" ${_fornSel.has(String(f.id)) ? 'checked' : ''} onclick="event.stopPropagation()" onchange="_fornSelToggle('${f.id}',this.checked)" aria-label="Selecionar fornecedor"></td>
+        <td><div class="forn-razao" style="font-weight:600">${esc(f.razao_social || '')}</div>${f.nome_fantasia && f.nome_fantasia !== f.razao_social ? `<div class="forn-fantasia">${esc(f.nome_fantasia)}</div>` : ''}${dup}</td>
+        <td style="white-space:nowrap">${esc(f.cnpj || '—')}</td>
+        <td><span class="forn-sit ${sitCls}">${esc(f.situacao || '—')}</span></td>
+        <td class="col-actions" onclick="event.stopPropagation()">
+          <button class="btn btn-ghost btn-sm" onclick="toggleFornCard('${f.id}',true)">Editar</button>
+          <button class="btn btn-ghost btn-sm" onclick="_fornExcluirLinha('${f.id}')">Excluir</button>
+        </td>
+      </tr>`;
+    }).join('')}</tbody>
+  </table></div>`;
+  _fornUpdateBulk();
 }
 
+function _fornExcluirLinha(id) {
+  const f = _fornCache.find(x => String(x.id) === String(id));
+  _deleteForn(id, f ? f.razao_social : '');
+}
+function _fornSelToggle(id, on) { if (on) _fornSel.add(String(id)); else _fornSel.delete(String(id)); _fornUpdateBulk(); }
+function _fornSelAll(on) {
+  document.querySelectorAll('#forn-list .forn-row-check').forEach(cb => { cb.checked = on; if (on) _fornSel.add(String(cb.dataset.id)); else _fornSel.delete(String(cb.dataset.id)); });
+  _fornUpdateBulk();
+}
+function _fornUpdateBulk() {
+  const bar = document.getElementById('forn-bulk-bar');
+  if (!bar) return;
+  const n = _fornSel.size;
+  bar.style.display = n ? 'flex' : 'none';
+  document.getElementById('forn-bulk-count').textContent = `${n} selecionado${n === 1 ? '' : 's'}`;
+  const all = document.getElementById('forn-check-all');
+  if (all) { const total = document.querySelectorAll('#forn-list .forn-row-check').length; all.checked = n > 0 && n === total; all.indeterminate = n > 0 && n < total; }
+}
+async function _fornBulkExcluir() {
+  const ids = [..._fornSel];
+  if (!ids.length) return;
+  const ok = await customConfirm(`Excluir ${ids.length} fornecedor(es)? Vão para a Lixeira (30 dias antes da exclusão definitiva).`,
+    { title: 'Excluir fornecedores', icon: '⚠️', okLabel: 'Excluir', okClass: 'btn-danger' });
+  if (!ok) return;
+  let n = 0;
+  for (const id of ids) { const r = await API.del(`/api/fornecedores/${id}`); if (r?.ok) n++; }
+  await _auditEvento('FORNECEDOR_EXCLUIDO', `${n} fornecedor(es) enviado(s) à Lixeira em massa`);
+  _fornSel = new Set();
+  toast(`${n} fornecedor(es) enviado(s) à Lixeira.`, 'success');
+  renderFornecedores();
+}
+
+// Abre o detalhe do fornecedor num modal (ver/editar/certidões/sanções). O detalhe
+// rico é o mesmo de antes; só mudou o container (card inline → modal).
 async function toggleFornCard(id, editMode = false, tab = 'dados') {
-  if (_expandedFornId && _expandedFornId !== id) _collapseFornCard(_expandedFornId);
-  if (_expandedFornId === id && !editMode) { _collapseFornCard(id); return; }
   _currentForn = await buscarFornecedor(id);
   if (!_currentForn) return;
   _currentForn._baseUpdatedAt = _currentForn.updatedAt;
@@ -2730,26 +2780,20 @@ async function toggleFornCard(id, editMode = false, tab = 'dados') {
   else _renderFornCardView();
 }
 function _collapseFornCard(id) {
-  const el = document.querySelector(`.forn-list-item[data-forn-id="${id}"]`);
-  if (el) {
-    el.classList.remove('expanded', 'editing');
-    el.querySelector('.forn-inline-body')?.remove();
-    el.querySelector('.forn-inline-edit-header')?.remove();
-  }
-  if (_expandedFornId === id) { _expandedFornId = null; _currentForn = null; }
+  document.getElementById('forn-detail-overlay')?.classList.add('hidden');
+  _expandedFornId = null; _currentForn = null;
 }
 function _getFornCardEl() {
-  return document.querySelector(`.forn-list-item[data-forn-id="${_expandedFornId}"]`);
+  return document.getElementById('forn-detail-body');
 }
 function _setFornCardBody(html, mode = 'view') {
   const el = _getFornCardEl();
   if (!el) return;
-  el.classList.remove('expanded', 'editing');
-  el.classList.add(mode === 'edit' ? 'editing' : 'expanded');
-  el.querySelector('.forn-inline-body')?.remove();
-  el.querySelector('.forn-inline-edit-header')?.remove();
-  el.insertAdjacentHTML('beforeend', html);
-  el.scrollIntoView({ behavior: 'smooth', block: 'nearest' });
+  el.innerHTML = html;
+  const t = document.getElementById('forn-detail-titulo');
+  if (t) t.textContent = _currentForn?.razao_social || 'Fornecedor';
+  document.getElementById('forn-detail-overlay').classList.remove('hidden');
+  el.scrollTop = 0;
 }
 
 function _fornTabsHtml(active) {
