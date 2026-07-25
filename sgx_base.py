@@ -366,6 +366,30 @@ def send_email_raw(smtp, frm, to, subj, html, plain=''):
             s.login(user, pw); s.send_message(msg)
 
 
+# ── Captura de falhas (crash log que sobrevive ao fechamento da janela) ─────────
+# Quando o servidor cai, a janela do .bat fecha e leva o traceback junto. Isto
+# grava a causa num arquivo persistente, cobrindo os três jeitos de o processo
+# morrer: exceção não-tratada em qualquer thread, segfault de C (ex.: SQLite sob
+# concorrência) e erro fatal na thread principal do serve_forever.
+
+def instalar_captura_de_falhas(log_dir, sigla):
+    """Arma faulthandler + threading.excepthook, gravando em <log_dir>/<sigla>_crash.log.
+    Chamar uma vez no início do __main__. Devolve o caminho do arquivo."""
+    import faulthandler, threading, traceback, datetime
+    os.makedirs(log_dir, exist_ok=True)
+    caminho = os.path.join(log_dir, f'{sigla}_crash.log')
+    fh = open(caminho, 'a', buffering=1, encoding='utf-8', errors='replace')
+    fh.write(f'\n=== captura armada em {datetime.datetime.now():%Y-%m-%d %H:%M:%S} ===\n')
+    faulthandler.enable(file=fh, all_threads=True)   # pega segfault (traceback de C-level)
+    def _hook(args):
+        fh.write(f'\n--- exceção não tratada em thread "{args.thread.name}" '
+                 f'({datetime.datetime.now():%Y-%m-%d %H:%M:%S}) ---\n')
+        traceback.print_exception(args.exc_type, args.exc_value, args.exc_traceback, file=fh)
+        fh.flush()
+    threading.excepthook = _hook
+    return caminho
+
+
 # ── Configurações genéricas (sys_settings key/value) ────────────────────────
 
 def save_settings(get_db, data):
