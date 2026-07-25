@@ -8,6 +8,7 @@
 ## [Não versionado]
 
 ### Adicionado
+- **A lista de Entradas distingue a origem de cada lançamento.** As entradas geradas pela **reconciliação** (saldo inicial) aparecem com o selo **"Reconciliação"** e as vindas do **import do Fiorilli** com "Import Fiorilli", em vez de todas caírem como "Compra direta". Entradas antigas já criadas são reclassificadas automaticamente.
 - **Importar entradas do Fiorilli.** Na tela de Entradas, o administrador pode importar a **REQUISIÇÃO DE ENTRADA** exportada do Fiorilli (CSV): o sistema cria a entrada com seus itens e **lotes (com validade)** de uma vez, aproveitando o número da requisição como chave — reimportar não duplica. Produtos (por código Fiorilli), fornecedores (por CNPJ) e centros de custo (por código) que ainda não existirem são criados a partir do próprio arquivo.
 - **A entrada ganhou os campos Nº da Requisição e Data da Requisição**, alinhando o registro ao do Fiorilli.
 

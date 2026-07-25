@@ -293,6 +293,14 @@ def init_db():
         cols_ent = [r[1] for r in conn.execute('PRAGMA table_info(entradas)').fetchall()]
         for _ec in ('requisicao', 'data_requisicao', 'tipo_fiorilli'):
             if _ec not in cols_ent: conn.execute(f"ALTER TABLE entradas ADD COLUMN {_ec} TEXT DEFAULT ''")
+        # Origem da entrada: '' (manual), 'reconciliacao' (saldo inicial do bootstrap) ou
+        # 'fiorilli' (import de entradas). tipo (pedido/compra_direta) tem CHECK e não
+        # comporta valor novo sem rebuild — origem é uma coluna à parte. Backfill das já
+        # criadas pelo texto da observação.
+        if 'origem' not in cols_ent:
+            conn.execute("ALTER TABLE entradas ADD COLUMN origem TEXT DEFAULT ''")
+            conn.execute("UPDATE entradas SET origem='reconciliacao' WHERE (origem IS NULL OR origem='') AND observacao LIKE 'Saldo inicial%'")
+            conn.execute("UPDATE entradas SET origem='fiorilli' WHERE (origem IS NULL OR origem='') AND observacao LIKE 'Importado do Fiorilli%'")
 
         # Responsável e e-mail do centro de custo (vêm do cadastro do Fiorilli).
         cols_cc = [r[1] for r in conn.execute('PRAGMA table_info(centros_custo)').fetchall()]
@@ -1931,8 +1939,8 @@ class SGEAHandler(http.server.SimpleHTTPRequestHandler):
                         custo = round((F['valor'] or 0) / q, 4)
                         eid = str(uuid.uuid4())
                         conn.execute(
-                            '''INSERT INTO entradas (id, tipo, data_entrega, observacao, created_by)
-                               VALUES (?, 'compra_direta', ?, ?, ?)''',
+                            '''INSERT INTO entradas (id, tipo, data_entrega, observacao, created_by, origem)
+                               VALUES (?, 'compra_direta', ?, ?, ?, 'reconciliacao')''',
                             (eid, data_ent, 'Saldo inicial — importação Fiorilli', s['user_id']))
                         cur = conn.execute(
                             '''INSERT INTO entrada_itens
@@ -2554,8 +2562,8 @@ class SGEAHandler(http.server.SimpleHTTPRequestHandler):
                 obs = f"Importado do Fiorilli — requisição {req['requisicao']}"
                 if req['proclic']: obs += f"; processo licitatório {req['proclic']}"
                 conn.execute('''INSERT INTO entradas
-                    (id,tipo,fornecedor_id,nfe_numero,data_entrega,recebedor_id,centro_custo_id,observacao,created_by,requisicao,data_requisicao,tipo_fiorilli)
-                    VALUES (?, 'compra_direta', ?,?,?,?,?,?,?,?,?,?)''',
+                    (id,tipo,fornecedor_id,nfe_numero,data_entrega,recebedor_id,centro_custo_id,observacao,created_by,requisicao,data_requisicao,tipo_fiorilli,origem)
+                    VALUES (?, 'compra_direta', ?,?,?,?,?,?,?,?,?,?,'fiorilli')''',
                     (eid, fid, req['documento'], req['data_entrega'], receb_id, cc_id, obs, s['user_id'],
                      req['requisicao'], req['data_requisicao'], req['tprequi']))
                 r['entradas'] += 1

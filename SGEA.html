@@ -57,6 +57,9 @@
   .seg-radio input { display: none; }
   .seg-radio label:has(input:checked) { background: var(--brand); color: #fff; }
   body.dark .seg-radio, body.dark .seg-radio label + label { border-color: #444; }
+  /* Badge de origem "Reconciliação" na lista de entradas */
+  .badge-recon { background: #ede9fe; color: #5b21b6; }
+  body.dark .badge-recon { background: #2e1065; color: #c4b5fd; }
 
   /* ── Painel de lotes (produto) ───────────────────── */
   .lotes-panel { padding: 12px 16px; background: var(--gray-50); border-top: 1px solid var(--gray-200); }
@@ -3891,6 +3894,17 @@ async function importarEntradaFiorilli(file) {
   renderEntradas();
 }
 
+function _entradaTipoLabel(e) {
+  if (e.origem === 'reconciliacao') return 'Reconciliação';
+  if (e.origem === 'fiorilli') return 'Import Fiorilli';
+  return e.tipo === 'pedido' ? 'Com pedido' : 'Compra direta';
+}
+function _entradaTipoBadge(e) {
+  if (e.origem === 'reconciliacao') return '<span class="badge badge-recon">Reconciliação</span>';
+  if (e.origem === 'fiorilli') return '<span class="badge badge-neutral">Import Fiorilli</span>';
+  return e.tipo === 'pedido' ? '<span class="badge badge-neutral">Com pedido</span>' : '<span class="badge badge-ok">Compra direta</span>';
+}
+
 async function renderEntradas() {
   const btnImp = document.getElementById('btn-import-entrada');
   if (btnImp) btnImp.style.display = _apiUser?.admin ? '' : 'none';
@@ -3899,7 +3913,7 @@ async function renderEntradas() {
   if (!items.length) { el.innerHTML = '<div class="empty">Nenhuma entrada registrada.</div>'; return; }
   const cols = [
     { h: 'Data Entrega', get: e => e.data_entrega || '' },
-    { h: 'Tipo', get: e => e.tipo || '' },
+    { h: 'Tipo', get: e => _entradaTipoLabel(e) },
     { h: 'Pedido', get: e => e.pedido_numero || '' },
     { h: 'Fornecedor', get: e => e.fornecedor_nome || '' },
     { h: 'NF-e', get: e => e.nfe_numero || '' },
@@ -3909,7 +3923,7 @@ async function renderEntradas() {
     <thead>${_tblTh('entradas', cols)}</thead>
     <tbody>${_tblApply('entradas', cols, items).map(e => `<tr>
       <td>${fmtDate(e.data_entrega)}</td>
-      <td>${e.tipo === 'pedido' ? '<span class="badge badge-neutral">Com pedido</span>' : '<span class="badge badge-ok">Compra direta</span>'}</td>
+      <td>${_entradaTipoBadge(e)}</td>
       <td>${esc(e.pedido_numero || '—')}</td>
       <td>${esc(e.fornecedor_nome || '—')}</td>
       <td>${esc(e.nfe_numero || '—')}</td>
