@@ -1,6 +1,6 @@
 # SGEA — Sistema de Gestão de Estoque do Almoxarifado
 
-![Versão](https://img.shields.io/badge/versão-v0.34.0-blue) ![Tecnologia](https://img.shields.io/badge/tecnologia-Python%20%2B%20SQLite-orange) ![Licença](https://img.shields.io/badge/licença-MIT-green) ![Multiusuário](https://img.shields.io/badge/acesso-multiusuário-blueviolet) [![DOI](https://zenodo.org/badge/DOI/10.5281/zenodo.21570250.svg)](https://doi.org/10.5281/zenodo.21570250) [![CI](https://github.com/devtulio/sgea/actions/workflows/ci.yml/badge.svg)](https://github.com/devtulio/sgea/actions/workflows/ci.yml)
+![Versão](https://img.shields.io/badge/versão-v0.34.1-blue) ![Tecnologia](https://img.shields.io/badge/tecnologia-Python%20%2B%20SQLite-orange) ![Licença](https://img.shields.io/badge/licença-MIT-green) ![Multiusuário](https://img.shields.io/badge/acesso-multiusuário-blueviolet) [![DOI](https://zenodo.org/badge/DOI/10.5281/zenodo.21570250.svg)](https://doi.org/10.5281/zenodo.21570250) [![CI](https://github.com/devtulio/sgea/actions/workflows/ci.yml/badge.svg)](https://github.com/devtulio/sgea/actions/workflows/ci.yml)
 
 ## Descrição
 
@@ -22,23 +22,26 @@ Funciona em rede local: um único computador executa o servidor e todos os usuá
 - **Alertas de Validade** — tela dedicada com lotes vencidos ou a vencer numa janela de 30/60/90 dias
 - **Entrada com ou sem pedido** — vínculo opcional a um Pedido (nº + código de licitação); sem pedido, a entrada é tratada como compra direta (só NF, fornecedor e produto)
 - **Reversão segura** — excluir uma saída devolve exatamente as quantidades aos lotes de origem; excluir uma entrada é bloqueado se algum de seus lotes já foi parcialmente consumido
-- **Fornecedores** — cadastro rico: consulta automática de CNPJ (ReceitaWS/BrasilAPI) com endereço, CNAE e quadro societário; consulta de sanções federais (CEIS/CNEP); certidões e sanções manuais (Art. 156, Lei 14.133/2021) com relatórios imprimíveis (com QR de autenticidade); importação a partir de um backup do SGCA/SGDP; exclusão reversível pela Lixeira
+- **Fornecedores** — cadastro rico: consulta automática de CNPJ (ReceitaWS/BrasilAPI) com endereço, CNAE e quadro societário; consulta de sanções federais (CEIS/CNEP); certidões e sanções manuais (Art. 156, Lei 14.133/2021) com relatórios imprimíveis (com QR de autenticidade); exportação e sincronização do cadastro com os sistemas irmãos (SGCD/SGCA) casando por CNPJ, com tela de revisão quando o mesmo fornecedor mudou dos dois lados; exclusão reversível pela Lixeira
+- **Tela de Fornecedores em tabela** — colunas ordenáveis pelo cabeçalho, seleção em massa para envio à Lixeira e o cadastro completo (Dados, Certidões, Sanções) numa janela de detalhe
 - **Cadastros de apoio** — Centros de Custo (com código, responsável e e-mail), Funcionários (solicitantes de saída; com cargo, unidade, matrícula, natureza/forma de provimento e data/ato de admissão) e Frota (veículos, para correlacionar saídas de combustível/peças)
+- **Ações em massa nos cadastros** — Frota, Centros de Custo e Funcionários têm coluna de seleção com "selecionar todos" (respeitando a busca ativa) e barra de ações com Excluir em lote (com resumo do que foi bloqueado e por quê), Ativar, Inativar, Exportar CSV e, só na Frota, Reatribuir centro de custo
 - **Ficha de manutenção da Frota** — além do cadastro do veículo (nº, placa, ano, marca/modelo, combustível, centro de custo), cada veículo guarda um catálogo de peças: 11 tipos de filtro, óleos de motor/transmissão, bateria e pneus, com as referências cruzadas entre marcas; o botão **Ficha** gera um documento A4 imprimível com o cadastro e todo o catálogo por seção
 - **Importação das requisições de entrada e saída do Fiorilli** — lê a *REQUISIÇÃO DE ENTRADA* ou de *SAÍDA* (CSV) e lança o movimento inteiro: a entrada cria itens e lotes com validade (criando produto por `codigo_fiorilli`, fornecedor por CNPJ e centro de custo por código quando faltarem); a saída baixa o estoque honrando o lote que o Fiorilli indicou e é **toda-ou-nada** — faltando produto cadastrado ou saldo, nada é gravado e o sistema devolve a lista do que impediu. Idempotente pelo nº da requisição em ambos os casos
 - **Importação de funcionários pela folha do Fiorilli** — botão que lê o CSV da folha de pagamento e cadastra todos os servidores de uma vez, detectando o encoding, ignorando salários, deduplicando por matrícula e fazendo upsert (reimportar atualiza, não duplica)
 - **Importação de centros de custo por CSV** — lê o cadastro do Fiorilli (CODCCUSTO/DESCR); concilia por código e, não achando, pelo nome, adotando o centro já existente para preservar os vínculos em vez de duplicar
-- **Importação da Frota por CSV** — botão que lê a planilha *CONTROLE DE FROTA*, deduplica por número, vincula o centro de custo pelo nome (criando os que faltarem) e faz upsert
+- **Importação da Frota por planilha** — botão que lê a planilha *CONTROLE DE FROTA* em **.csv ou .xlsx** (lendo a aba *DADOS* automaticamente), deduplica por número, vincula o centro de custo **pelo código** (formato "N - NOME"), caindo para o nome quando não encontra (criando os que faltarem), e faz upsert
 - **Autenticação multiusuário** com hashing PBKDF2-HMAC-SHA256 e gestão de usuários pelo admin
-- **Reconciliação com o Fiorilli** — importa o relatório de Posição do Estoque do Fiorilli (CSV Dados) e compara item a item por `codigo_fiorilli`, classificando em confere / diverge / só-Fiorilli / só-SGEA / unidade incompatível; converte as quantidades do Fiorilli para a unidade de consumo do SGEA e é **somente leitura** (o Fiorilli continua o razão oficial). Exporta as pendências em CSV
+- **Reconciliação com o Fiorilli** — importa o relatório de Posição do Estoque do Fiorilli (CSV Dados) e compara item a item por `codigo_fiorilli`, classificando em confere / diverge / só-Fiorilli / só-SGEA / unidade incompatível; converte as quantidades do Fiorilli para a unidade de consumo do SGEA. **Não escreve no Fiorilli** (ele continua o razão oficial), mas oferece dois atalhos para corrigir o lado do SGEA sem sair da tela: **Cadastrar itens do Fiorilli** (com saldo inicial opcional) e o botão **Editar** por linha, que reprocessa o extrato ao salvar. Exporta as pendências em CSV
 - **Auditoria** — trilha de eventos de criação/edição/exclusão em todos os módulos, com tela de consulta filtrável (admin)
 - **Lixeira** — Entradas, Saídas e Fornecedores excluídos ficam disponíveis para restaurar por 30 dias
 - **Alerta diário por e-mail** (SMTP configurável) resumindo lotes vencidos ou vencendo nos próximos 7 dias
-- **Tela de Configurações em 7 abas** — Interface (tema, largura do conteúdo, fonte, cor de destaque), Organização (órgão/CNPJ/autoridade competente e brasão), Comunicação (SMTP), Dados (backup/restore, Zona de Perigo), Segurança (troca da própria senha e config pessoal de e-mail/SMTP), Diagnóstico (checagens de consistência) e Usuários (admin), com salvamento único e indicador de alterações não salvas — mesmo padrão visual dos sistemas irmãos
+- **Tela de Configurações em 7 abas** — Interface (tema, largura do conteúdo, fonte, cor de destaque), Organização (órgão/CNPJ/autoridade competente e brasão), Comunicação (SMTP), Dados (backup/restore, Zona de Perigo), Segurança (troca da própria senha e config pessoal de e-mail/SMTP), Diagnóstico (checagens de consistência, com o painel de erros recentes do sistema) e Usuários (admin), com salvamento único e indicador de alterações não salvas — mesmo padrão visual dos sistemas irmãos
 - **Login no padrão visual dos sistemas irmãos** — cartão institucional, identificação do órgão, aviso de Caps Lock e último backup exibido antes de entrar
 - **Busca global (Ctrl+K)** — encontra produtos, fornecedores, funcionários, frota, centros de custo e pedidos por qualquer tela, com atalho de teclado
 - **Sino de notificações** — contagem de lotes vencidos/vencendo nos próximos 7 dias, com painel de acesso rápido
-- **Backup automático** (JSON + banco de dados SQLite) ao encerrar a última sessão, com rotação configurável, restauração a partir de arquivo e reset de fábrica com confirmação em 3 etapas
+- **Backup automático** (JSON + pacote `.zip` do banco — o `.db` legado ainda restaura) ao encerrar a última sessão, com rotação configurável, restauração a partir de arquivo e reset de fábrica com confirmação em 3 etapas
+- **Motor de captura e tratamento de erros** — erros do servidor e do navegador do usuário são registrados em log rotativo e agrupados na tela **Erros recentes** (Configurações → Diagnóstico, somente admin); travamentos graves ficam em `SGEA_crash.log`
 - **Diagnóstico e correção automática de rede** — verifica IP, porta, perfil de rede e firewall
 
 > Fora de escopo nesta versão, planejado para depois: importação do histórico da planilha — o código Fiorilli como chave única de produto já prepara esse caminho.
@@ -109,6 +112,12 @@ Se a conexão não funcionar, execute **`Diagnostico SGEA.bat`** (ou a opção *
 SGEA/
 ├── SGEA.html                # Frontend — aplicação web
 ├── server.py                # Servidor Python (API REST + SQLite) — porta 3003
+├── sgx_base.py              # Esqueleto compartilhado da família (backend) — cópia distribuída
+├── base.css                 # Esqueleto compartilhado da família (estilos) — cópia distribuída
+├── base.js                  # Esqueleto compartilhado da família (JS) — cópia distribuída
+├── _esqueleto.sha256        # Manifesto de integridade das cópias do esqueleto (conferido no CI)
+├── waitress/                # Servidor WSGI vendorizado (puro-Python, nada a instalar)
+├── scripts/                 # Utilitários de desenvolvimento (lint, verificação do esqueleto)
 ├── tests/                   # Suíte de testes automatizados do backend
 │   ├── test_server.py
 │   └── e2e/                 # Testes E2E (Playwright) — navegador real de ponta a ponta
@@ -143,7 +152,7 @@ SGEA/
 | **Relatório de Pedidos em Aberto** | Pedidos pendentes de entrega |
 | **Relatórios de Frota** | Inventário, combustível, por centro de custo e pendências |
 | **Relatório de Fornecedores** | Cadastro de fornecedores |
-| **Relatório de Sanções** | Fornecedores sancionados (CEIS/CNEP) |
+| **Relatório de Sanções** | Sanções registradas no cadastro do fornecedor (Art. 156 da Lei 14.133/2021) |
 | **Relatório de Auditoria** | Trilha de eventos do sistema |
 | **Relatório de Integridade** | Estado do banco, backups e contagens |
 
@@ -168,6 +177,7 @@ Todos os documentos abrem em janela separada com botão "🖨 Imprimir / Salvar 
 | **HTML5 + CSS3** | Interface da aplicação, layout responsivo |
 | **JavaScript puro (ES6+)** | Toda a lógica de negócio, sem frameworks externos |
 | **Python 3 (stdlib)** | Servidor local: REST API, SQLite, auth, proxy CNPJ |
+| **waitress (vendorizado, puro-Python)** | Servidor WSGI que atende as requisições — vem junto na pasta `waitress/`, não precisa instalar nada |
 | **SQLite** | Armazenamento persistente dos dados (`sgea.db`) |
 | **ReceitaWS** | Consulta de CNPJ no cadastro de fornecedores |
 

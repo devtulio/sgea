@@ -9,6 +9,16 @@
 
 ---
 
+## [0.34.1] — 2026-07-25
+
+### Documentação
+- **Auditoria do manual, do README e do changelog.** Corrigidas descrições que não correspondiam mais ao sistema: a tela de Fornecedores (que virou tabela + janela, mas o manual ainda descrevia painel expansível e um seletor de ordenação que não existe), o backup do banco (é pacote .zip desde a 0.28.0, não .db), a contagem de relatórios (nove, não cinco) e a Lixeira (que também guarda Fornecedores).
+- **Funcionalidades que existiam sem documentação passaram a constar no manual e no README:** ações em massa nos cadastros (Frota, Centros de Custo e Funcionários), painel "Erros recentes do sistema" no Diagnóstico, exportação/sincronização do cadastro de fornecedores por CNPJ, sugestão de nomes no campo Responsável do centro de custo e o critério "PENDENTE - …" no relatório de Pendências de Peças.
+- **README:** importação da Frota corrigida (aceita .xlsx e casa o centro de custo pelo código), Reconciliação com os dois atalhos de correção, relatório de Sanções descrito pela fonte correta (sanções do cadastro, não CEIS/CNEP), e a árvore de arquivos com o esqueleto compartilhado e o waitress vendorizado.
+- **Manual:** as seções 6.1 e 7.1 (importações do Fiorilli) ganharam âncora própria no sumário, e a versão 0.13.7 entrou no Histórico de Versões.
+
+---
+
 ## [0.34.0] — 2026-07-25
 
 ### Adicionado
