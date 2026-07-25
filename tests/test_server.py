@@ -914,6 +914,42 @@ class TestImportFrotaAprimorada(SGEATestCase):
         self.assertEqual(antes, depois)
         self.assertEqual(self._veiculo('7')['centro_custo_id'], cc['id'])
 
+    def test_importa_xlsx_base64(self):
+        import base64, io, zipfile
+        # xlsx mínimo (2 abas: OUTRA e DADOS) montado à mão para exercitar o parser stdlib
+        def xml(s): return s.encode('utf-8')
+        wb = ('<?xml version="1.0"?><workbook xmlns="http://schemas.openxmlformats.org/spreadsheetml/2006/main"'
+              ' xmlns:r="http://schemas.openxmlformats.org/officeDocument/2006/relationships"><sheets>'
+              '<sheet name="OUTRA" sheetId="1" r:id="rId1"/><sheet name="DADOS" sheetId="2" r:id="rId2"/>'
+              '</sheets></workbook>')
+        rels = ('<?xml version="1.0"?><Relationships xmlns="http://schemas.openxmlformats.org/package/2006/relationships">'
+                '<Relationship Id="rId1" Target="worksheets/sheet1.xml"/>'
+                '<Relationship Id="rId2" Target="worksheets/sheet2.xml"/></Relationships>')
+        sst = ('<?xml version="1.0"?><sst xmlns="http://schemas.openxmlformats.org/spreadsheetml/2006/main" count="4" uniqueCount="4">'
+               '<si><t>FROTA</t></si><si><t>PLACA</t></si><si><t>RENAVAM</t></si><si><t>AAA1B22</t></si></sst>')
+        # sheet2 (DADOS): linha 1 cabeçalho (s0,s1,s2), linha 2: numero 9 / placa s3 / renavam inline
+        sheet2 = ('<?xml version="1.0"?><worksheet xmlns="http://schemas.openxmlformats.org/spreadsheetml/2006/main"><sheetData>'
+                  '<row r="1"><c r="A1" t="s"><v>0</v></c><c r="B1" t="s"><v>1</v></c><c r="C1" t="s"><v>2</v></c></row>'
+                  '<row r="2"><c r="A2"><v>9</v></c><c r="B2" t="s"><v>3</v></c><c r="C2" t="inlineStr"><is><t>555</t></is></c></row>'
+                  '</sheetData></worksheet>')
+        sheet1 = ('<?xml version="1.0"?><worksheet xmlns="http://schemas.openxmlformats.org/spreadsheetml/2006/main">'
+                  '<sheetData><row r="1"><c r="A1" t="s"><v>0</v></c></row></sheetData></worksheet>')
+        buf = io.BytesIO()
+        with zipfile.ZipFile(buf, 'w') as z:
+            z.writestr('xl/workbook.xml', xml(wb))
+            z.writestr('xl/_rels/workbook.xml.rels', xml(rels))
+            z.writestr('xl/sharedStrings.xml', xml(sst))
+            z.writestr('xl/worksheets/sheet1.xml', xml(sheet1))
+            z.writestr('xl/worksheets/sheet2.xml', xml(sheet2))
+        b64 = base64.b64encode(buf.getvalue()).decode()
+        token = self.login()
+        status, resp = self.request('POST', '/api/frota/import', {'xlsx_b64': b64, 'criar_centros': False}, token=token)
+        self.assertEqual(status, 200, resp)
+        self.assertEqual(resp['inseridos'], 1)
+        v = self._veiculo('9')
+        self.assertEqual(v['placa'], 'AAA1B22')
+        self.assertEqual(v['renavam'], '555')  # veio da aba DADOS (não da OUTRA)
+
     def test_centro_sem_prefixo_cria_com_codigo(self):
         token = self.login()
         csv = 'FROTA;PLACA;CENTRO DE CUSTO\n8;XYZ9K88;10 - TRANSPORTE RODOVIARIO'

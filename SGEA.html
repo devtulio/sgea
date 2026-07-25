@@ -569,17 +569,18 @@
         <div id="frota-csv-upload">
           <div style="background:var(--gray-50);border:1px solid var(--gray-200);border-radius:8px;padding:12px 16px;margin-bottom:14px;font-size:.8rem;color:var(--gray-600)">
             <div style="font-weight:600;margin-bottom:6px;color:var(--gray-700)">Como funciona</div>
-            Selecione o CSV da planilha <strong>CONTROLE DE FROTA</strong> (colunas Frota, Placa, Centro de Custo,
-            Marca, Modelo, Fabricação/Modelo, Combustível, filtros, óleos, bateria e pneus). O importador:<br>
+            Selecione a planilha <strong>CONTROLE DE FROTA</strong> em <strong>.xlsx</strong> (lê a aba <strong>DADOS</strong>)
+            ou o <strong>.csv</strong> exportado dela — colunas Frota, Placa, Centro de Custo, identificação (RENAVAM,
+            chassi, cor…), filtros, óleos, bateria e pneus. O importador:<br>
             • deduplica <strong>por número de frota</strong>;<br>
-            • vincula o Centro de Custo <strong>pelo nome</strong>;<br>
-            • atualiza quem já existe (mesmo número) e insere quem é novo — reimportar não duplica.
+            • vincula o Centro de Custo <strong>pelo código</strong> (formato "N - NOME"), com fallback pelo nome;<br>
+            • atualiza quem já existe (mesmo número) e insere quem é novo — reimportar não duplica nem apaga.
           </div>
           <label style="display:flex;align-items:center;gap:8px;font-size:.8rem;margin-bottom:12px;text-transform:none;font-weight:500"><input type="checkbox" id="frota-csv-criar-cc" checked> Criar centros de custo que não existirem no cadastro</label>
           <div style="border:2px dashed var(--gray-300);border-radius:8px;padding:32px;text-align:center;cursor:pointer" onclick="document.getElementById('frota-csv-input').click()" role="button" tabindex="0">
             <div style="font-size:2rem;margin-bottom:8px">📂</div>
-            <div style="font-size:.85rem;color:var(--gray-600)">Clique para selecionar o arquivo CSV</div>
-            <input type="file" id="frota-csv-input" accept=".csv,text/csv" style="display:none" onchange="carregarFrotaCsv(this)">
+            <div style="font-size:.85rem;color:var(--gray-600)">Clique para selecionar a planilha (.xlsx ou .csv)</div>
+            <input type="file" id="frota-csv-input" accept=".csv,.xlsx,text/csv,application/vnd.openxmlformats-officedocument.spreadsheetml.sheet" style="display:none" onchange="carregarFrotaCsv(this)">
           </div>
         </div>
         <div id="frota-csv-preview" style="display:none">
@@ -641,7 +642,7 @@
           <button onclick="limparBuscaCrud()" id="crud-search-clear" title="Limpar busca" style="display:none;position:absolute;right:7px;top:50%;transform:translateY(-50%);background:none;border:none;cursor:pointer;color:var(--gray-400);font-size:.85rem;padding:0;line-height:1">✕</button>
         </div>
         <button class="btn btn-outline" id="crud-btn-import-func" onclick="abrirImportFuncionarios()" style="display:none" title="Importar funcionários da folha do Fiorilli (CSV)">Importar CSV</button>
-        <button class="btn btn-outline" id="crud-btn-import-frota" onclick="abrirImportFrota()" style="display:none" title="Importar a planilha CONTROLE DE FROTA (CSV)">Importar CSV</button>
+        <button class="btn btn-outline" id="crud-btn-import-frota" onclick="abrirImportFrota()" style="display:none" title="Importar a planilha CONTROLE DE FROTA (.xlsx ou .csv)">Importar planilha</button>
         <button class="btn btn-outline" id="crud-btn-import-cc" onclick="abrirImportCentros()" style="display:none" title="Importar o cadastro de centros de custo do Fiorilli (CSV)">Importar CSV</button>
         <button class="btn btn-primary" id="crud-btn-novo" onclick="openCrudModal()">+ Novo</button>
       </div>
@@ -2151,8 +2152,9 @@ async function aplicarImportCentros() {
 
 // ── Importar planilha CONTROLE DE FROTA (CSV) ───────────
 let _frotaCsvText = '';
+let _frotaXlsxB64 = '';
 function abrirImportFrota() {
-  _frotaCsvText = '';
+  _frotaCsvText = ''; _frotaXlsxB64 = '';
   document.getElementById('frota-csv-upload').style.display = '';
   document.getElementById('frota-csv-preview').style.display = 'none';
   document.getElementById('frota-csv-done').style.display = 'none';
@@ -2164,29 +2166,45 @@ function fecharImportFrota() {
   document.getElementById('modal-frota-csv').classList.add('hidden');
   if (_crudAtual === 'frota') renderCrud();
 }
+function _bufToB64(buf) {
+  const bytes = new Uint8Array(buf); let bin = ''; const chunk = 0x8000;
+  for (let i = 0; i < bytes.length; i += chunk) bin += String.fromCharCode.apply(null, bytes.subarray(i, i + chunk));
+  return btoa(bin);
+}
 async function carregarFrotaCsv(input) {
   const file = input.files[0];
   if (!file) return;
   const buf = await file.arrayBuffer();
-  let text;
-  try { text = new TextDecoder('utf-8', { fatal: true }).decode(buf); }
-  catch { text = new TextDecoder('iso-8859-1').decode(buf); }  // fallback p/ CSV latin-1 do Excel
-  _frotaCsvText = text;
-  const linhas = text.split(/\r?\n/).filter(l => l.trim());
-  if (linhas.length < 2) { toast('CSV vazio ou sem dados.', 'error'); _frotaCsvText = ''; return; }
-  const card = (n, lbl) => `<div style="flex:1;min-width:140px;background:var(--gray-50);border:1px solid var(--gray-200);border-radius:8px;padding:10px 14px"><div style="font-size:1.2rem;font-weight:700;word-break:break-word">${esc(String(n))}</div><div style="font-size:.72rem;color:var(--gray-600)">${lbl}</div></div>`;
+  _frotaCsvText = ''; _frotaXlsxB64 = '';
+  let qtd, lbl;
+  if (/\.xlsx$/i.test(file.name)) {
+    _frotaXlsxB64 = _bufToB64(buf);
+    qtd = 'DADOS'; lbl = 'aba lida da planilha .xlsx';
+  } else {
+    let text;
+    try { text = new TextDecoder('utf-8', { fatal: true }).decode(buf); }
+    catch { text = new TextDecoder('iso-8859-1').decode(buf); }  // fallback p/ CSV latin-1 do Excel
+    _frotaCsvText = text;
+    const linhas = text.split(/\r?\n/).filter(l => l.trim());
+    if (linhas.length < 2) { toast('CSV vazio ou sem dados.', 'error'); _frotaCsvText = ''; return; }
+    qtd = linhas.length - 1; lbl = 'linhas de veículo detectadas';
+  }
+  const card = (n, l) => `<div style="flex:1;min-width:140px;background:var(--gray-50);border:1px solid var(--gray-200);border-radius:8px;padding:10px 14px"><div style="font-size:1.2rem;font-weight:700;word-break:break-word">${esc(String(n))}</div><div style="font-size:.72rem;color:var(--gray-600)">${l}</div></div>`;
   document.getElementById('frota-csv-cards').innerHTML =
-    card(linhas.length - 1, 'linhas de veículo detectadas') + card(file.name, 'arquivo selecionado');
+    card(qtd, lbl) + card(file.name, 'arquivo selecionado');
   document.getElementById('frota-csv-upload').style.display = 'none';
   document.getElementById('frota-csv-preview').style.display = '';
   document.getElementById('frota-csv-btn-aplicar').style.display = '';
 }
 async function aplicarImportFrota() {
-  if (!_frotaCsvText) return;
+  if (!_frotaCsvText && !_frotaXlsxB64) return;
   const btn = document.getElementById('frota-csv-btn-aplicar');
   btn.disabled = true; btn.textContent = 'Importando…';
   const criar = document.getElementById('frota-csv-criar-cc').checked;
-  const r = await API.post('/api/frota/import', { csv: _frotaCsvText, criar_centros: criar });
+  const payload = _frotaXlsxB64
+    ? { xlsx_b64: _frotaXlsxB64, criar_centros: criar }
+    : { csv: _frotaCsvText, criar_centros: criar };
+  const r = await API.post('/api/frota/import', payload);
   const d = await API.json(r);
   btn.disabled = false; btn.textContent = 'Importar';
   if (!r || !r.ok) { toast(d?.error || 'Falha ao importar.', 'error'); return; }

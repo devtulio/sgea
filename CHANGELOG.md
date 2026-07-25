@@ -11,6 +11,7 @@
 - **O cadastro de frota ganhou os dados oficiais do veículo (do Fiorilli).** Novos campos: RENAVAM, chassi, cor, KM atual, categoria da CNH, espécie (TCE), potência/cilindrada, lotação, situação e observação — aparecem na edição do veículo e na Ficha do Veículo, e alimentam a busca (por RENAVAM/chassi também).
 
 ### Alterado
+- **A importação de frota passa a aceitar o arquivo `.xlsx` direto**, além do `.csv`. Basta selecionar a planilha CONTROLE DE FROTA em Excel — o sistema lê a aba **DADOS** automaticamente, sem precisar exportar para CSV antes (leitura feita no servidor, sem depender de programa externo).
 - **A importação da planilha CONTROLE DE FROTA foi atualizada para a versão aprimorada.** Passa a importar os campos de identificação acima e a casar o **centro de custo pelo código** (formato "N - NOME") — antes casava pelo nome inteiro e criava centros duplicados quando a grafia variava. A reimportação continua sem apagar o que já está preenchido (célula em branco não zera).
 
 ### Corrigido

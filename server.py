@@ -16,7 +16,10 @@ import uuid
 import re
 import csv
 import io
+import base64
+import zipfile
 import unicodedata
+from xml.etree import ElementTree as ET
 from email.mime.text import MIMEText
 from email.mime.multipart import MIMEMultipart
 from urllib.parse import urlparse, parse_qs
@@ -508,34 +511,107 @@ _FROTA_HEADER_MAP = {
     'OBSERVACAO DE QUALIDADE': 'observacao', 'OBSERVACAO': 'observacao',
 }
 
-def _parse_frota_csv(csv_text):
-    """Parseia a planilha CONTROLE DE FROTA exportada em CSV. Detecta o delimitador
-    (; ou ,), mapeia colunas por cabeçalho (sem acento/caixa) e deduplica por número
-    de frota (última linha vence). Retorna lista de dicts (campo -> valor)."""
-    csv_text = csv_text.lstrip('﻿')
-    linhas = csv_text.splitlines()
-    if not linhas or not csv_text.strip():
-        raise ValueError('CSV vazio.')
-    delim = ';' if linhas[0].count(';') >= linhas[0].count(',') else ','
-    rows = list(csv.reader(io.StringIO(csv_text), delimiter=delim))
-    header = [_norm_header(h) for h in rows[0]]
+def _frota_registros(rows):
+    """Recebe linhas (lista de listas) — de CSV ou XLSX — mapeia colunas por
+    cabeçalho (sem acento/caixa) e deduplica por número de frota (última vence).
+    Retorna lista de dicts (campo -> valor)."""
+    rows = [r for r in rows if r]
+    if not rows:
+        raise ValueError('Planilha vazia.')
+    header = [_norm_header(str(h)) for h in rows[0]]
     idx = {}
     for i, h in enumerate(header):
         campo = _FROTA_HEADER_MAP.get(h)
         if campo and campo not in idx:
             idx[campo] = i
     if 'numero' not in idx:
-        raise ValueError('Não encontrei a coluna "FROTA" (número do veículo) no CSV.')
+        raise ValueError('Não encontrei a coluna "FROTA" (número do veículo) na planilha.')
     dedup = {}  # numero -> registro (última linha vence)
     for r in rows[1:]:
-        if not any((c or '').strip() for c in r):
+        if not any(str(c or '').strip() for c in r):
             continue
-        reg = {campo: (r[i].strip() if i < len(r) and r[i] is not None else '') for campo, i in idx.items()}
+        reg = {campo: (str(r[i]).strip() if i < len(r) and r[i] is not None else '') for campo, i in idx.items()}
         num = (reg.get('numero') or '').strip()
         if not num:
             continue
         dedup[num] = reg
     return list(dedup.values())
+
+def _parse_frota_csv(csv_text):
+    """Parseia a planilha CONTROLE DE FROTA exportada em CSV (detecta ; ou ,)."""
+    csv_text = (csv_text or '').lstrip('﻿')
+    linhas = csv_text.splitlines()
+    if not linhas or not csv_text.strip():
+        raise ValueError('CSV vazio.')
+    delim = ';' if linhas[0].count(';') >= linhas[0].count(',') else ','
+    rows = list(csv.reader(io.StringIO(csv_text), delimiter=delim))
+    return _frota_registros(rows)
+
+_XLSX_NS = '{http://schemas.openxmlformats.org/spreadsheetml/2006/main}'
+_XLSX_R = '{http://schemas.openxmlformats.org/officeDocument/2006/relationships}'
+_XLSX_REL = '{http://schemas.openxmlformats.org/package/2006/relationships}'
+
+def _col_idx(ref):
+    """Referência de célula ('B3') -> índice 0-based da coluna (1)."""
+    letras = ''.join(ch for ch in ref if ch.isalpha())
+    n = 0
+    for ch in letras:
+        n = n * 26 + (ord(ch.upper()) - 64)
+    return n - 1
+
+def _xlsx_para_linhas(raw, aba='DADOS'):
+    """Lê um .xlsx (zip de XMLs) só com a stdlib e devolve as linhas da aba pedida
+    (ou a primeira, se não achar) como lista de listas de strings. Sem dependência."""
+    try:
+        z = zipfile.ZipFile(io.BytesIO(raw))
+    except Exception:
+        raise ValueError('Arquivo .xlsx inválido ou corrompido.')
+    nomes = z.namelist()
+    # workbook: nome da aba -> r:id ; primeiro como fallback
+    wb = ET.fromstring(z.read('xl/workbook.xml'))
+    alvo_rid = primeiro_rid = None
+    for sh in wb.iter(f'{_XLSX_NS}sheet'):
+        rid = sh.get(f'{_XLSX_R}id')
+        if primeiro_rid is None:
+            primeiro_rid = rid
+        if (sh.get('name') or '').strip().upper() == aba.upper():
+            alvo_rid = rid
+    rid = alvo_rid or primeiro_rid
+    # rels: r:id -> arquivo da planilha
+    rels = ET.fromstring(z.read('xl/_rels/workbook.xml.rels'))
+    target = None
+    for rel in rels.iter(f'{_XLSX_REL}Relationship'):
+        if rel.get('Id') == rid:
+            target = rel.get('Target')
+    if not target:
+        raise ValueError('Não consegui localizar a aba dentro do .xlsx.')
+    path = target if target.startswith('xl/') else 'xl/' + target.lstrip('/')
+    # textos compartilhados
+    shared = []
+    if 'xl/sharedStrings.xml' in nomes:
+        sst = ET.fromstring(z.read('xl/sharedStrings.xml'))
+        for si in sst.iter(f'{_XLSX_NS}si'):
+            shared.append(''.join(t.text or '' for t in si.iter(f'{_XLSX_NS}t')))
+    # linhas da aba
+    ws = ET.fromstring(z.read(path))
+    linhas = []
+    for row in ws.iter(f'{_XLSX_NS}row'):
+        cells, maxc = {}, -1
+        for c in row.findall(f'{_XLSX_NS}c'):
+            col = _col_idx(c.get('r') or 'A')
+            t = c.get('t')
+            v = c.find(f'{_XLSX_NS}v')
+            if t == 's':
+                val = shared[int(v.text)] if v is not None and v.text is not None else ''
+            elif t == 'inlineStr':
+                isn = c.find(f'{_XLSX_NS}is')
+                val = ''.join(tt.text or '' for tt in isn.iter(f'{_XLSX_NS}t')) if isn is not None else ''
+            else:
+                val = v.text if v is not None and v.text is not None else ''
+            cells[col] = val
+            maxc = max(maxc, col)
+        linhas.append([str(cells.get(i, '')) for i in range(maxc + 1)])
+    return linhas
 
 # ── Importação do "CADASTRO DE CENTROS DE CUSTO" (export do Fiorilli) ───────
 # CODCCUSTO é o código único do centro (1..N); DESCR é a descrição usada como nome.
@@ -1529,15 +1605,23 @@ class SGEAHandler(http.server.SimpleHTTPRequestHandler):
         self._json(200, {'inseridos': inseridos, 'atualizados': atualizados, 'ignorados': ignorados})
 
     def _import_frota(self, data):
-        """Importa a planilha CONTROLE DE FROTA (CSV). Upsert por número de frota
+        """Importa a planilha CONTROLE DE FROTA (CSV ou XLSX). Upsert por número de frota
         (idempotente). O centro de custo vem por nome; casa com o cadastro existente
         (case-insensitive) e, se criar_centros!=False, cria o que faltar."""
         csv_text = data.get('csv') or ''
-        if not csv_text.strip():
-            self._json(400, {'error': 'CSV vazio.'}); return
+        xlsx_b64 = data.get('xlsx_b64') or ''
         criar_cc = data.get('criar_centros', True)
         try:
-            registros = _parse_frota_csv(csv_text)
+            if xlsx_b64:
+                try:
+                    raw = base64.b64decode(xlsx_b64)
+                except Exception:
+                    raise ValueError('Arquivo .xlsx inválido.')
+                registros = _frota_registros(_xlsx_para_linhas(raw, 'DADOS'))
+            elif csv_text.strip():
+                registros = _parse_frota_csv(csv_text)
+            else:
+                self._json(400, {'error': 'Envie um arquivo CSV ou XLSX.'}); return
         except ValueError as e:
             self._json(400, {'error': str(e)}); return
         import_cols = ('numero', 'placa', 'marca', 'modelo', 'combustivel') + FROTA_PECAS_COLS + FROTA_DOC_COLS
