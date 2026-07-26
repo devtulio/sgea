@@ -1,12 +1,12 @@
 # SGEA — Sistema de Gestão de Estoque do Almoxarifado
 
-![Versão](https://img.shields.io/badge/versão-v0.34.1-blue) ![Tecnologia](https://img.shields.io/badge/tecnologia-Python%20%2B%20SQLite-orange) ![Licença](https://img.shields.io/badge/licença-MIT-green) ![Multiusuário](https://img.shields.io/badge/acesso-multiusuário-blueviolet) [![DOI](https://zenodo.org/badge/DOI/10.5281/zenodo.21570250.svg)](https://doi.org/10.5281/zenodo.21570250) [![CI](https://github.com/devtulio/sgea/actions/workflows/ci.yml/badge.svg)](https://github.com/devtulio/sgea/actions/workflows/ci.yml)
+![Versão](https://img.shields.io/badge/versão-v0.34.2-blue) ![Tecnologia](https://img.shields.io/badge/tecnologia-Python%20%2B%20SQLite-orange) ![Licença](https://img.shields.io/badge/licença-MIT-green) ![Multiusuário](https://img.shields.io/badge/acesso-multiusuário-blueviolet) [![DOI](https://zenodo.org/badge/DOI/10.5281/zenodo.21570250.svg)](https://doi.org/10.5281/zenodo.21570250) [![CI](https://github.com/devtulio/sgea/actions/workflows/ci.yml/badge.svg)](https://github.com/devtulio/sgea/actions/workflows/ci.yml)
 
 ## Descrição
 
 O **SGEA** é uma aplicação web multiusuário para o **Almoxarifado**, destinada ao controle de estoque de itens licitados: entradas (com ou sem pedido/licitação vinculado), saídas por centro de custo/solicitante, e rastreamento de lote e validade.
 
-O sistema nasceu para substituir uma planilha Excel usada em paralelo ao sistema oficial (Fiorilli), corrigindo três limitações dela: itens comprados por embalagem (caixa) mas retirados em unidade fracionada, ausência de controle de lote/validade, e a exigência informal de vincular toda entrada a um pedido (quando também existem compras diretas). Compartilha a arquitetura (servidor Python stdlib + SQLite + frontend single-file) com os sistemas irmãos SGCD, SGCA e SGDP.
+O sistema nasceu para substituir uma planilha Excel usada em paralelo ao sistema oficial (Fiorilli), corrigindo três limitações dela: itens comprados por embalagem (caixa) mas retirados em unidade fracionada, ausência de controle de lote/validade, e a exigência informal de vincular toda entrada a um pedido (quando também existem compras diretas). Compartilha a arquitetura (servidor Python + SQLite + frontend single-file, sem nada a instalar) com os sistemas irmãos SGCD, SGCA e SGDP.
 
 Funciona em rede local: um único computador executa o servidor e todos os usuários acessam pelo navegador via IP ou `localhost`.
 
@@ -185,7 +185,7 @@ Todos os documentos abrem em janela separada com botão "🖨 Imprimir / Salvar 
 
 ## Desenvolvimento
 
-O sistema em si continua zero-dependência (Python stdlib + HTML puro). Para quem for alterar o código, há um lint opcional que verifica variáveis indefinidas no JavaScript de `SGEA.html`:
+O sistema em si continua sem nada a instalar: Python stdlib + HTML puro, mais o **waitress** vendorizado em `waitress/` — não é biblioteca padrão, mas viaja junto do repositório, então não há passo de instalação de dependências. Para quem for alterar o código, há um lint opcional que verifica variáveis indefinidas no JavaScript de `SGEA.html`:
 
 ```bash
 npm install   # uma vez, instala apenas o ESLint (ferramenta de dev, não é usada em produção)

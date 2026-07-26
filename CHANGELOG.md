@@ -9,6 +9,14 @@
 
 ---
 
+## [0.34.2] — 2026-07-25
+
+### Documentação
+- **README:** as duas frases que ainda descreviam o sistema como "zero-dependência / Python stdlib" passam a citar o waitress vendorizado, em paridade com os sistemas irmãos.
+- **`requirements.txt`** dizia que o sistema roda inteiramente com a biblioteca padrão do Python. Desde a 0.30.0 o servidor sobe pelo **waitress**, que vem vendorizado na pasta `waitress/` do próprio projeto: nada precisa ser instalado, mas não é biblioteca padrão. O comentário passa a dizer isso — mesma correção aplicada aos quatro sistemas da família.
+
+---
+
 ## [0.34.1] — 2026-07-25
 
 ### Documentação

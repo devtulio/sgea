@@ -3,7 +3,7 @@
 <head>
 <meta charset="UTF-8">
 <meta name="viewport" content="width=device-width, initial-scale=1.0">
-<title>Manual Operacional — SGEA v0.34.1</title>
+<title>Manual Operacional — SGEA v0.34.2</title>
 <style>
   * { box-sizing: border-box; margin: 0; padding: 0; }
   body { font-family: 'Times New Roman', Times, serif; font-size: 12pt; color: #000; background: #f5f5f5; }
@@ -54,7 +54,7 @@
       size: A4;
       margin: 20mm 20mm 25mm;
       @top-center {
-        content: "SGEA v0.34.1 — Manual Operacional";
+        content: "SGEA v0.34.2 — Manual Operacional";
         font-family: 'Times New Roman', serif;
         font-size: 9pt;
         color: #666;
@@ -80,7 +80,7 @@
     <div class="cover-title">Manual Operacional</div>
     <div class="cover-subtitle">SGEA — Sistema de Gestão de Estoque do Almoxarifado</div>
     <div class="cover-system">Entradas, Saídas, Lotes/Validade e cadastros de apoio</div>
-    <div class="cover-version">Versão v0.34.1</div>
+    <div class="cover-version">Versão v0.34.2</div>
     <br>
     <div style="font-size:11pt; color:#555; line-height:1.8;">
       Aplicação web multiusuário para o Almoxarifado<br>
@@ -249,6 +249,7 @@
   <h2 id="sec15">15. Histórico de Versões</h2>
   <table>
     <tr><th>Versão</th><th>Data</th><th>Resumo</th></tr>
+    <tr><td>0.34.2</td><td>25/07/2026</td><td>Correção do <code>requirements.txt</code>, que ainda afirmava que o sistema roda só com a biblioteca padrão do Python — o servidor usa o waitress, que vem junto no projeto (nada a instalar).</td></tr>
     <tr><td>0.34.1</td><td>25/07/2026</td><td>Auditoria da documentação: manual e README alinhados ao sistema (tela de Fornecedores em tabela, backup em pacote .zip, Lixeira com Fornecedores) e passam a descrever o que faltava — ações em massa nos cadastros, painel de erros recentes, sincronização do cadastro de fornecedores e importação da Frota por .xlsx.</td></tr>
     <tr><td>0.34.0</td><td>25/07/2026</td><td><strong>Importar do Fiorilli as requisições de entrada e de saída</strong> (CSV). A entrada cria itens e lotes com validade, criando produto, fornecedor e centro de custo que faltarem; a saída baixa o estoque honrando o lote que o Fiorilli indicou e é <strong>toda-ou-nada</strong> — faltando produto ou saldo, nada é importado e o sistema lista o que impediu. As listas passam a mostrar a <strong>origem</strong> de cada lançamento (Manual, Reconciliação, Import Fiorilli) e, nas saídas, o nº da requisição. A entrada ganhou <strong>Chave de Acesso da NF-e</strong>, Nº e Data da Requisição, e o seletor de tipo virou botão segmentado.</td></tr>
         <tr><td>0.33.2</td><td>25/07/2026</td><td>Badges de DOI (Zenodo) e CI no README, em paridade com os demais sistemas.</td></tr>
