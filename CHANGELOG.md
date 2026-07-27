@@ -9,6 +9,13 @@
 
 ---
 
+## [0.35.1] — 2026-07-27
+
+### Corrigido
+- **Listas dentro das janelas de confirmação voltam a quebrar linha.** O resumo do que não pôde ser excluído numa ação em massa saía com todos os itens grudados num parágrafo só. Correção no componente compartilhado pelos quatro sistemas.
+
+---
+
 ## [0.35.0] — 2026-07-25
 
 ### Adicionado

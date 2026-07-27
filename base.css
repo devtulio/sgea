@@ -224,6 +224,9 @@ body.dark .badge-neutral { background: #323232; }
 .toast-msg { background: var(--accent); color: #fff; padding: 10px 16px; border-radius: var(--radius); font-size: .8rem; box-shadow: var(--shadow-md); animation: slideIn .2s ease; max-width: 320px; border-left: 4px solid var(--brand); white-space: pre-line; }
 .toast-msg.success { border-color: var(--success); }
 .toast-msg.error   { border-color: var(--danger); }
+/* Mesmo motivo do toast: customConfirm() escreve por textContent, então listas
+   (ex.: "não foi possível excluir: ...") só quebram linha com pre-line. */
+#confirm-msg { white-space: pre-line; }
 @keyframes slideIn { from { transform: translateX(20px); opacity: 0; } to { transform: translateX(0); opacity: 1; } }
 
 /* ── Notificações (sino) ─────────────────────────────────────── */
