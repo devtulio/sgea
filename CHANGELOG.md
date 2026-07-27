@@ -9,6 +9,16 @@
 
 ---
 
+## [0.35.2] — 2026-07-27
+
+### Alterado
+- **A importação de fornecedores por CSV passou a ser restrita ao administrador** e a gravar em lote, alinhando-se às demais importações do sistema (que já eram restritas). Os botões de importar da tela de Fornecedores e da Reconciliação deixam de aparecer para quem não é administrador.
+
+### Corrigido
+- **Reimportar o mesmo CSV de fornecedores duplicava o cadastro.** Agora casa por **CNPJ**, atualizando quem já existe (preservando certidões e sanções) em vez de criar cópias.
+
+---
+
 ## [0.35.1] — 2026-07-27
 
 ### Corrigido

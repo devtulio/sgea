@@ -122,6 +122,7 @@ valores precisam ser copiados literalmente, nunca recriados "parecidos".
 1. **Nunca declarar cor de marca fora do `<style>` específico do sistema.** `base.css` só traz um neutro de bootstrap (`#4b5563`) de propósito — cor institucional é sempre override local, e o usuário pode trocar por um dos 3 temas alternativos ou modo escuro a qualquer momento pela tela de Configurações.
 2. **Copiar valores literais deste arquivo**, nunca recriar de memória — é o motivo deste arquivo existir (ver [[feedback_paridade_visual_familia_sgcd]]).
 3. Ao adicionar um sistema novo à família ou uma tela nova a um existente, tudo que não for específico de domínio (login, Configurações→Aparência, sidebar, modais) segue este documento; lógica de negócio (SMTP, ICP-Brasil, PNCP, CRUD específico) não é coberta aqui — ver README de cada sistema.
+4. **Importação em lote: rota própria no servidor + restrita ao administrador.** Nunca implementar importação como um laço no navegador sobre as rotas de criação/edição — isso deixa a operação sem transação (cai no meio e grava metade), sem idempotência (reimportar duplica) e **sem como restringir**, já que a rota é a mesma que o usuário comum usa para trabalhar. O botão que abre a importação leva `class="admin-only"`. Padronizado em 2026-07-27, depois de encontrar os quatro sistemas com regras diferentes entre si. Exceção deliberada: o *Alimentar do Fiorilli* do SGCA, que só atualiza as quantidades de uma ata já aberta na tela — é edição, não importação.
 
 ## Manutenção
 

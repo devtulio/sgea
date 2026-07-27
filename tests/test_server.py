@@ -921,6 +921,45 @@ class TestImportEntradaFiorilli(SGEATestCase):
         self.assertEqual(self._estoque('088.002.001'), 10)  # não dobrou
 
 
+class TestImportFornecedoresSoAdmin(SGEATestCase):
+    """O CSV de fornecedores passou a gravar pela rota /import (admin, em lote,
+    upsert por CNPJ). Antes ia pela rota comum de criação, uma linha por vez."""
+
+    def _payload(self, cnpj, razao):
+        return {'fornecedores': [{'cnpj': cnpj, 'razao_social': razao, 'razao': razao}]}
+
+    def test_usuario_comum_nao_importa(self):
+        admin = self.login()
+        st, u = self.request('POST', '/api/usuarios', {
+            'username': 'u_import_sgea', 'nome': 'Comum', 'password': 'senha123',
+            'senha': 'senha123', 'admin': False}, token=admin)
+        self.assertIn(st, (200, 201), u)
+        comum = self.request('POST', '/api/auth/login',
+                             {'username': 'u_import_sgea', 'password': 'senha123'})[1]['token']
+        # o DB é compartilhado pelo módulo e outro teste conta os usuários — some
+        # com este assim que ele cumpre o papel
+        self.addCleanup(lambda: self._remover_usuario('u_import_sgea'))
+        st, d = self.request('POST', '/api/fornecedores/import',
+                             self._payload('44555666000199', 'Fornecedor CSV SGEA'), token=comum)
+        self.assertEqual(st, 403, d)
+
+    def _remover_usuario(self, username):
+        with server.get_db() as conn:
+            conn.execute('DELETE FROM usuarios WHERE username=?', (username,))
+
+    def test_reimportar_nao_duplica(self):
+        admin = self.login()
+        payload = self._payload('77666555000144', 'Fornecedor Repetido SGEA')
+        st, d1 = self.request('POST', '/api/fornecedores/import', payload, token=admin)
+        self.assertEqual(st, 200, d1)
+        st, d2 = self.request('POST', '/api/fornecedores/import', payload, token=admin)
+        self.assertEqual(st, 200, d2)
+        st, lista = self.request('GET', '/api/fornecedores', token=admin)
+        iguais = [f for f in lista['items']
+                  if ''.join(c for c in (f.get('cnpj') or '') if c.isdigit()) == '77666555000144']
+        self.assertEqual(len(iguais), 1)
+
+
 class TestBulkProdutosPedidos(SGEATestCase):
     """Ações em massa de Produtos e Pedidos."""
 

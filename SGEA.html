@@ -360,7 +360,7 @@
       <h2>Reconciliação com o Fiorilli</h2>
       <div class="view-actions">
         <input type="file" id="recon-file" accept=".csv,text/csv" style="display:none" onchange="_reconImportar(this.files[0]); this.value='';">
-        <button class="btn btn-primary btn-sm" onclick="document.getElementById('recon-file').click()">⬆️ Importar CSV do Fiorilli</button>
+        <button class="btn btn-primary btn-sm admin-only" onclick="document.getElementById('recon-file').click()">⬆️ Importar CSV do Fiorilli</button>
         <button class="btn btn-outline btn-sm hidden" id="recon-btn-cadastrar" onclick="abrirCadastrarRecon()">➕ Cadastrar itens do Fiorilli</button>
         <button class="btn btn-outline btn-sm hidden" id="recon-btn-exportar" onclick="_reconExportarPendencias()">⬇️ Exportar pendências</button>
       </div>
@@ -424,7 +424,7 @@
           <svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><circle cx="12" cy="12" r="10"/><line x1="12" y1="8" x2="12" y2="12"/><line x1="12" y1="16" x2="12.01" y2="16"/></svg>
           Relatório de Sanções
         </button>
-        <button class="btn btn-outline" onclick="abrirModalCsv()" title="Importar fornecedores de arquivo CSV">
+        <button class="btn btn-outline admin-only" onclick="abrirModalCsv()" title="Importar fornecedores de arquivo CSV (restrito ao administrador)">
           <svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><path d="M21 15v4a2 2 0 0 1-2 2H5a2 2 0 0 1-2-2v-4"/><polyline points="17 8 12 3 7 8"/><line x1="12" y1="3" x2="12" y2="15"/></svg>
           Importar CSV
         </button>
@@ -1349,7 +1349,7 @@
 // ══════════════════════════════════════════════════════════════
 // API / SESSÃO
 // ══════════════════════════════════════════════════════════════
-const SGEA_VERSION = '0.35.1';
+const SGEA_VERSION = '0.35.2';
 document.title = `SGEA v${SGEA_VERSION}`;
 
 let _apiToken = localStorage.getItem('sgea-token') || null;
@@ -3796,6 +3796,8 @@ async function importarCsv() {
   let ok = 0, erros = 0;
   const bar = document.getElementById('csv-progress-bar');
   const msg = document.getElementById('csv-progress-msg');
+
+  const preparados = [];
   for (let i = 0; i < _csvRows.length; i++) {
     const r = _csvRows[i];
     bar.style.width = `${Math.round((i / _csvRows.length) * 100)}%`;
@@ -3822,13 +3824,25 @@ async function importarCsv() {
       if (consultar && validarCnpj(digits)) {
         try { const { data } = await fetchCnpjData(digits); forn = { ...forn, ...data, id: digits }; } catch { /* ignora erro de CNPJ individual */ }
       }
-      await criarFornecedor(forn);
+      preparados.push(forn);
       ok++;
     } catch { erros++; }
   }
+  // Consulta de CNPJ fica no navegador (progresso + conexão do usuário); a
+  // gravação vai num lote só para /api/fornecedores/import, que é restrita ao
+  // administrador, roda em transação e casa por CNPJ. Antes cada linha ia pela
+  // rota comum de criação: qualquer usuário importava e reimportar duplicava.
+  msg.textContent = `Gravando ${preparados.length} fornecedor(es)…`;
+  let resumo = null;
+  if (preparados.length) {
+    const r = await API.post('/api/fornecedores/import', { fornecedores: preparados });
+    resumo = await API.json(r);
+    if (!r || !r.ok) { msg.textContent = resumo?.error || 'Falha ao importar.'; toast(resumo?.error || 'Falha ao importar.', 'error', 9000); return; }
+  }
   bar.style.width = '100%';
-  msg.textContent = `Concluído! ${ok} importado(s)${erros ? ', ' + erros + ' erro(s)' : ''}.`;
-  if (ok) await _auditEvento('FORNECEDOR_CRIADO', `Importação CSV: ${ok} fornecedor(es)`);
+  const detalhe = `${resumo?.novos || 0} novo(s), ${resumo?.atualizados || 0} atualizado(s)`;
+  msg.textContent = `Concluído! ${detalhe}${erros ? ', ' + erros + ' erro(s)' : ''}.`;
+  if (ok) await _auditEvento('FORNECEDOR_CRIADO', `Importação CSV: ${detalhe}`);
   await renderFornecedores();
   setTimeout(() => { fecharModalCsv(); toast(`${ok} fornecedor(es) importado(s).`, 'success'); }, 1400);
 }
