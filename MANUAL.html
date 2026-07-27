@@ -3,7 +3,7 @@
 <head>
 <meta charset="UTF-8">
 <meta name="viewport" content="width=device-width, initial-scale=1.0">
-<title>Manual Operacional — SGEA v0.34.2</title>
+<title>Manual Operacional — SGEA v0.35.0</title>
 <style>
   * { box-sizing: border-box; margin: 0; padding: 0; }
   body { font-family: 'Times New Roman', Times, serif; font-size: 12pt; color: #000; background: #f5f5f5; }
@@ -54,7 +54,7 @@
       size: A4;
       margin: 20mm 20mm 25mm;
       @top-center {
-        content: "SGEA v0.34.2 — Manual Operacional";
+        content: "SGEA v0.35.0 — Manual Operacional";
         font-family: 'Times New Roman', serif;
         font-size: 9pt;
         color: #666;
@@ -80,7 +80,7 @@
     <div class="cover-title">Manual Operacional</div>
     <div class="cover-subtitle">SGEA — Sistema de Gestão de Estoque do Almoxarifado</div>
     <div class="cover-system">Entradas, Saídas, Lotes/Validade e cadastros de apoio</div>
-    <div class="cover-version">Versão v0.34.2</div>
+    <div class="cover-version">Versão v0.35.0</div>
     <br>
     <div style="font-size:11pt; color:#555; line-height:1.8;">
       Aplicação web multiusuário para o Almoxarifado<br>
@@ -107,6 +107,7 @@
     <div class="toc-item h3"><a href="#sec7-1">7.1. Importar a requisição de saída do Fiorilli</a></div>
     <div class="toc-item h2"><a href="#sec8">8. Alertas de Validade</a></div>
     <div class="toc-item h2"><a href="#sec9">9. Cadastros de Apoio</a></div>
+    <div class="toc-item h3"><a href="#sec9-1">9.1. Importar o pedido do Fiorilli</a></div>
     <div class="toc-item h2"><a href="#sec10">10. Fornecedores</a></div>
     <div class="toc-item h2"><a href="#sec11">11. Configurações</a></div>
     <div class="toc-item h2"><a href="#sec12">12. Auditoria e Lixeira</a></div>
@@ -159,6 +160,8 @@
     <li><strong>Saldo Inicial</strong> — só aparece ao criar um produto novo; usado para lançar um saldo de partida (ex.: ao migrar de outro controle), gerando um lote sem data de validade</li>
   </ul>
   <p>Clicar em uma linha da lista de produtos expande um painel com o detalhamento por lote (número do lote, validade, quantidade recebida e saldo atual), na mesma ordem em que serão consumidos numa saída (lotes com validade mais próxima primeiro). Nas listas de <strong>Estoque</strong>, <strong>Entradas</strong> e <strong>Saídas</strong>, <strong>clicar no título de uma coluna ordena por ela</strong> (clicar de novo inverte); a coluna Estoque ordena por quantidade.</p>
+  <p>A lista de Estoque aceita <strong>ações em massa</strong>: a primeira coluna traz uma caixa de seleção por linha e um "selecionar todos" no cabeçalho, que marca apenas o que está visível (respeitando a busca ativa). Com produtos marcados, aparece uma barra com <strong>Excluir</strong> — ao final, um resumo diz o que foi excluído e o que ficou bloqueado, com o motivo (lotes, entradas, saídas ou itens de pedido vinculados) —, <strong>Ativar</strong>, <strong>Inativar</strong>, <strong>Exportar CSV</strong> apenas dos selecionados e <strong>Reatribuir centro de custo</strong>, que troca de uma vez o centro de todos os marcados. Produtos inativos continuam na lista, identificados por um selo.</p>
+  <div class="dica">A ação em massa altera só a situação (ativo/inativo) e o centro de custo. Unidade, embalagem e código Fiorilli mudam o cálculo do estoque e continuam sendo editados produto a produto, de propósito.</div>
   <div class="nota">Um produto só pode ser excluído se não tiver nenhum lote ou movimentação vinculada — o sistema bloqueia a exclusão nesse caso para preservar o histórico.</div>
 
   <h2 id="sec6">6. Entradas</h2>
@@ -198,6 +201,13 @@
   <p>A tela de <strong>Frota</strong> tem um <strong>Importar planilha</strong> equivalente (administradores): ele lê a planilha <strong>CONTROLE DE FROTA</strong> — com o cadastro do veículo, os dados de identificação e todo o catálogo de peças — e cadastra a frota de uma vez. Aceita o arquivo <strong>.xlsx</strong> direto (lê a aba <strong>DADOS</strong> automaticamente, sem precisar exportar para CSV) ou o <strong>.csv</strong> exportado dela; <strong>deduplica por número de frota</strong> e vincula o <strong>Centro de Custo pelo código</strong> (formato "N - NOME"), com fallback pelo nome, criando os que ainda não existirem (isso pode ser desligado na própria janela). Também é <strong>idempotente</strong> e <strong>não apaga o que já está preenchido</strong>: reimportar atualiza o veículo já cadastrado (mesmo número), insere só os novos, e uma coluna em branco na planilha não zera o dado já cadastrado.</p>
   <p><strong>Fornecedores</strong> tem cadastro próprio, mais completo — ver seção seguinte.</p>
   <p><strong>Pedidos</strong> vão além do cadastro simples: cada pedido (número + código de licitação) agrupa <strong>vários produtos</strong>, cada um com a quantidade pedida. Ao registrar uma Entrada vinculada a um pedido, o sistema abate automaticamente a quantidade recebida dos itens correspondentes — a quantidade recebida nunca é digitada nem armazenada à parte, é sempre calculada a partir das entradas reais. Assim cada item mostra seu <strong>saldo em aberto</strong> e um <strong>status</strong> (aberto, parcial, atendido) e o pedido mostra um status agregado. É possível <strong>cancelar</strong> um pedido inteiro ou <strong>anular o saldo</strong> de um item específico (quando o restante não vai mais ser entregue), sem afetar o que já foi recebido.</p>
+  <p>Cada pedido guarda ainda a <strong>previsão de entrega</strong> (que aparece na lista, para cobrar o fornecedor atrasado) e, por item, o <strong>valor unitário</strong> e a <strong>marca</strong> arrematados — úteis para conferir a nota fiscal na hora de lançar a entrada. A lista de Pedidos também aceita <strong>ações em massa</strong>: com pedidos marcados, a barra oferece <strong>Cancelar pedidos</strong> (que anula o saldo pendente de cada item, ignorando os já atendidos ou cancelados e informando quais foram ignorados) e <strong>Exportar CSV</strong> dos selecionados.</p>
+
+  <h3 id="sec9-1">9.1. Importar o pedido do Fiorilli</h3>
+  <p>O administrador pode lançar um pedido inteiro a partir do arquivo de <strong>pedido de compra</strong> exportado do Fiorilli (CSV). Na tela de Pedidos, use <strong>⬆️ Importar do Fiorilli</strong> e escolha o arquivo: o sistema cria o pedido com número, data, previsão de entrega, licitação, fornecedor e todos os itens, com valor unitário e marca. Fornecedor (pelo CNPJ) e produtos (pelo código Fiorilli) que ainda não existirem são criados a partir do próprio arquivo.</p>
+  <p>Duas conversões acontecem sozinhas e vale saber que existem. O Fiorilli informa a quantidade na <strong>unidade licitada</strong> (caixas, por exemplo) e o SGEA controla tudo em <strong>unidade de consumo</strong>: o sistema multiplica pela quantidade por embalagem do produto — 5 caixas de 100 viram 500 unidades — e divide o valor unitário na mesma proporção, para que o preço fique comparável ao custo do lote na entrada. E quando o mesmo produto aparece em mais de um item da licitação, as quantidades são <strong>somadas</strong> num único item do pedido.</p>
+  <div class="dica">O número do pedido é a chave: importar o mesmo arquivo de novo não duplica nada.</div>
+  <div class="aviso">Se o pedido já tiver entregas registradas <strong>no Fiorilli</strong>, ele nasce aqui com o saldo cheio — o recebido do SGEA vem sempre das entradas lançadas neste sistema. A importação avisa quais itens estão nessa situação, para você lançar a entrada correspondente e o saldo ficar correto.</div>
 
   <h2 id="sec10">10. Fornecedores</h2>
   <p>A lista de fornecedores aparece em <strong>tabela</strong> — colunas Razão Social, CNPJ e Situação, que ordenam ao clicar no cabeçalho, com <strong>seleção em massa</strong> para enviar vários de uma vez à Lixeira. Clicar numa linha (ou no botão <strong>Editar</strong>) abre o cadastro completo numa <strong>janela</strong>, com as abas Dados, Certidões e Sanções.</p>
@@ -249,6 +259,7 @@
   <h2 id="sec15">15. Histórico de Versões</h2>
   <table>
     <tr><th>Versão</th><th>Data</th><th>Resumo</th></tr>
+    <tr><td>0.35.0</td><td>25/07/2026</td><td><strong>Importação do pedido de compra do Fiorilli</strong> (CSV), com previsão de entrega, valor unitário e marca por item, conversão automática da unidade licitada para a de consumo e soma dos itens repetidos. <strong>Ações em massa no Estoque</strong> (excluir, ativar, inativar, exportar CSV e reatribuir centro de custo) <strong>e em Pedidos</strong> (cancelar em lote e exportar CSV).</td></tr>
     <tr><td>0.34.2</td><td>25/07/2026</td><td>Correção do <code>requirements.txt</code>, que ainda afirmava que o sistema roda só com a biblioteca padrão do Python — o servidor usa o waitress, que vem junto no projeto (nada a instalar).</td></tr>
     <tr><td>0.34.1</td><td>25/07/2026</td><td>Auditoria da documentação: manual e README alinhados ao sistema (tela de Fornecedores em tabela, backup em pacote .zip, Lixeira com Fornecedores) e passam a descrever o que faltava — ações em massa nos cadastros, painel de erros recentes, sincronização do cadastro de fornecedores e importação da Frota por .xlsx.</td></tr>
     <tr><td>0.34.0</td><td>25/07/2026</td><td><strong>Importar do Fiorilli as requisições de entrada e de saída</strong> (CSV). A entrada cria itens e lotes com validade, criando produto, fornecedor e centro de custo que faltarem; a saída baixa o estoque honrando o lote que o Fiorilli indicou e é <strong>toda-ou-nada</strong> — faltando produto ou saldo, nada é importado e o sistema lista o que impediu. As listas passam a mostrar a <strong>origem</strong> de cada lançamento (Manual, Reconciliação, Import Fiorilli) e, nas saídas, o nº da requisição. A entrada ganhou <strong>Chave de Acesso da NF-e</strong>, Nº e Data da Requisição, e o seletor de tipo virou botão segmentado.</td></tr>

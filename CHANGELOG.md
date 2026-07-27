@@ -9,6 +9,21 @@
 
 ---
 
+## [0.35.0] — 2026-07-25
+
+### Adicionado
+- **Importar o pedido de compra do Fiorilli.** Na tela de Pedidos, o administrador importa o CSV exportado do Fiorilli e o sistema cria o pedido inteiro — número, data, previsão de entrega, licitação, fornecedor e itens. Fornecedor (por CNPJ) e produtos (por código Fiorilli) que faltarem são criados a partir do próprio arquivo, e reimportar o mesmo pedido não duplica nada.
+- **A quantidade é convertida automaticamente.** O Fiorilli informa na unidade licitada e o SGEA controla em unidade de consumo: 5 caixas de 100 viram 500 unidades, e o valor unitário é dividido na mesma proporção, para ficar comparável ao custo do lote na entrada. Itens repetidos do mesmo produto são somados num item só.
+- **Aviso de entrega já registrada no Fiorilli.** Se o pedido importado já tiver recebimento lá, ele nasce aqui com saldo cheio (o recebido do SGEA vem sempre das entradas lançadas neste sistema) — a importação lista esses itens para você lançar a entrada correspondente.
+- **O pedido passa a guardar previsão de entrega** e, por item, **valor unitário e marca** — disponíveis também no cadastro manual, e exibidos na lista e na janela do pedido.
+- **Ações em massa no Estoque:** seleção por linha e "selecionar todos" (respeitando a busca), com Excluir em lote (com resumo do que ficou bloqueado e por quê), Ativar, Inativar, Exportar CSV e Reatribuir centro de custo.
+- **Ações em massa em Pedidos:** Cancelar em lote — anula o saldo pendente de cada item e ignora os já atendidos ou cancelados, informando quais — e Exportar CSV dos selecionados.
+
+### Alterado
+- A geração de CSV das exportações e o seletor de centro de custo das ações em massa passaram a ser compartilhados pelas telas, em vez de repetidos em cada uma.
+
+---
+
 ## [0.34.2] — 2026-07-25
 
 ### Documentação

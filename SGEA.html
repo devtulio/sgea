@@ -282,6 +282,15 @@
         <button class="btn btn-primary" onclick="openProdutoModal()">+ Novo Produto</button>
       </div>
     </div>
+    <div id="prod-bulk-bar" class="bulk-bar" style="display:none" role="region" aria-label="Ações em massa">
+      <span id="prod-bulk-count" class="bulk-count"></span>
+      <button class="btn btn-danger btn-sm" onclick="_prodBulkExcluir()">Excluir</button>
+      <button class="btn btn-outline btn-sm" onclick="_prodBulkAtivo(true)">Ativar</button>
+      <button class="btn btn-outline btn-sm" onclick="_prodBulkAtivo(false)">Inativar</button>
+      <button class="btn btn-outline btn-sm" onclick="_prodBulkExport()">Exportar CSV</button>
+      <button class="btn btn-outline btn-sm" onclick="_prodBulkReatribuirCC()">Reatribuir centro de custo</button>
+      <button class="btn btn-ghost btn-sm" onclick="_prodSel=new Set();renderProdutos()">Limpar seleção</button>
+    </div>
     <div id="produtos-list"></div>
   </div>
 
@@ -290,8 +299,16 @@
     <div class="dash-top">
       <h2>Pedidos</h2>
       <div class="view-actions">
+        <input type="file" id="pedido-import-file" accept=".csv,text/csv" style="display:none" onchange="importarPedidoFiorilli(this.files[0]); this.value='';">
+        <button class="btn btn-ghost" id="btn-import-pedido" style="display:none" onclick="document.getElementById('pedido-import-file').click()">⬆️ Importar do Fiorilli</button>
         <button class="btn btn-primary" onclick="openPedidoModal()">+ Novo Pedido</button>
       </div>
+    </div>
+    <div id="ped-bulk-bar" class="bulk-bar" style="display:none" role="region" aria-label="Ações em massa">
+      <span id="ped-bulk-count" class="bulk-count"></span>
+      <button class="btn btn-danger btn-sm" onclick="_pedBulkCancelar()">Cancelar pedidos</button>
+      <button class="btn btn-outline btn-sm" onclick="_pedBulkExport()">Exportar CSV</button>
+      <button class="btn btn-ghost btn-sm" onclick="_pedSel=new Set();renderPedidos()">Limpar seleção</button>
     </div>
     <div id="pedidos-list"></div>
   </div>
@@ -1214,6 +1231,7 @@
         <div class="info-field"><label for="pf-licitacao">Código da Licitação</label><input type="text" id="pf-licitacao"></div>
         <div class="info-field"><label for="pf-data">Data do Pedido</label><input type="date" id="pf-data"></div>
         <div class="info-field"><label for="pf-fornecedor">Fornecedor</label><select id="pf-fornecedor"></select></div>
+        <div class="info-field"><label for="pf-data-entrega">Previsão de Entrega</label><input type="date" id="pf-data-entrega"></div>
       </div>
       <div id="pf-status-row" style="display:none;align-items:center;gap:10px;margin-bottom:14px">
         <span style="font-size:.72rem;font-weight:700;text-transform:uppercase;color:var(--gray-500)">Status</span>
@@ -1331,7 +1349,7 @@
 // ══════════════════════════════════════════════════════════════
 // API / SESSÃO
 // ══════════════════════════════════════════════════════════════
-const SGEA_VERSION = '0.34.2';
+const SGEA_VERSION = '0.35.0';
 document.title = `SGEA v${SGEA_VERSION}`;
 
 let _apiToken = localStorage.getItem('sgea-token') || null;
@@ -1899,41 +1917,52 @@ async function bulkAtivo(v) {
   toast(`${d.atualizados || 0} registro(s) ${v ? 'ativado(s)' : 'inativado(s)'}.`, 'success');
 }
 
+// Gera e baixa um CSV a partir das linhas já montadas. BOM + CRLF: o Excel em
+// português abre assim sem quebrar acento nem juntar tudo numa coluna.
+function _csvDownload(linhas, nomeArquivo) {
+  const blob = new Blob(['﻿' + linhas.join('\r\n')], { type: 'text/csv;charset=utf-8' });
+  const a = document.createElement('a');
+  a.href = URL.createObjectURL(blob);
+  a.download = nomeArquivo;
+  a.click();
+  URL.revokeObjectURL(a.href);
+}
+const _csvEsc = v => { const t = String(v ?? ''); return /[";\n]/.test(t) ? `"${t.replace(/"/g, '""')}"` : t; };
+
 function bulkExport() {
   const itens = _crudSelItens();
   if (!itens.length) return;
   const cfg = CRUD_MODULES[_crudAtual];
   const cols = cfg.columns;
   const val = (c, i) => c.kfn ? c.kfn(i) : (i[c.k] ?? '');
-  const escCsv = s => { s = String(s ?? ''); return /[";\n]/.test(s) ? `"${s.replace(/"/g, '""')}"` : s; };
-  const linhas = [cols.map(c => escCsv(c.h)).join(';')];
-  itens.forEach(i => linhas.push(cols.map(c => escCsv(val(c, i))).join(';')));
-  const blob = new Blob(['﻿' + linhas.join('\r\n')], { type: 'text/csv;charset=utf-8' });
-  const a = document.createElement('a');
-  a.href = URL.createObjectURL(blob);
-  a.download = `${cfg.titulo.replace(/\s+/g, '_')}_selecionados.csv`;
-  a.click();
-  URL.revokeObjectURL(a.href);
+  const linhas = [cols.map(c => _csvEsc(c.h)).join(';')];
+  itens.forEach(i => linhas.push(cols.map(c => _csvEsc(val(c, i))).join(';')));
+  _csvDownload(linhas, `${cfg.titulo.replace(/\s+/g, '_')}_selecionados.csv`);
   toast(`${itens.length} registro(s) exportado(s).`, 'success');
 }
 
-async function bulkReatribuirCC() {
-  const ids = _crudSelIds();
-  if (!ids.length) return;
+// Abre o seletor de centro de custo (modal #bulkcc-overlay) e resolve com o id
+// escolhido, ou null se o usuário desistir. Usado pelos cadastros e por Produtos.
+async function _escolherCentroCusto(mensagem) {
   const cc = await _fetchList('centros-custo');
+  if (!cc.length) { toast('Nenhum centro de custo cadastrado.', 'error', 9000); return null; }
   const sel = document.getElementById('bulkcc-select');
   sel.innerHTML = cc.map(c => `<option value="${c.id}">${esc(c.nome || ('#' + c.id))}</option>`).join('');
-  if (!cc.length) { toast('Nenhum centro de custo cadastrado.', 'error', 9000); return; }
-  document.getElementById('bulkcc-msg').textContent =
-    `Definir o centro de custo de ${ids.length} registro(s) selecionado(s):`;
+  document.getElementById('bulkcc-msg').textContent = mensagem;
   const overlay = document.getElementById('bulkcc-overlay');
   overlay.classList.remove('hidden');
-  const novoId = await new Promise(res => {
+  return new Promise(res => {
     const okBtn = document.getElementById('bulkcc-ok'), cancelBtn = document.getElementById('bulkcc-cancel');
     const fim = v => { overlay.classList.add('hidden'); okBtn.onclick = cancelBtn.onclick = null; res(v); };
     okBtn.onclick = () => fim(sel.value);
     cancelBtn.onclick = () => fim(null);
   });
+}
+
+async function bulkReatribuirCC() {
+  const ids = _crudSelIds();
+  if (!ids.length) return;
+  const novoId = await _escolherCentroCusto(`Definir o centro de custo de ${ids.length} registro(s) selecionado(s):`);
   if (novoId == null) return;
   const r = await API.post(`/api/${_crudAtual}/bulk-update`, { ids, patch: { centro_custo_id: Number(novoId) } });
   const d = await API.json(r);
@@ -2396,7 +2425,7 @@ async function renderProdutos() {
     { h: 'Ações', noSort: true, cls: 'col-actions' },
   ];
   el.innerHTML = `<div class="list-table-wrap"><table class="list-table">
-    <thead>${_tblTh('produtos', cols)}</thead>
+    <thead>${_tblTh('produtos', cols).replace('<tr>', '<tr><th class="col-check"><input type="checkbox" id="prod-check-all" onchange="_prodSelAll(this.checked)" aria-label="Selecionar todos os produtos visíveis"></th>')}</thead>
     <tbody>${_tblApply('produtos', cols, items).map(p => {
       let validadeBadge = '<span class="badge badge-neutral">—</span>';
       if (p.proxima_validade) {
@@ -2404,7 +2433,8 @@ async function renderProdutos() {
         else validadeBadge = `<span class="badge badge-neutral">${fmtDate(p.proxima_validade)}</span>`;
       }
       return `<tr class="clickable" onclick="_toggleLotes('${p.id}', this)" role="button" tabindex="0">
-        <td>${esc(p.nome)}</td>
+        <td class="col-check" onclick="event.stopPropagation()"><input type="checkbox" class="prod-row-check" data-id="${p.id}" ${_prodSel.has(String(p.id)) ? 'checked' : ''} onchange="_prodSelToggle('${p.id}', this.checked)" aria-label="Selecionar produto"></td>
+        <td>${esc(p.nome)}${p.ativo ? '' : ' <span class="badge badge-neutral">Inativo</span>'}</td>
         <td>${esc(p.codigo_fiorilli)}</td>
         <td>${esc(p.centro_custo_nome || '—')}</td>
         <td>${p.estoque_fisico} ${esc(p.unidade_consumo)}</td>
@@ -2414,11 +2444,97 @@ async function renderProdutos() {
           <button class="btn btn-ghost btn-sm" onclick="openProdutoModal('${p.id}')">Editar</button>
           <button class="btn btn-ghost btn-sm" onclick="deleteProduto('${p.id}')">Excluir</button>
         </td>
-      </tr><tr class="lotes-row hidden" id="lotes-row-${p.id}"><td colspan="7" style="padding:0"></td></tr>`;
+      </tr><tr class="lotes-row hidden" id="lotes-row-${p.id}"><td colspan="8" style="padding:0"></td></tr>`;
     }).join('')}</tbody>
   </table></div>`;
+  _prodUpdateBulk();
 }
 const _debouncedRenderProdutos = _debounce(renderProdutos, 250);
+
+// ── Ações em massa dos produtos (mesmo padrão dos cadastros e de fornecedores) ──
+let _prodSel = new Set();
+const _prodSelIds = () => [..._prodSel];
+function _prodSelToggle(id, on) { if (on) _prodSel.add(String(id)); else _prodSel.delete(String(id)); _prodUpdateBulk(); }
+function _prodSelAll(on) {
+  document.querySelectorAll('#produtos-list .prod-row-check').forEach(cb => {
+    cb.checked = on;
+    if (on) _prodSel.add(String(cb.dataset.id)); else _prodSel.delete(String(cb.dataset.id));
+  });
+  _prodUpdateBulk();
+}
+function _prodUpdateBulk() {
+  const bar = document.getElementById('prod-bulk-bar');
+  if (!bar) return;
+  // a seleção só vale para o que está na tela: filtrar a busca descarta o resto
+  const visiveis = [...document.querySelectorAll('#produtos-list .prod-row-check')];
+  const idsVisiveis = new Set(visiveis.map(cb => String(cb.dataset.id)));
+  _prodSel = new Set([..._prodSel].filter(id => idsVisiveis.has(id)));
+  const n = _prodSel.size;
+  bar.style.display = n ? 'flex' : 'none';
+  document.getElementById('prod-bulk-count').textContent = `${n} selecionado${n === 1 ? '' : 's'}`;
+  const all = document.getElementById('prod-check-all');
+  if (all) { all.checked = n > 0 && n === visiveis.length; all.indeterminate = n > 0 && n < visiveis.length; }
+}
+const _prodNome = id => (_produtosCache.find(p => String(p.id) === String(id)) || {}).nome || id;
+
+async function _prodBulkExcluir() {
+  const ids = _prodSelIds();
+  if (!ids.length) return;
+  const ok = await customConfirm(
+    `Excluir ${ids.length} produto(s)? Esta ação é permanente (não vai para a Lixeira). Produtos com lote ou movimentação não são excluídos.`,
+    { title: 'Excluir produtos', icon: '⚠️', okLabel: 'Excluir', okClass: 'btn-danger' });
+  if (!ok) return;
+  const r = await API.post('/api/produtos/bulk-delete', { ids });
+  const d = await API.json(r);
+  if (!r || !r.ok) { toast(d?.error || 'Falha na exclusão em massa.', 'error', 9000); return; }
+  const nExc = (d.excluidos || []).length, bloq = d.bloqueados || [];
+  await _auditEvento('PRODUTO_EXCLUIDO', `${nExc} produto(s) excluído(s) em massa`);
+  _prodSel = new Set();
+  await renderProdutos();
+  if (!bloq.length) { toast(`${nExc} produto(s) excluído(s).`, 'success'); return; }
+  await customConfirm(
+    `${nExc} excluído(s). ${bloq.length} não pôde(ram) ser excluído(s):\n\n` +
+    bloq.map(b => `• ${_prodNome(b.id)}: ${b.motivo}`).join('\n'),
+    { title: 'Exclusão parcial', icon: 'ℹ️', okLabel: 'Entendi', cancelLabel: 'Fechar' });
+}
+
+async function _prodBulkAtivo(ativo) {
+  const ids = _prodSelIds();
+  if (!ids.length) return;
+  const r = await API.post('/api/produtos/bulk-update', { ids, patch: { ativo } });
+  const d = await API.json(r);
+  if (!r || !r.ok) { toast(d?.error || 'Falha ao atualizar.', 'error'); return; }
+  await _auditEvento('PRODUTO_EDITADO', `${d.atualizados} produto(s) ${ativo ? 'ativado(s)' : 'inativado(s)'} em massa`);
+  _prodSel = new Set();
+  toast(`${d.atualizados} produto(s) ${ativo ? 'ativado(s)' : 'inativado(s)'}.`, 'success');
+  renderProdutos();
+}
+
+async function _prodBulkReatribuirCC() {
+  const ids = _prodSelIds();
+  if (!ids.length) return;
+  // mesmo seletor usado pelos cadastros (modal #bulkcc-overlay), em vez de um prompt
+  const cc = await _escolherCentroCusto(`Definir o centro de custo de ${ids.length} produto(s) selecionado(s):`);
+  if (cc == null) return;
+  const r = await API.post('/api/produtos/bulk-update', { ids, patch: { centro_custo_id: Number(cc) } });
+  const d = await API.json(r);
+  if (!r || !r.ok) { toast(d?.error || 'Falha ao reatribuir.', 'error'); return; }
+  await _auditEvento('PRODUTO_EDITADO', `${d.atualizados} produto(s) reatribuído(s) de centro de custo em massa`);
+  _prodSel = new Set();
+  toast(`${d.atualizados} produto(s) reatribuído(s).`, 'success');
+  renderProdutos();
+}
+
+function _prodBulkExport() {
+  const ids = new Set(_prodSelIds());
+  const sel = _produtosCache.filter(p => ids.has(String(p.id)));
+  if (!sel.length) return;
+  const cab = ['codigo_fiorilli', 'nome', 'centro_custo_nome', 'unidade_consumo', 'unidade_licitada',
+               'qtd_por_embalagem', 'estoque_fisico', 'estoque_financeiro', 'ativo'];
+  const linhas = [cab.join(';'), ...sel.map(p => cab.map(c => _csvEsc(p[c])).join(';'))];
+  _csvDownload(linhas, `produtos_${new Date().toISOString().slice(0, 10)}.csv`);
+  toast(`${sel.length} produto(s) exportado(s).`, 'success');
+}
 
 async function _toggleLotes(pid, trEl) {
   const row = document.getElementById(`lotes-row-${pid}`);
@@ -3742,20 +3858,111 @@ function _pedidoStatusBadge(status) {
   return `<span class="badge ${cls}">${esc(label)}</span>`;
 }
 
+function _pedidoOrigemBadge(p) {
+  return p.origem === 'fiorilli'
+    ? '<span class="badge badge-neutral">Import Fiorilli</span>'
+    : '<span class="badge badge-ok">Manual</span>';
+}
+
+async function importarPedidoFiorilli(file) {
+  if (!file) return;
+  let csv;
+  try { csv = await file.text(); } catch { toast('Não consegui ler o arquivo.', 'error'); return; }
+  const r = await API.post('/api/pedidos/import', { csv });
+  const d = await API.json(r);
+  if (!r || !r.ok) { toast(d?.error || 'Falha ao importar.', 'error', 9000); return; }
+  await _auditEvento('PEDIDO_IMPORTADO', `Importação de pedidos do Fiorilli: ${d.pedidos} pedido(s), ${d.itens} item(ns)`, null);
+  let msg = `${d.pedidos} pedido(s) importado(s), ${d.itens} item(ns)`;
+  if (d.produtos_criados) msg += `; ${d.produtos_criados} produto(s) criado(s)`;
+  if (d.fornecedores_criados) msg += `; ${d.fornecedores_criados} fornecedor(es) criado(s)`;
+  if (d.ja_existentes) msg += `; ${d.ja_existentes} já existia(m)`;
+  if (d.itens_pulados) msg += `; ${d.itens_pulados} item(ns) pulado(s)`;
+  // o Fiorilli pode mandar pedido já parcialmente entregue lá; aqui o recebido vem
+  // das entradas, então o pedido nasce com saldo cheio — avisar para não passar batido
+  const av = d.com_entrega_no_fiorilli || [];
+  if (av.length) msg += '\nAtenção — entrega já registrada no Fiorilli, lance a entrada aqui:\n' + av.slice(0, 8).join('\n');
+  toast(msg + '.', av.length ? '' : 'success', av.length ? 15000 : 9000);
+  renderPedidos();
+}
+
 async function renderPedidos() {
   const items = await _fetchList('pedidos');
   const el = document.getElementById('pedidos-list');
+  document.getElementById('btn-import-pedido').style.display = _apiUser?.admin ? '' : 'none';
   if (!items.length) { el.innerHTML = '<div class="empty">Nenhum pedido registrado.</div>'; return; }
   el.innerHTML = `<div class="list-table-wrap"><table class="list-table">
-    <thead><tr><th>Número</th><th>Licitação</th><th>Fornecedor</th><th>Status</th><th class="col-actions">Ações</th></tr></thead>
+    <thead><tr><th class="col-check"><input type="checkbox" id="ped-check-all" onchange="_pedSelAll(this.checked)" aria-label="Selecionar todos os pedidos visíveis"></th><th>Número</th><th>Licitação</th><th>Fornecedor</th><th>Previsão</th><th>Status</th><th>Origem</th><th class="col-actions">Ações</th></tr></thead>
     <tbody>${items.map(p => `<tr>
+      <td class="col-check"><input type="checkbox" class="ped-row-check" data-id="${p.id}" ${_pedSel.has(String(p.id)) ? 'checked' : ''} onchange="_pedSelToggle('${p.id}', this.checked)" aria-label="Selecionar pedido"></td>
       <td>${esc(p.numero)}</td>
       <td>${esc(p.codigo_licitacao || '—')}</td>
       <td>${esc(p.fornecedor_nome || '—')}</td>
+      <td>${p.data_entrega_prevista ? fmtDate(p.data_entrega_prevista) : '—'}</td>
       <td>${_pedidoStatusBadge(p.status)}</td>
+      <td>${_pedidoOrigemBadge(p)}</td>
       <td class="col-actions"><button class="btn btn-ghost btn-sm" onclick="openPedidoModal('${p.id}')">Ver/Editar</button></td>
     </tr>`).join('')}</tbody>
   </table></div>`;
+  _pedidosCache = items;
+  _pedUpdateBulk();
+}
+
+// ── Ações em massa dos pedidos ────────────────────────────────────────────────
+// Pedido não tem exclusão (o saldo das entradas depende dele): a ação em massa é
+// cancelar, que anula o saldo pendente de cada item.
+let _pedSel = new Set();
+let _pedidosCache = [];
+function _pedSelToggle(id, on) { if (on) _pedSel.add(String(id)); else _pedSel.delete(String(id)); _pedUpdateBulk(); }
+function _pedSelAll(on) {
+  document.querySelectorAll('#pedidos-list .ped-row-check').forEach(cb => {
+    cb.checked = on;
+    if (on) _pedSel.add(String(cb.dataset.id)); else _pedSel.delete(String(cb.dataset.id));
+  });
+  _pedUpdateBulk();
+}
+function _pedUpdateBulk() {
+  const bar = document.getElementById('ped-bulk-bar');
+  if (!bar) return;
+  const visiveis = [...document.querySelectorAll('#pedidos-list .ped-row-check')];
+  const idsVisiveis = new Set(visiveis.map(cb => String(cb.dataset.id)));
+  _pedSel = new Set([..._pedSel].filter(id => idsVisiveis.has(id)));
+  const n = _pedSel.size;
+  bar.style.display = n ? 'flex' : 'none';
+  document.getElementById('ped-bulk-count').textContent = `${n} selecionado${n === 1 ? '' : 's'}`;
+  const all = document.getElementById('ped-check-all');
+  if (all) { all.checked = n > 0 && n === visiveis.length; all.indeterminate = n > 0 && n < visiveis.length; }
+}
+const _pedNumero = id => (_pedidosCache.find(p => String(p.id) === String(id)) || {}).numero || id;
+
+async function _pedBulkCancelar() {
+  const ids = [..._pedSel];
+  if (!ids.length) return;
+  const ok = await customConfirm(
+    `Cancelar ${ids.length} pedido(s)? O saldo ainda não recebido de cada item é anulado. Pedidos já atendidos ou cancelados são ignorados.`,
+    { title: 'Cancelar pedidos', icon: '⚠️', okLabel: 'Cancelar pedidos', okClass: 'btn-danger', cancelLabel: 'Voltar' });
+  if (!ok) return;
+  const r = await API.post('/api/pedidos/bulk-cancelar', { ids });
+  const d = await API.json(r);
+  if (!r || !r.ok) { toast(d?.error || 'Falha ao cancelar em massa.', 'error', 9000); return; }
+  const nCanc = (d.cancelados || []).length, bloq = d.bloqueados || [];
+  await _auditEvento('PEDIDO_CANCELADO', `${nCanc} pedido(s) cancelado(s) em massa`);
+  _pedSel = new Set();
+  await renderPedidos();
+  if (!bloq.length) { toast(`${nCanc} pedido(s) cancelado(s).`, 'success'); return; }
+  await customConfirm(
+    `${nCanc} cancelado(s). ${bloq.length} não pôde(ram) ser cancelado(s):\n\n` +
+    bloq.map(b => `• ${_pedNumero(b.id)}: ${b.motivo}`).join('\n'),
+    { title: 'Cancelamento parcial', icon: 'ℹ️', okLabel: 'Entendi', cancelLabel: 'Fechar' });
+}
+
+function _pedBulkExport() {
+  const ids = new Set([..._pedSel]);
+  const sel = _pedidosCache.filter(p => ids.has(String(p.id)));
+  if (!sel.length) return;
+  const cab = ['numero', 'codigo_licitacao', 'fornecedor_nome', 'data_pedido', 'data_entrega_prevista', 'status', 'origem'];
+  const linhas = [cab.join(';'), ...sel.map(p => cab.map(c => _csvEsc(p[c])).join(';'))];
+  _csvDownload(linhas, `pedidos_${new Date().toISOString().slice(0, 10)}.csv`);
+  toast(`${sel.length} pedido(s) exportado(s).`, 'success');
 }
 
 let _pedidoProdutos = [];
@@ -3770,6 +3977,7 @@ async function openPedidoModal(id) {
   document.getElementById('pf-numero').value = item?.numero || '';
   document.getElementById('pf-licitacao').value = item?.codigo_licitacao || '';
   document.getElementById('pf-data').value = item?.data_pedido || '';
+  document.getElementById('pf-data-entrega').value = item?.data_entrega_prevista || '';
   document.getElementById('pf-fornecedor').value = item?.fornecedor_id || '';
   document.getElementById('pedido-modal-overlay').dataset.id = id || '';
 
@@ -3788,10 +3996,12 @@ async function openPedidoModal(id) {
     addBtn.style.display = 'none';
     viewWrap.style.display = '';
     viewWrap.innerHTML = `<div class="list-table-wrap"><table class="list-table">
-      <thead><tr><th>Produto</th><th>Pedida</th><th>Recebida</th><th>Saldo</th><th>Status</th><th class="col-actions">Ações</th></tr></thead>
+      <thead><tr><th>Produto</th><th>Marca</th><th>Pedida</th><th class="col-num">Valor Unit.</th><th>Recebida</th><th>Saldo</th><th>Status</th><th class="col-actions">Ações</th></tr></thead>
       <tbody>${item.itens.map(i => `<tr>
         <td>${esc(i.produto_nome)}</td>
+        <td>${esc(i.marca || '—')}</td>
         <td>${i.quantidade_pedida} ${esc(i.unidade_consumo || '')}</td>
+        <td class="col-num">${i.valor_unitario ? fmtMoney(i.valor_unitario) : '—'}</td>
         <td>${i.quantidade_recebida}</td>
         <td>${i.saldo}</td>
         <td>${_pedidoStatusBadge(i.status)}</td>
@@ -3832,6 +4042,7 @@ async function savePedido() {
     numero,
     codigo_licitacao: document.getElementById('pf-licitacao').value.trim() || null,
     data_pedido: document.getElementById('pf-data').value || null,
+    data_entrega_prevista: document.getElementById('pf-data-entrega').value || null,
     fornecedor_id: document.getElementById('pf-fornecedor').value || null,
   };
   if (!id) {

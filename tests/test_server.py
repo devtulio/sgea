@@ -921,6 +921,184 @@ class TestImportEntradaFiorilli(SGEATestCase):
         self.assertEqual(self._estoque('088.002.001'), 10)  # não dobrou
 
 
+class TestBulkProdutosPedidos(SGEATestCase):
+    """Ações em massa de Produtos e Pedidos."""
+
+    def _produto(self, token, cod, nome='PROD BULK', emb=1):
+        st, d = self.request('POST', '/api/produtos', {
+            'codigo_fiorilli': cod, 'nome': nome, 'unidade_consumo': 'UN',
+            'unidade_licitada': 'UN', 'qtd_por_embalagem': emb}, token=token)
+        self.assertEqual(st, 201, d)
+        return d['id']
+
+    def test_bulk_delete_respeita_produto_com_movimentacao(self):
+        token = self.login()
+        livre = self._produto(token, '077.101.001', 'PROD SEM USO')
+        usado = self._produto(token, '077.101.002', 'PROD COM LOTE')
+        # dá movimento ao segundo: entrada gera lote
+        st, d = self.request('POST', '/api/entradas', {
+            'tipo': 'compra_direta', 'data_entrega': '2026-07-01',
+            'itens': [{'produto_id': usado, 'quantidade_embalagem': 5, 'valor_unitario': 2.0}]}, token=token)
+        self.assertEqual(st, 201, d)
+        st, d = self.request('POST', '/api/produtos/bulk-delete', {'ids': [livre, usado]}, token=token)
+        self.assertEqual(st, 200, d)
+        self.assertEqual(d['excluidos'], [livre])
+        self.assertEqual(len(d['bloqueados']), 1)
+        self.assertEqual(d['bloqueados'][0]['id'], usado)
+        self.assertIn('lote', d['bloqueados'][0]['motivo'].lower())
+
+    def test_bulk_update_ativo_e_centro_custo(self):
+        token = self.login()
+        a = self._produto(token, '077.102.001', 'PROD A')
+        b = self._produto(token, '077.102.002', 'PROD B')
+        st, cc = self.request('POST', '/api/centros-custo', {'codigo': '901', 'nome': 'CC BULK'}, token=token)
+        self.assertEqual(st, 201, cc)
+        st, d = self.request('POST', '/api/produtos/bulk-update',
+                             {'ids': [a, b], 'patch': {'ativo': False, 'centro_custo_id': cc['id']}}, token=token)
+        self.assertEqual(st, 200, d)
+        self.assertEqual(d['atualizados'], 2)
+        with server.get_db() as conn:
+            rows = conn.execute('SELECT ativo, centro_custo_id FROM produtos WHERE id IN (?,?)', (a, b)).fetchall()
+        self.assertTrue(all(r['ativo'] == 0 and r['centro_custo_id'] == cc['id'] for r in rows))
+
+    def test_bulk_update_ignora_campo_fora_da_lista(self):
+        """Só ativo e centro_custo_id passam — o resto muda o cálculo de estoque."""
+        token = self.login()
+        a = self._produto(token, '077.103.001', 'PROD NOME ORIGINAL', emb=12)
+        st, d = self.request('POST', '/api/produtos/bulk-update',
+                             {'ids': [a], 'patch': {'nome': 'HACKEADO', 'qtd_por_embalagem': 999}}, token=token)
+        self.assertEqual(st, 200, d)
+        self.assertEqual(d['atualizados'], 0)
+        with server.get_db() as conn:
+            r = conn.execute('SELECT nome, qtd_por_embalagem FROM produtos WHERE id=?', (a,)).fetchone()
+        self.assertEqual((r['nome'], r['qtd_por_embalagem']), ('PROD NOME ORIGINAL', 12))
+
+    def test_bulk_cancelar_pedidos_anula_saldo_e_bloqueia_repetido(self):
+        token = self.login()
+        prod = self._produto(token, '077.104.001', 'PROD PEDIDO BULK')
+        ids = []
+        for num in ('077201/26', '077202/26'):
+            st, d = self.request('POST', '/api/pedidos', {
+                'numero': num, 'itens': [{'produto_id': prod, 'quantidade_pedida': 10}]}, token=token)
+            self.assertEqual(st, 201, d)
+            ids.append(d['id'])
+        st, d = self.request('POST', '/api/pedidos/bulk-cancelar', {'ids': ids}, token=token)
+        self.assertEqual(st, 200, d)
+        self.assertEqual(len(d['cancelados']), 2)
+        self.assertEqual(d['bloqueados'], [])
+        with server.get_db() as conn:
+            for pid in ids:
+                p = conn.execute('SELECT status FROM pedidos WHERE id=?', (pid,)).fetchone()
+                self.assertEqual(p['status'], 'cancelado')
+                it = conn.execute('SELECT quantidade_anulada FROM pedido_itens WHERE pedido_id=?', (pid,)).fetchone()
+                self.assertEqual(it['quantidade_anulada'], 10)   # saldo pendente anulado
+        # segunda passada: já cancelados viram bloqueados, sem anular de novo
+        st, d = self.request('POST', '/api/pedidos/bulk-cancelar', {'ids': ids}, token=token)
+        self.assertEqual(st, 200, d)
+        self.assertEqual(d['cancelados'], [])
+        self.assertEqual(len(d['bloqueados']), 2)
+        with server.get_db() as conn:
+            it = conn.execute('SELECT quantidade_anulada FROM pedido_itens WHERE pedido_id=?', (ids[0],)).fetchone()
+            self.assertEqual(it['quantidade_anulada'], 10)
+
+
+class TestImportPedidoFiorilli(SGEATestCase):
+    """Exportação 'PEDIDO' do Fiorilli: uma linha por item, cabeçalho repetido.
+    Cada teste usa códigos próprios (o DB é compartilhado no módulo)."""
+    HDR = ("NUMPED;DATPED;DATENT;INSMF;NOME;PROCLIC;LICIT;CODCCUSTO;"
+           "ITEM;CADPRO;QTD;QTDENT;QTDANU;MARCA;DISC1;UNID1;PRCUNT")
+
+    def _csv(self, numped, itens=None, cnpj='66.777.888/0001-99'):
+        rows = [self.HDR] + [';'.join([numped, '27/07/2026', '03/08/2026', cnpj,
+            'FORN PEDIDO LTDA', '000035/26', 'PREGÃO ELETRÔNICO', '7',
+            str(i + 1), it[0], it[1], it.__getitem__(2), it[3], it[4], it[5], it[6], it[7]])
+            for i, it in enumerate(itens)]
+        return '\n'.join(rows)
+
+    def _pedido(self, numero):
+        with server.get_db() as conn:
+            p = conn.execute('SELECT * FROM pedidos WHERE numero=?', (numero,)).fetchone()
+            if not p:
+                return None, []
+            itens = conn.execute('''SELECT pi.*, pr.codigo_fiorilli FROM pedido_itens pi
+                                    JOIN produtos pr ON pr.id=pi.produto_id WHERE pi.pedido_id=?''', (p['id'],)).fetchall()
+            return dict(p), [dict(i) for i in itens]
+
+    def test_importa_pedido_cria_produto_e_fornecedor(self):
+        token = self.login()
+        csv = self._csv('06601/26', cnpj='66.001.000/0001-01', itens=[
+            ('066.001.001', '10', '0', '0', 'OR Design', 'CADEIRA FIXA', 'UN', '253,9'),
+            ('066.001.002', '3',  '0', '0', 'Amaflex',   'CADEIRA PRESIDENTE', 'UN', '1351,2'),
+        ])
+        st, d = self.request('POST', '/api/pedidos/import', {'csv': csv}, token=token)
+        self.assertEqual(st, 200, d)
+        self.assertEqual((d['pedidos'], d['itens'], d['produtos_criados'], d['fornecedores_criados']), (1, 2, 2, 1))
+        p, itens = self._pedido('06601/26')
+        self.assertEqual((p['data_pedido'], p['data_entrega_prevista'], p['origem']),
+                         ('2026-07-27', '2026-08-03', 'fiorilli'))
+        self.assertEqual(p['codigo_licitacao'], '000035/26')
+        por_cod = {i['codigo_fiorilli']: i for i in itens}
+        self.assertEqual(por_cod['066.001.001']['quantidade_pedida'], 10)
+        self.assertEqual(por_cod['066.001.001']['valor_unitario'], 253.9)
+        self.assertEqual(por_cod['066.001.002']['marca'], 'Amaflex')
+
+    def test_converte_quantidade_pela_embalagem(self):
+        """Fiorilli manda a quantidade na unidade LICITADA; quantidade_pedida é
+        comparada com as entradas, que estão em unidade de CONSUMO."""
+        token = self.login()
+        st, _ = self.request('POST', '/api/produtos', {
+            'codigo_fiorilli': '066.002.001', 'nome': 'LUVA CAIXA 100',
+            'unidade_consumo': 'UN', 'unidade_licitada': 'CX', 'qtd_por_embalagem': 100}, token=token)
+        self.assertEqual(st, 201)
+        csv = self._csv('06602/26', cnpj='66.002.000/0001-02', itens=[('066.002.001', '5', '0', '0', 'MarcaX', 'LUVA', 'CX', '44,85')])
+        st, d = self.request('POST', '/api/pedidos/import', {'csv': csv}, token=token)
+        self.assertEqual(st, 200, d)
+        self.assertEqual(d['produtos_criados'], 0)          # usou o produto já cadastrado
+        _, itens = self._pedido('06602/26')
+        self.assertEqual(itens[0]['quantidade_pedida'], 500)  # 5 caixas x 100
+        self.assertAlmostEqual(itens[0]['valor_unitario'], 0.4485, places=4)  # preço por unidade
+
+    def test_soma_linhas_do_mesmo_produto(self):
+        """UNIQUE(pedido_id, produto_id): itens distintos da licitação podem cair
+        no mesmo produto — têm de somar, não estourar."""
+        token = self.login()
+        csv = self._csv('06603/26', cnpj='66.003.000/0001-03', itens=[
+            ('066.003.001', '4', '0', '0', 'M1', 'ITEM REPETIDO', 'UN', '10,00'),
+            ('066.003.001', '6', '0', '0', 'M1', 'ITEM REPETIDO', 'UN', '10,00'),
+        ])
+        st, d = self.request('POST', '/api/pedidos/import', {'csv': csv}, token=token)
+        self.assertEqual(st, 200, d)
+        _, itens = self._pedido('06603/26')
+        self.assertEqual(len(itens), 1)
+        self.assertEqual(itens[0]['quantidade_pedida'], 10)
+
+    def test_avisa_entrega_ja_registrada_no_fiorilli(self):
+        token = self.login()
+        csv = self._csv('06604/26', cnpj='66.004.000/0001-04', itens=[('066.004.001', '10', '4', '0', 'M', 'ITEM PARCIAL', 'UN', '5,00')])
+        st, d = self.request('POST', '/api/pedidos/import', {'csv': csv}, token=token)
+        self.assertEqual(st, 200, d)
+        self.assertEqual(len(d['com_entrega_no_fiorilli']), 1)
+        self.assertIn('066.004.001', d['com_entrega_no_fiorilli'][0])
+
+    def test_idempotente_por_numero(self):
+        token = self.login()
+        csv = self._csv('06605/26', cnpj='66.005.000/0001-05', itens=[('066.005.001', '7', '0', '0', 'M', 'ITEM IDEM', 'UN', '1,00')])
+        self.request('POST', '/api/pedidos/import', {'csv': csv}, token=token)
+        st, d = self.request('POST', '/api/pedidos/import', {'csv': csv}, token=token)
+        self.assertEqual(st, 200, d)
+        self.assertEqual((d['pedidos'], d['ja_existentes']), (0, 1))
+        _, itens = self._pedido('06605/26')
+        self.assertEqual(itens[0]['quantidade_pedida'], 7)  # não dobrou
+
+    def test_quantidade_anulada_vem_do_csv(self):
+        token = self.login()
+        csv = self._csv('06606/26', cnpj='66.006.000/0001-06', itens=[('066.006.001', '10', '0', '3', 'M', 'ITEM ANULADO', 'UN', '2,00')])
+        st, d = self.request('POST', '/api/pedidos/import', {'csv': csv}, token=token)
+        self.assertEqual(st, 200, d)
+        _, itens = self._pedido('06606/26')
+        self.assertEqual((itens[0]['quantidade_pedida'], itens[0]['quantidade_anulada']), (10, 3))
+
+
 class TestImportSaidaFiorilli(SGEATestCase):
     """Requisição de SAÍDA do Fiorilli: quantidade em QUAN2, sem fornecedor/NF.
     Cada teste usa códigos próprios (o DB é compartilhado no módulo)."""

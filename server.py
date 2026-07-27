@@ -38,7 +38,7 @@ for _stream in (sys.stdout, sys.stderr):
 # Versão do servidor — DEVE acompanhar o SGEA_VERSION do SGEA.html a cada release.
 # Exposta em /health para o frontend detectar quando o processo em execução está
 # desatualizado (HTML novo servido, mas server.py antigo ainda rodando em memória).
-SERVER_VERSION = '0.34.2'
+SERVER_VERSION = '0.35.0'
 
 PORT        = int(os.environ.get('SGEA_PORT', 3003))
 _BASE       = os.path.dirname(os.path.abspath(__file__))
@@ -307,6 +307,18 @@ def init_db():
         if 'origem' not in cols_sai:
             conn.execute("ALTER TABLE saidas ADD COLUMN origem TEXT DEFAULT ''")
 
+        # Campos do pedido que o Fiorilli exporta: previsão de entrega (DATENT), e por
+        # item o valor unitário arrematado (PRCUNT) e a marca vencedora (MARCA).
+        # origem: '' (manual) ou 'fiorilli' (import de pedidos).
+        cols_ped = [r[1] for r in conn.execute('PRAGMA table_info(pedidos)').fetchall()]
+        for _pc in ('data_entrega_prevista', 'origem'):
+            if _pc not in cols_ped: conn.execute(f"ALTER TABLE pedidos ADD COLUMN {_pc} TEXT DEFAULT ''")
+        cols_pi = [r[1] for r in conn.execute('PRAGMA table_info(pedido_itens)').fetchall()]
+        if 'valor_unitario' not in cols_pi:
+            conn.execute("ALTER TABLE pedido_itens ADD COLUMN valor_unitario REAL DEFAULT 0")
+        if 'marca' not in cols_pi:
+            conn.execute("ALTER TABLE pedido_itens ADD COLUMN marca TEXT DEFAULT ''")
+
         # Responsável e e-mail do centro de custo (vêm do cadastro do Fiorilli).
         cols_cc = [r[1] for r in conn.execute('PRAGMA table_info(centros_custo)').fetchall()]
         for _cc in ('responsavel', 'email'):
@@ -572,6 +584,40 @@ def _parse_fiorilli_saida(csv_text):
         })
     return list(reqs.values())
 
+def _parse_fiorilli_pedido(csv_text):
+    """Parseia o CSV 'PEDIDO' do Fiorilli. Uma linha por item, cabeçalho repetido;
+    agrupa por NUMPED. QTD vem na unidade licitada — quem chama converte para
+    unidade de consumo usando a embalagem do produto."""
+    reader = csv.DictReader(io.StringIO((csv_text or '').lstrip('﻿')), delimiter=';')
+    faltando = {'NUMPED', 'DATPED', 'CADPRO', 'QTD'} - set(reader.fieldnames or [])
+    if faltando:
+        raise ValueError('Não parece a exportação de "PEDIDO" do Fiorilli. Faltam colunas: ' + ', '.join(sorted(faltando)))
+    def g(row, k): return (row.get(k) or '').strip()
+    peds = {}
+    for row in reader:
+        num = g(row, 'NUMPED')
+        if not num:
+            continue
+        if num not in peds:
+            peds[num] = {
+                'numero': num,
+                'data_pedido': _data_br_iso(g(row, 'DATPED')),
+                'data_entrega_prevista': _data_br_iso(g(row, 'DATENT')),
+                'cnpj': g(row, 'INSMF'),
+                'fornecedor_nome': g(row, 'NOME'),
+                'proclic': g(row, 'PROCLIC') or g(row, 'NUMLICIT'),
+                'modalidade': g(row, 'LICIT'),
+                'centro_raw': g(row, 'CODCCUSTO'),
+                'itens': [],
+            }
+        peds[num]['itens'].append({
+            'cadpro': g(row, 'CADPRO'), 'desc': g(row, 'DISC1'), 'unid': g(row, 'UNID1'),
+            'qtd': _float(g(row, 'QTD')) or 0.0, 'qtd_anulada': _float(g(row, 'QTDANU')) or 0.0,
+            'qtd_entregue': _float(g(row, 'QTDENT')) or 0.0,
+            'valor': _float(g(row, 'PRCUNT')) or 0.0, 'marca': g(row, 'MARCA'),
+        })
+    return list(peds.values())
+
 # ── Importação da planilha "CONTROLE DE FROTA" ──────────────────────────────
 def _norm_header(h):
     """Normaliza um cabeçalho de coluna: sem acento, maiúsculo, espaços colapsados."""
@@ -830,6 +876,7 @@ def _pedido_itens_com_saldo(conn, pedido_id):
     correr o risco de um contador desalinhar da soma real de entrada_itens."""
     rows = conn.execute('''
         SELECT pi.id, pi.produto_id, pi.quantidade_pedida, pi.quantidade_anulada,
+               pi.valor_unitario, pi.marca,
                p.nome AS produto_nome, p.unidade_consumo,
                COALESCE((
                    SELECT SUM(ei.quantidade_unidades)
@@ -1096,6 +1143,10 @@ _DEP_EXCLUSAO = {
     'funcionarios': [('entradas', 'recebedor_id', 'entrada(s) de estoque'),
                      ('saidas', 'solicitante_id', 'saída(s) de estoque')],
     'frota': [('saidas', 'frota_id', 'saída(s) de estoque')],
+    'produtos': [('lotes', 'produto_id', 'lote(s) de estoque'),
+                 ('entrada_itens', 'produto_id', 'item(ns) de entrada'),
+                 ('saida_itens', 'produto_id', 'item(ns) de saída'),
+                 ('pedido_itens', 'produto_id', 'item(ns) de pedido')],
 }
 
 def _motivo_em_uso(table, id_):
@@ -1388,7 +1439,21 @@ class SGEAHandler(http.server.SimpleHTTPRequestHandler):
                 patch = data.get('patch') if isinstance(data.get('patch'), dict) else {}
                 self._json(200, _crud_bulk_update(table, ids, patch)); return
 
-        if p == '/api/produtos':
+        if p == '/api/produtos/bulk-delete':
+            # reaproveita o mesmo motor das telas de cadastro: sucesso parcial, e
+            # o que a FK barra volta em 'bloqueados' com o motivo (_DEP_EXCLUSAO)
+            ids = data.get('ids') if isinstance(data.get('ids'), list) else []
+            self._json(200, _crud_bulk_delete('produtos', ids))
+        elif p == '/api/produtos/bulk-update':
+            # produto não está em CRUD_TABLES (tem handler próprio por causa de
+            # lote/estoque), então a lista de campos em massa é explícita aqui
+            ids = data.get('ids') if isinstance(data.get('ids'), list) else []
+            patch = data.get('patch') if isinstance(data.get('patch'), dict) else {}
+            self._json(200, self._bulk_update_produtos(ids, patch))
+        elif p == '/api/pedidos/bulk-cancelar':
+            ids = data.get('ids') if isinstance(data.get('ids'), list) else []
+            self._json(200, self._bulk_cancelar_pedidos(ids))
+        elif p == '/api/produtos':
             self._create_produto(data)
         elif p == '/api/fornecedores':
             self._create_fornecedor(data)
@@ -1413,6 +1478,9 @@ class SGEAHandler(http.server.SimpleHTTPRequestHandler):
         elif p == '/api/saidas/import':
             if not s['admin']: self._json(403, {'error': 'Acesso restrito'}); return
             self._import_saidas_fiorilli(data, s)
+        elif p == '/api/pedidos/import':
+            if not s['admin']: self._json(403, {'error': 'Acesso restrito'}); return
+            self._import_pedidos_fiorilli(data, s)
         elif p == '/api/centros-custo/import':
             if not s['admin']: self._json(403, {'error': 'Acesso restrito'}); return
             self._import_centros(data)
@@ -2380,28 +2448,116 @@ class SGEAHandler(http.server.SimpleHTTPRequestHandler):
         try:
             with get_db() as conn:
                 conn.execute('''INSERT INTO pedidos
-                    (id,numero,codigo_licitacao,data_pedido,fornecedor_id,status)
-                    VALUES (?,?,?,?,?,'aberto')''',
+                    (id,numero,codigo_licitacao,data_pedido,fornecedor_id,status,data_entrega_prevista)
+                    VALUES (?,?,?,?,?,'aberto',?)''',
                     (pid, data['numero'], data.get('codigo_licitacao'), data.get('data_pedido'),
-                     data.get('fornecedor_id')))
+                     data.get('fornecedor_id'), data.get('data_entrega_prevista')))
                 for it in itens:
                     pid_prod = it.get('produto_id')
                     qtd = int(it.get('quantidade_pedida') or 0)
                     if not pid_prod or qtd <= 0:
                         raise ValueError('Item inválido: produto e quantidade pedida são obrigatórios')
-                    conn.execute('''INSERT INTO pedido_itens (pedido_id,produto_id,quantidade_pedida)
-                        VALUES (?,?,?)''', (pid, pid_prod, qtd))
+                    conn.execute('''INSERT INTO pedido_itens
+                        (pedido_id,produto_id,quantidade_pedida,valor_unitario,marca)
+                        VALUES (?,?,?,?,?)''',
+                        (pid, pid_prod, qtd, float(it.get('valor_unitario') or 0), it.get('marca') or ''))
         except ValueError as e:
             self._json(400, {'error': str(e)}); return
         except sqlite3.IntegrityError:
             self._json(409, {'error': 'Já existe um pedido com esse número/licitação, ou item duplicado'}); return
         self._json(201, self._get_pedido_dict(pid))
 
+    def _import_pedidos_fiorilli(self, data, s):
+        """Importa pedidos do CSV 'PEDIDO' do Fiorilli: cria o pedido com seus itens,
+        criando fornecedor (por CNPJ) e produto (por codigo_fiorilli) que faltarem.
+        Idempotente pelo número do pedido.
+
+        Dois cuidados que não são óbvios:
+        - a quantidade do Fiorilli vem na unidade LICITADA e `quantidade_pedida` é
+          comparada com as entradas, que estão em unidade de CONSUMO — daí a
+          multiplicação pela embalagem do produto;
+        - `UNIQUE(pedido_id, produto_id)` obriga a somar as linhas que repetem o mesmo
+          CADPRO (itens diferentes da licitação podem cair no mesmo produto)."""
+        csv_text = data.get('csv') or ''
+        if not csv_text.strip():
+            self._json(400, {'error': 'CSV vazio.'}); return
+        try:
+            peds = _parse_fiorilli_pedido(csv_text)
+        except ValueError as e:
+            self._json(400, {'error': str(e)}); return
+
+        r = {'pedidos': 0, 'itens': 0, 'produtos_criados': 0, 'fornecedores_criados': 0,
+             'ja_existentes': 0, 'itens_pulados': 0, 'com_entrega_no_fiorilli': []}
+        with get_db() as conn:
+            forn_by_cnpj = {re.sub(r'\D', '', (x['cnpj'] or '')): x['id']
+                            for x in conn.execute('SELECT id, cnpj FROM fornecedores WHERE deleted_at IS NULL').fetchall() if x['cnpj']}
+            prod = {x['codigo_fiorilli']: (x['id'], x['qtd_por_embalagem'] or 1)
+                    for x in conn.execute('SELECT id, codigo_fiorilli, qtd_por_embalagem FROM produtos').fetchall()}
+            existentes = {x['numero'] for x in conn.execute('SELECT numero FROM pedidos').fetchall()}
+            for ped in peds:
+                if ped['numero'] in existentes:
+                    r['ja_existentes'] += 1; continue
+                cnpjd = re.sub(r'\D', '', ped['cnpj'])
+                fid = forn_by_cnpj.get(cnpjd)
+                if not fid and cnpjd:
+                    fid = str(uuid.uuid4())
+                    blob = {'id': fid, 'razao_social': ped['fornecedor_nome'], 'cnpj': ped['cnpj'],
+                            'cnpj_digits': cnpjd, 'updatedAt': _now_precise()}
+                    conn.execute('INSERT INTO fornecedores (id,data,cnpj,razao_social,updated_at) VALUES (?,?,?,?,?)',
+                                 (fid, json.dumps(blob, ensure_ascii=False), ped['cnpj'], ped['fornecedor_nome'], _now()))
+                    forn_by_cnpj[cnpjd] = fid; r['fornecedores_criados'] += 1
+
+                # agrega por produto antes de gravar (UNIQUE(pedido_id, produto_id))
+                agregado = {}
+                for it in ped['itens']:
+                    cad = it['cadpro']
+                    if not _CADPRO_RE.match(cad):
+                        r['itens_pulados'] += 1; continue
+                    if cad not in prod:
+                        pid_prod = str(uuid.uuid4()); unid = _norm_unid(it['unid']) or 'UN'
+                        conn.execute('''INSERT INTO produtos (id,codigo_fiorilli,nome,unidade_consumo,unidade_licitada,qtd_por_embalagem,ativo)
+                                        VALUES (?,?,?,?,?,1,1)''',
+                                     (pid_prod, cad, it['desc'] or cad, unid, unid))
+                        prod[cad] = (pid_prod, 1); r['produtos_criados'] += 1
+                    pid_prod, emb = prod[cad]
+                    qtd = int(round(it['qtd'] * (emb or 1)))
+                    if qtd <= 0:
+                        r['itens_pulados'] += 1; continue
+                    a = agregado.setdefault(pid_prod, {'qtd': 0, 'anulada': 0, 'valor': 0.0, 'marca': ''})
+                    a['qtd'] += qtd
+                    a['anulada'] += int(round(it['qtd_anulada'] * (emb or 1)))
+                    a['valor'] = round(it['valor'] / (emb or 1), 4)   # por unidade de consumo
+                    a['marca'] = a['marca'] or it['marca']
+                    if it['qtd_entregue'] > 0:
+                        r['com_entrega_no_fiorilli'].append(f"{ped['numero']} — {cad}: {it['qtd_entregue']:g} já entregue(s) no Fiorilli")
+                if not agregado:
+                    continue
+
+                pid = str(uuid.uuid4())
+                conn.execute('''INSERT INTO pedidos
+                    (id,numero,codigo_licitacao,data_pedido,fornecedor_id,status,data_entrega_prevista,origem)
+                    VALUES (?,?,?,?,?,'aberto',?,'fiorilli')''',
+                    (pid, ped['numero'], ped['proclic'] or None, ped['data_pedido'], fid,
+                     ped['data_entrega_prevista']))
+                r['pedidos'] += 1
+                for pid_prod, a in agregado.items():
+                    conn.execute('''INSERT INTO pedido_itens
+                        (pedido_id,produto_id,quantidade_pedida,quantidade_anulada,valor_unitario,marca)
+                        VALUES (?,?,?,?,?,?)''',
+                        (pid, pid_prod, a['qtd'], a['anulada'], a['valor'], a['marca']))
+                    r['itens'] += 1
+            _insert_audit_raw(conn, {'type': 'PEDIDO_IMPORTADO', 'ts': _now(),
+                'user_id': s['user_id'], 'user_nome': s['nome'], 'label': 'Pedidos importados do Fiorilli',
+                'detail': (f"{r['pedidos']} pedido(s), {r['itens']} item(ns); "
+                           f"{r['produtos_criados']} produto(s), {r['fornecedores_criados']} fornecedor(es) criado(s); "
+                           f"{r['ja_existentes']} já existente(s)")})
+        self._json(200, r)
+
     def _update_pedido(self, pid, data):
         # Só cabeçalho — itens são imutáveis após criação (o saldo de outras
         # entradas já pode depender da quantidade_pedida original) e status
         # não é mais editável aqui, só via _cancelar_pedido.
-        cols = ['numero', 'codigo_licitacao', 'data_pedido', 'fornecedor_id']
+        cols = ['numero', 'codigo_licitacao', 'data_pedido', 'fornecedor_id', 'data_entrega_prevista']
         fields = {k: data[k] for k in cols if k in data}
         with get_db() as conn:
             row = conn.execute('SELECT id FROM pedidos WHERE id=?', (pid,)).fetchone()
@@ -2425,6 +2581,48 @@ class SGEAHandler(http.server.SimpleHTTPRequestHandler):
             conn.execute('UPDATE pedido_itens SET quantidade_anulada = quantidade_anulada + ? WHERE id=?',
                          (alvo['saldo'], item_id))
         self._json(200, self._get_pedido_dict(item['pedido_id']))
+
+    def _bulk_update_produtos(self, ids, patch):
+        """Ativar/inativar e reatribuir centro de custo em massa. Só essas duas
+        colunas: o resto do cadastro (embalagem, unidade, código) muda o cálculo de
+        estoque e não faz sentido aplicar em lote sem olhar produto a produto."""
+        fields = {}
+        if 'ativo' in patch:
+            fields['ativo'] = int(bool(patch['ativo']))
+        if 'centro_custo_id' in patch:
+            fields['centro_custo_id'] = patch['centro_custo_id'] or None
+        if not fields or not ids:
+            return {'atualizados': 0}
+        fields['updated_at'] = _now()
+        sets = ','.join(f'{k}=?' for k in fields)
+        n = 0
+        with get_db() as conn:
+            for id_ in ids:
+                n += conn.execute(f'UPDATE produtos SET {sets} WHERE id=?',
+                                  list(fields.values()) + [id_]).rowcount
+        return {'atualizados': n}
+
+    def _bulk_cancelar_pedidos(self, ids):
+        """Cancela vários pedidos. Pedido não tem exclusão — cancelar anula o saldo
+        pendente de cada item. Quem já está atendido ou cancelado volta em
+        'bloqueados', como na exclusão em massa dos cadastros."""
+        cancelados, bloqueados = [], []
+        with get_db() as conn:
+            for pid in ids:
+                row = conn.execute('SELECT * FROM pedidos WHERE id=?', (pid,)).fetchone()
+                if not row:
+                    bloqueados.append({'id': pid, 'motivo': 'Pedido não encontrado.'}); continue
+                itens = _pedido_itens_com_saldo(conn, pid)
+                status_atual = _pedido_status_agregado(row['status'], itens)
+                if status_atual in ('atendido', 'cancelado'):
+                    bloqueados.append({'id': pid, 'motivo': f'Pedido já está {status_atual}.'}); continue
+                for it in itens:
+                    if it['saldo'] > 0:
+                        conn.execute('UPDATE pedido_itens SET quantidade_anulada = quantidade_anulada + ? WHERE id=?',
+                                     (it['saldo'], it['id']))
+                conn.execute("UPDATE pedidos SET status='cancelado', updated_at=? WHERE id=?", (_now(), pid))
+                cancelados.append(pid)
+        return {'cancelados': cancelados, 'bloqueados': bloqueados}
 
     def _cancelar_pedido(self, pid):
         with get_db() as conn:
