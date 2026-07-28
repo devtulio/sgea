@@ -1,0 +1,27 @@
+Windows Registry Editor Version 5.00
+
+; SGEA - perguntar onde salvar cada arquivo baixado (Chrome e Edge).
+;
+; Para que serve: nos computadores que acessam o sistema pelo endereco de
+; rede (http://192.168.x.x:3003), o navegador nao permite que a pagina abra
+; a janela "Salvar como" - isso so vale para HTTPS ou localhost. Sem este
+; ajuste, os downloads caem direto na pasta de Downloads. Na maquina que roda
+; o servidor nao e necessario: la o sistema ja abre a janela sozinho.
+;
+; Como usar: botao direito neste arquivo -> Executar como administrador ->
+; confirmar. Depois feche e reabra o navegador. Vale por computador (todos os
+; usuarios), uma unica vez, e sobrevive a reinicio e atualizacao do navegador.
+;
+; Conferir se pegou: abra chrome://policy (ou edge://policy) e procure
+; PromptForDownloadLocation - deve aparecer com valor true.
+;
+; Desfazer: troque 00000001 por 00000000 e execute de novo.
+;
+; Havendo dominio/AD, o mesmo ajuste vira uma GPO unica e nenhum computador
+; precisa ser visitado. Ver a secao de uso em rede local do MANUAL.
+
+[HKEY_LOCAL_MACHINE\SOFTWARE\Policies\Google\Chrome]
+"PromptForDownloadLocation"=dword:00000001
+
+[HKEY_LOCAL_MACHINE\SOFTWARE\Policies\Microsoft\Edge]
+"PromptForDownloadLocation"=dword:00000001

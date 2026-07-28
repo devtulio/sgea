@@ -3,7 +3,7 @@
 <head>
 <meta charset="UTF-8">
 <meta name="viewport" content="width=device-width, initial-scale=1.0">
-<title>Manual Operacional — SGEA v0.35.6</title>
+<title>Manual Operacional — SGEA v0.35.7</title>
 <style>
   * { box-sizing: border-box; margin: 0; padding: 0; }
   body { font-family: 'Times New Roman', Times, serif; font-size: 12pt; color: #000; background: #f5f5f5; }
@@ -54,7 +54,7 @@
       size: A4;
       margin: 20mm 20mm 25mm;
       @top-center {
-        content: "SGEA v0.35.6 — Manual Operacional";
+        content: "SGEA v0.35.7 — Manual Operacional";
         font-family: 'Times New Roman', serif;
         font-size: 9pt;
         color: #666;
@@ -80,7 +80,7 @@
     <div class="cover-title">Manual Operacional</div>
     <div class="cover-subtitle">SGEA — Sistema de Gestão de Estoque do Almoxarifado</div>
     <div class="cover-system">Entradas, Saídas, Lotes/Validade e cadastros de apoio</div>
-    <div class="cover-version">Versão v0.35.6</div>
+    <div class="cover-version">Versão v0.35.7</div>
     <br>
     <div style="font-size:11pt; color:#555; line-height:1.8;">
       Aplicação web multiusuário para o Almoxarifado<br>
@@ -258,7 +258,7 @@
 
   <div class="dica">
     <strong>Baixar arquivos escolhendo a pasta, nos postos da rede.</strong> Na máquina que roda o servidor (acesso por <code>localhost</code>), todo download do sistema abre a janela <strong>"Salvar como"</strong>. Nos computadores que acessam <strong>pelo endereço de rede</strong> (<code>http://192.168.x.x:3003</code>), o navegador não oferece essa janela à página — é uma regra de segurança dele: só páginas servidas por HTTPS ou por <code>localhost</code> podem gravar em pasta escolhida. Nesses postos o arquivo vai direto para a pasta de Downloads.<br><br>
-    Para que também perguntem, ligue a opção <strong>do navegador</strong> em cada posto: <strong>Configurações → Downloads → "Perguntar onde salvar cada arquivo antes de fazer o download"</strong>. Para padronizar sem depender de cada usuário, aplique a política do navegador — salve o texto abaixo como <code>perguntar-onde-salvar.reg</code> e execute <strong>como Administrador, uma vez por computador</strong> (havendo domínio/AD, o mesmo ajuste vira uma GPO única e nenhum posto precisa ser visitado):<br><br>
+    Para que também perguntem, ligue a opção <strong>do navegador</strong> em cada posto: <strong>Configurações → Downloads → "Perguntar onde salvar cada arquivo antes de fazer o download"</strong>. Para padronizar sem depender de cada usuário, aplique a política do navegador: o arquivo <strong><code>Perguntar Onde Salvar Downloads.reg</code></strong> acompanha o sistema, na mesma pasta do <code>Iniciar SGEA.bat</code> — copie-o para o posto e execute com <strong>botão direito → Executar como administrador</strong>, uma vez por computador (havendo domínio/AD, o mesmo ajuste vira uma GPO única e nenhum posto precisa ser visitado). É o conteúdo abaixo:<br><br>
     <code>Windows Registry Editor Version 5.00</code><br>
     <code>&nbsp;</code><br>
     <code>[HKEY_LOCAL_MACHINE\SOFTWARE\Policies\Google\Chrome]</code><br>
@@ -272,6 +272,7 @@
   <h2 id="sec15">15. Histórico de Versões</h2>
   <table>
     <tr><th>Versão</th><th>Data</th><th>Resumo</th></tr>
+    <tr><td>0.35.7</td><td>28/07/2026</td><td>O arquivo <code>Perguntar Onde Salvar Downloads.reg</code> passa a acompanhar o sistema: aplicado num posto da rede, faz o navegador perguntar onde salvar cada download.</td></tr>
     <tr><td>0.35.6</td><td>28/07/2026</td><td>Documentação: a seção de uso em rede local passa a explicar como fazer os postos que acessam pelo endereço de rede perguntarem onde salvar cada download (opção do navegador ou política, com o .reg pronto).</td></tr>
     <tr><td>0.35.5</td><td>28/07/2026</td><td>Corrigido: documentos e relatórios saíam com margem dobrada na impressão; no papel agora vale só a margem de página de 20 mm.</td></tr>
     <tr><td>0.35.4</td><td>27/07/2026</td><td>O campo Código Fiorilli ganhou máscara NNN.NNN.NNN: digite só os números que os pontos entram sozinhos, e código incompleto é recusado ao salvar.</td></tr>

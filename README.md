@@ -1,6 +1,6 @@
 # SGEA — Sistema de Gestão de Estoque do Almoxarifado
 
-![Versão](https://img.shields.io/badge/versão-v0.35.6-blue) ![Tecnologia](https://img.shields.io/badge/tecnologia-Python%20%2B%20SQLite-orange) ![Licença](https://img.shields.io/badge/licença-MIT-green) ![Multiusuário](https://img.shields.io/badge/acesso-multiusuário-blueviolet) [![DOI](https://zenodo.org/badge/DOI/10.5281/zenodo.21570250.svg)](https://doi.org/10.5281/zenodo.21570250) [![CI](https://github.com/devtulio/sgea/actions/workflows/ci.yml/badge.svg)](https://github.com/devtulio/sgea/actions/workflows/ci.yml)
+![Versão](https://img.shields.io/badge/versão-v0.35.7-blue) ![Tecnologia](https://img.shields.io/badge/tecnologia-Python%20%2B%20SQLite-orange) ![Licença](https://img.shields.io/badge/licença-MIT-green) ![Multiusuário](https://img.shields.io/badge/acesso-multiusuário-blueviolet) [![DOI](https://zenodo.org/badge/DOI/10.5281/zenodo.21570250.svg)](https://doi.org/10.5281/zenodo.21570250) [![CI](https://github.com/devtulio/sgea/actions/workflows/ci.yml/badge.svg)](https://github.com/devtulio/sgea/actions/workflows/ci.yml)
 
 ## Descrição
 
@@ -129,6 +129,7 @@ SGEA/
 ├── Criar Atalho SGEA.ps1    # Script PowerShell de criação do atalho
 ├── Diagnostico SGEA.bat     # Roda o diagnóstico de rede (clique duplo)
 ├── Liberar Porta SGEA.bat   # Cria regra de firewall para a porta (Admin)
+├── Perguntar Onde Salvar Downloads.reg  # Política do navegador: perguntar onde salvar cada download (Admin)
 ├── diagnostico.py           # Script de diagnóstico de rede e firewall
 ├── sgea.ico                 # Ícone do sistema
 ├── sgea.db                  # Banco de dados SQLite (criado automaticamente)
