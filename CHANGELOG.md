@@ -9,6 +9,13 @@
 
 ---
 
+## [0.35.6] — 2026-07-28
+
+### Documentação
+- **Manual: como fazer os postos da rede perguntarem onde salvar os downloads.** A janela "Salvar como" só é oferecida à página em origem segura (`localhost` ou HTTPS); nos computadores que acessam pelo endereço de rede o arquivo vai direto para a pasta de Downloads. A seção de uso em rede local passa a trazer a opção do navegador e a política equivalente (`PromptForDownloadLocation`), com o arquivo `.reg` pronto — uma vez por computador, ou uma GPO única onde houver domínio.
+
+---
+
 ## [0.35.5] — 2026-07-28
 
 ### Corrigido
