@@ -34,7 +34,15 @@
 // A margem vai no @page, não no padding do body: em documento multipágina o
 // padding só vale no topo da 1ª página e no fim da última, deixando o miolo
 // colado na borda.
-const DOC_PAGE_CSS = `@page { size: A4; margin: 20mm; @bottom-right { content: "Folha " counter(page); font-size: 8pt; color: #888; } }`;
+//
+// O `padding: 0` na impressão fecha o outro lado do problema: os modelos usam
+// padding no body para a janela de prévia não ficar com o texto colado na borda,
+// e esse recuo SOMAVA com a margem do @page no papel (20mm + 20~25mm = ~4cm de
+// branco). Na tela o padding continua valendo; no papel, quem manda é o @page —
+// que é também a margem que a caixa de impressão do navegador mostra como
+// "Padrão", e que o usuário pode ajustar por lá se quiser.
+const DOC_PAGE_CSS = `@page { size: A4; margin: 20mm; @bottom-right { content: "Folha " counter(page); font-size: 8pt; color: #888; } }
+@media print { body { padding: 0 !important; } }`;
 
 // ── API wrapper (fetch + Bearer token + 401 → logout) ──────────────────────
 const API = {

@@ -9,6 +9,13 @@
 
 ---
 
+## [0.35.5] — 2026-07-28
+
+### Corrigido
+- **Documentos e relatórios saíam com margem dobrada na impressão.** O recuo usado para a janela de prévia somava com a margem de página do próprio documento, resultando em cerca de 4 cm de branco em cima e embaixo. Pior em documento de várias páginas: esse recuo só valia na primeira e na última folha, e o miolo saía colado na borda. A margem impressa passa a ser **só a de página (20 mm)**, em todos os documentos e relatórios; a prévia na tela continua com o recuo confortável de sempre.
+
+---
+
 ## [0.35.4] — 2026-07-27
 
 ### Adicionado
