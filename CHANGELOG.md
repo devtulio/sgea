@@ -9,6 +9,13 @@
 
 ---
 
+## [0.35.4] — 2026-07-27
+
+### Adicionado
+- **O campo Código Fiorilli passou a ter máscara.** Digite só os números e os pontos entram sozinhos, no formato **NNN.NNN.NNN** (9 dígitos); colar um código já pontuado, com espaços ou junto de outro texto também funciona — só os dígitos são aproveitados. Ao salvar, um código incompleto é recusado com aviso, em vez de gravar um valor que não casa com nada no Fiorilli.
+
+---
+
 ## [0.35.3] — 2026-07-27
 
 ### Corrigido

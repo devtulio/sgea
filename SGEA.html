@@ -1198,7 +1198,7 @@
     <div class="modal-body">
       <div class="form-grid">
         <div class="info-field span-2"><label for="pf-nome">Nome do Produto *</label><input type="text" id="pf-nome"></div>
-        <div class="info-field"><label for="pf-codigo-fiorilli">Código Fiorilli *</label><input type="text" id="pf-codigo-fiorilli"></div>
+        <div class="info-field"><label for="pf-codigo-fiorilli">Código Fiorilli *</label><input type="text" id="pf-codigo-fiorilli" inputmode="numeric" maxlength="11" placeholder="NNN.NNN.NNN" oninput="mascaraCadpro(this)"></div>
         <div class="info-field"><label for="pf-centro-custo">Centro de Custo</label><select id="pf-centro-custo"></select></div>
         <div class="info-field"><label for="pf-unidade-licitada">Unidade Licitada (compra)</label><input type="text" id="pf-unidade-licitada" placeholder="Ex: CAIXA, FRASCO"></div>
         <div class="info-field"><label for="pf-qtd-embalagem">Unidades por Embalagem</label><input type="number" id="pf-qtd-embalagem" min="1" value="1"></div>
@@ -1349,7 +1349,7 @@
 // ══════════════════════════════════════════════════════════════
 // API / SESSÃO
 // ══════════════════════════════════════════════════════════════
-const SGEA_VERSION = '0.35.3';
+const SGEA_VERSION = '0.35.4';
 document.title = `SGEA v${SGEA_VERSION}`;
 
 let _apiToken = localStorage.getItem('sgea-token') || null;
@@ -2593,6 +2593,14 @@ function closeProdutoModal() { _reconEditando = false; document.getElementById('
 async function saveProduto() {
   const fromRecon = _reconEditando;  // capturado antes de closeProdutoModal limpar a flag
   const id = document.getElementById('produto-modal-overlay').dataset.id;
+  // O código do Fiorilli é a chave que casa o produto com o extrato e com as
+  // requisições importadas: código pela metade não casa com nada, em silêncio.
+  const cod = document.getElementById('pf-codigo-fiorilli').value.trim();
+  if (!cadproValido(cod)) {
+    toast('Código Fiorilli deve ter 9 dígitos, no formato NNN.NNN.NNN.', 'error');
+    document.getElementById('pf-codigo-fiorilli').focus();
+    return;
+  }
   const data = {
     nome: document.getElementById('pf-nome').value.trim(),
     codigo_fiorilli: document.getElementById('pf-codigo-fiorilli').value.trim(),

@@ -678,3 +678,15 @@ async function checarVersaoServidor(appVersion, batName) {
   }
   document.getElementById('server-version-warn-msg').textContent = '⚠ ' + msg;
 }
+
+// ── Código do catálogo Fiorilli/SCPI (CADPRO) ─────────────────────────────────
+// São 9 dígitos exibidos como NNN.NNN.NNN. O usuário digita só números e os
+// pontos entram sozinhos; colar um código já pontuado (ou com espaços) também
+// funciona, porque só os dígitos são considerados. É o mesmo código no SGEA
+// (produtos) e no SGCA (itens da ata), e é a chave que casa o registro com o
+// relatório do Fiorilli — formato errado quebra o casamento em silêncio.
+function mascaraCadpro(el) {
+  const d = (el.value || '').replace(/\D/g, '').slice(0, 9);
+  el.value = [d.slice(0, 3), d.slice(3, 6), d.slice(6, 9)].filter(Boolean).join('.');
+}
+const cadproValido = v => /^\d{3}\.\d{3}\.\d{3}$/.test((v || '').trim());
