@@ -38,7 +38,7 @@ for _stream in (sys.stdout, sys.stderr):
 # Versão do servidor — DEVE acompanhar o SGEA_VERSION do SGEA.html a cada release.
 # Exposta em /health para o frontend detectar quando o processo em execução está
 # desatualizado (HTML novo servido, mas server.py antigo ainda rodando em memória).
-SERVER_VERSION = '0.35.7'
+SERVER_VERSION = '0.35.8'
 
 PORT        = int(os.environ.get('SGEA_PORT', 3003))
 _BASE       = os.path.dirname(os.path.abspath(__file__))
@@ -48,7 +48,9 @@ _BASE       = os.path.dirname(os.path.abspath(__file__))
 _DATA_DIR   = os.environ.get('SGEA_DATA_DIR', _BASE)
 DB_PATH     = os.path.join(_DATA_DIR, 'sgea.db')
 BACKUP_DIR  = os.path.join(_DATA_DIR, 'backups')
-PROFILE_DIR = os.path.join(_DATA_DIR, 'browser-profile')
+# Perfil do navegador em %TEMP%, como nos irmaos: dentro da pasta do sistema
+# ele inchava para gigabytes e ia junto em qualquer copia da pasta.
+PROFILE_DIR = os.path.join(os.environ.get('TEMP', os.path.expanduser('~')), 'SGEA-Profile')
 BACKUP_KEEP = 7      # número de backups automáticos mantidos
 SESSION_TTL = 60     # renovado pelo ping a cada 5s (ver comentário em _watchdog mais abaixo)
 
@@ -3738,11 +3740,23 @@ if __name__ == '__main__':
     print(f'  Rede:     http://{ip_local}:{PORT}/SGEA.html')
     print()
 
+    # Instalacao que ja rodou a versao anterior deixou o perfil dentro da pasta
+    # do sistema (podia passar de 4 GB). Nao apagamos por conta propria - so
+    # avisamos onde esta.
+    _perfil_antigo = os.path.join(_DATA_DIR, 'browser-profile')
+    if os.path.isdir(_perfil_antigo):
+        print(f'  Aviso: a pasta "browser-profile" nao e mais usada e pode ser apagada ({_perfil_antigo}).')
+
     browser = _find_browser()
     if browser:
         subprocess.Popen([
             browser, f'--app=http://localhost:{PORT}/SGEA.html', '--start-maximized',
-            '--disable-background-mode', f'--user-data-dir={PROFILE_DIR}',
+            '--disable-background-mode',
+            # O Chrome baixa ~4 GB de modelo de IA local dentro do perfil (pasta
+            # OptGuideOnDeviceModel) sem que nada aqui use isso. Desligado na
+            # abertura: o perfil do sistema fica em dezenas de MB.
+            '--disable-features=OptimizationGuideOnDeviceModel',
+            f'--user-data-dir={PROFILE_DIR}',
         ])
         print('  App aberto no navegador.')
     else:

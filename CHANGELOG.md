@@ -9,6 +9,14 @@
 
 ---
 
+## [0.35.8] — 2026-07-28
+
+### Corrigido
+- **A janela do sistema acumulava vários GB no computador.** O sistema abre o app numa janela dedicada do navegador, com perfil próprio, e o Chrome baixava para dentro desse perfil o modelo de inteligência artificial local dele — cerca de **4 GB** que nada aqui usa. A abertura passa a desligar esse recurso: o perfil fica em algumas dezenas de MB.
+- **O perfil do navegador saiu de dentro da pasta do sistema** e passou para a pasta temporária do Windows, como já era nos sistemas irmãos — antes ele inchava a pasta e ia junto em qualquer cópia dela. Na primeira execução da nova versão o sistema **avisa no console** que a pasta `browser-profile` antiga pode ser apagada; ela não é removida automaticamente. A janela do app pede login de novo e as preferências de aparência (tema, largura, fonte) voltam ao padrão nessa máquina — nada disso fica no banco de dados.
+
+---
+
 ## [0.35.7] — 2026-07-28
 
 ### Adicionado
