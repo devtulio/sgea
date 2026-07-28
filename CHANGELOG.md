@@ -9,6 +9,14 @@
 
 ---
 
+## [0.35.3] — 2026-07-27
+
+### Corrigido
+- **A Reconciliação com o Fiorilli estava restrita apenas na tela.** O botão de importar já não aparecia para quem não é administrador, mas a operação em si continuava aceita pelo servidor. Ela não altera produto nem saldo, porém recebe um arquivo, lê o estoque inteiro e registra o evento na Trilha de Auditoria — agora é restrita ao administrador de ponta a ponta, como as demais importações.
+- **A tela de Reconciliação deixa de aparecer no menu para quem não é administrador**, em vez de abrir uma tela sem nenhuma ação disponível.
+
+---
+
 ## [0.35.2] — 2026-07-27
 
 ### Alterado

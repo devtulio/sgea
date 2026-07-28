@@ -921,6 +921,34 @@ class TestImportEntradaFiorilli(SGEATestCase):
         self.assertEqual(self._estoque('088.002.001'), 10)  # não dobrou
 
 
+class TestReconciliacaoSoAdmin(SGEATestCase):
+    """A reconciliação não altera produto nem saldo, mas recebe arquivo, lê o
+    estoque inteiro e grava evento na auditoria — restrita ao administrador, como
+    as demais importações. Antes só o botão era escondido."""
+
+    def _comum(self, admin):
+        st, u = self.request('POST', '/api/usuarios', {
+            'username': 'u_recon_comum', 'nome': 'Comum', 'password': 'senha123',
+            'senha': 'senha123', 'admin': False}, token=admin)
+        self.assertIn(st, (200, 201), u)
+        self.addCleanup(self._remover_recon_user)
+        return self.request('POST', '/api/auth/login',
+                            {'username': 'u_recon_comum', 'password': 'senha123'})[1]['token']
+
+    def _remover_recon_user(self):
+        with server.get_db() as conn:
+            conn.execute("DELETE FROM usuarios WHERE username='u_recon_comum'")
+
+    def test_usuario_comum_nao_reconcilia(self):
+        admin = self.login()
+        comum = self._comum(admin)
+        csv = "CADPRO;DISC1;UNID1;QUAN3;VATO3\n055.001.001;ITEM RECON;UN;5;10,00"
+        st, d = self.request('POST', '/api/reconciliacao', {'csv': csv}, token=comum)
+        self.assertEqual(st, 403, d)
+        st, d = self.request('POST', '/api/reconciliacao', {'csv': csv}, token=admin)
+        self.assertEqual(st, 200, d)
+
+
 class TestImportFornecedoresSoAdmin(SGEATestCase):
     """O CSV de fornecedores passou a gravar pela rota /import (admin, em lote,
     upsert por CNPJ). Antes ia pela rota comum de criação, uma linha por vez."""

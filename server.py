@@ -38,7 +38,7 @@ for _stream in (sys.stdout, sys.stderr):
 # Versão do servidor — DEVE acompanhar o SGEA_VERSION do SGEA.html a cada release.
 # Exposta em /health para o frontend detectar quando o processo em execução está
 # desatualizado (HTML novo servido, mas server.py antigo ainda rodando em memória).
-SERVER_VERSION = '0.35.2'
+SERVER_VERSION = '0.35.3'
 
 PORT        = int(os.environ.get('SGEA_PORT', 3003))
 _BASE       = os.path.dirname(os.path.abspath(__file__))
@@ -1496,6 +1496,11 @@ class SGEAHandler(http.server.SimpleHTTPRequestHandler):
         elif p == '/api/audit':
             self._add_audit(data, s)
         elif p == '/api/reconciliacao':
+            # Restrita ao administrador como as demais importações: apesar de não
+            # alterar produto nem saldo, ela recebe um arquivo, lê o estoque inteiro
+            # e grava o evento na trilha de auditoria. Antes, só o botão era
+            # escondido — a rota respondia a qualquer usuário logado.
+            if not s['admin']: self._json(403, {'error': 'Acesso restrito'}); return
             self._reconciliacao(data, s)
         elif p == '/api/reconciliacao/cadastrar':
             if not s['admin']: self._json(403, {'error': 'Acesso restrito'}); return

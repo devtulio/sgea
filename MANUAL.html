@@ -3,7 +3,7 @@
 <head>
 <meta charset="UTF-8">
 <meta name="viewport" content="width=device-width, initial-scale=1.0">
-<title>Manual Operacional — SGEA v0.35.2</title>
+<title>Manual Operacional — SGEA v0.35.3</title>
 <style>
   * { box-sizing: border-box; margin: 0; padding: 0; }
   body { font-family: 'Times New Roman', Times, serif; font-size: 12pt; color: #000; background: #f5f5f5; }
@@ -54,7 +54,7 @@
       size: A4;
       margin: 20mm 20mm 25mm;
       @top-center {
-        content: "SGEA v0.35.2 — Manual Operacional";
+        content: "SGEA v0.35.3 — Manual Operacional";
         font-family: 'Times New Roman', serif;
         font-size: 9pt;
         color: #666;
@@ -80,7 +80,7 @@
     <div class="cover-title">Manual Operacional</div>
     <div class="cover-subtitle">SGEA — Sistema de Gestão de Estoque do Almoxarifado</div>
     <div class="cover-system">Entradas, Saídas, Lotes/Validade e cadastros de apoio</div>
-    <div class="cover-version">Versão v0.35.2</div>
+    <div class="cover-version">Versão v0.35.3</div>
     <br>
     <div style="font-size:11pt; color:#555; line-height:1.8;">
       Aplicação web multiusuário para o Almoxarifado<br>
@@ -259,6 +259,7 @@
   <h2 id="sec15">15. Histórico de Versões</h2>
   <table>
     <tr><th>Versão</th><th>Data</th><th>Resumo</th></tr>
+    <tr><td>0.35.3</td><td>27/07/2026</td><td>A Reconciliação com o Fiorilli passa a ser restrita ao administrador também no servidor (antes só o botão era escondido), e a tela sai do menu para quem não é administrador.</td></tr>
     <tr><td>0.35.2</td><td>27/07/2026</td><td>A importação de fornecedores por CSV passou a ser restrita ao administrador e a casar por CNPJ (reimportar deixa de duplicar); os botões de importar da Reconciliação e de Fornecedores só aparecem para administradores.</td></tr>
     <tr><td>0.35.1</td><td>27/07/2026</td><td>Corrigido: o resumo do que não pôde ser excluído numa ação em massa saía com os itens grudados num parágrafo só.</td></tr>
     <tr><td>0.35.0</td><td>25/07/2026</td><td><strong>Importação do pedido de compra do Fiorilli</strong> (CSV), com previsão de entrega, valor unitário e marca por item, conversão automática da unidade licitada para a de consumo e soma dos itens repetidos. <strong>Ações em massa no Estoque</strong> (excluir, ativar, inativar, exportar CSV e reatribuir centro de custo) <strong>e em Pedidos</strong> (cancelar em lote e exportar CSV).</td></tr>
