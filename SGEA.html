@@ -1349,7 +1349,7 @@
 // ══════════════════════════════════════════════════════════════
 // API / SESSÃO
 // ══════════════════════════════════════════════════════════════
-const SGEA_VERSION = '0.35.10';
+const SGEA_VERSION = '0.35.11';
 document.title = `SGEA v${SGEA_VERSION}`;
 
 let _apiToken = localStorage.getItem('sgea-token') || null;
@@ -3473,7 +3473,7 @@ const _DOC_CSS = `
   ${DOC_PAGE_CSS}
 `;
 
-function _qrFooterReport(label, org) {
+function _docFooterReport(label, org) {
   const dtFmt = new Date().toLocaleDateString('pt-BR', { day: '2-digit', month: '2-digit', year: 'numeric' })
     + ' ' + new Date().toLocaleTimeString('pt-BR', { hour: '2-digit', minute: '2-digit' });
   const cod = (() => {
@@ -3483,12 +3483,8 @@ function _qrFooterReport(label, org) {
     const hex = (h >>> 0).toString(16).toUpperCase().padStart(8, '0');
     return hex.slice(0, 4) + '-' + hex.slice(4);
   })();
-  const qrText = `SGEA/${SGEA_VERSION}/${org.orgao || ''}/${cod}`;
-  const svg = _QR.svg(qrText, 3);
-  const svgB64 = svg ? 'data:image/svg+xml;base64,' + btoa(unescape(encodeURIComponent(svg))) : null;
   return `
-<div style="margin-top:28pt;border-top:1px solid #ccc;padding-top:8pt;display:flex;align-items:center;gap:16pt">
-  ${svgB64 ? `<img src="${svgB64}" width="64" height="64" alt="QR" style="flex-shrink:0;border:1px solid #eee">` : ''}
+<div style="margin-top:28pt;border-top:1px solid #ccc;padding-top:8pt">
   <div style="font-size:7.5pt;color:#666;line-height:1.6">
     Documento gerado pelo <strong>SGEA</strong> — Sistema de Gestão de Estoque do Almoxarifado &nbsp;·&nbsp; v${SGEA_VERSION}<br>
     ${dtFmt} &nbsp;·&nbsp; Código de autenticidade: <strong>${cod}</strong>
@@ -3508,7 +3504,7 @@ function _abrirDocumentoQR(org, titulo, subtitulo, corpoHtml, rotuloAuditoria) {
 </div>
 <div class="doc-title"><h3>${titulo}</h3>${subtitulo ? `<div class="sub">${subtitulo}</div>` : ''}</div>
 ${corpoHtml}
-${_qrFooterReport(titulo, org)}
+${_docFooterReport(titulo, org)}
 </body></html>`;
   const win = window.open('', '_blank', 'width=900,height=720');
   if (!win) { toast('Popup bloqueado pelo navegador. Permita popups para este site.', 'error'); return; }
@@ -4759,193 +4755,6 @@ function _rodapeRelatorioSGEA() {
   return `<div style="margin-top:28pt;border-top:1px solid #ccc;padding-top:8pt;font-size:7.5pt;color:#666;text-align:center">`
     + `Documento gerado pelo <strong>SGEA</strong> — Sistema de Gestão de Estoque do Almoxarifado &nbsp;·&nbsp; ${esc(dt)} &nbsp;·&nbsp; por ${esc(_apiUser?.nome || '—')}</div>`;
 }
-
-// ══════════════════════════════════════════════════════════════
-// QR CODE GENERATOR — puro JS, sem dependência (copiado do SGCD/SGCA)
-// Byte mode · ECC nível M · versões 1-10 (até 216 bytes) — usado só pelos
-// relatórios de Sanções (única dupla de documentos do SGEA com QR).
-// ══════════════════════════════════════════════════════════════
-const _QR = (function () {
-  'use strict';
-  const EXP = new Uint8Array(512), LOG = new Uint8Array(256);
-  (function () {
-    for (let i = 0, x = 1; i < 255; i++) {
-      EXP[i] = EXP[i + 255] = x; LOG[x] = i;
-      x = x < 128 ? x << 1 : (x << 1) ^ 0x11d;
-    }
-  })();
-  const gm = (a, b) => a && b ? EXP[LOG[a] + LOG[b]] : 0;
-
-  function rsPoly(n) {
-    let g = [1];
-    for (let i = 0; i < n; i++) {
-      const h = new Uint8Array(g.length + 1);
-      for (let j = 0; j < g.length; j++) { h[j] ^= g[j]; h[j+1] ^= gm(g[j], EXP[i]); }
-      g = h;
-    }
-    return g;
-  }
-  function rsRem(data, gen) {
-    const r = new Uint8Array(gen.length - 1);
-    for (const b of data) {
-      const c = b ^ r[0];
-      r.copyWithin(0, 1); r[r.length - 1] = 0;
-      if (c) for (let j = 0; j < r.length; j++) r[j] ^= gm(gen[j + 1], c);
-    }
-    return r;
-  }
-
-  const TB = [0,
-    [10,1,16,0,0],[16,1,28,0,0],[26,1,44,0,0],[18,2,32,0,0],
-    [24,2,43,0,0],[16,4,27,0,0],[18,4,31,0,0],[22,2,38,2,39],
-    [22,3,36,2,37],[26,4,43,1,44],
-  ];
-  const AP = [0,[],[6,18],[6,22],[6,26],[6,30],[6,34],
-    [6,22,38],[6,24,42],[6,26,46],[6,28,50]];
-
-  const MF = [
-    (r,c)=>(r+c)%2===0,(r,c)=>r%2===0,(r,c)=>c%3===0,(r,c)=>(r+c)%3===0,
-    (r,c)=>(Math.floor(r/2)+Math.floor(c/3))%2===0,(r,c)=>r*c%2+r*c%3===0,
-    (r,c)=>(r*c%2+r*c%3)%2===0,(r,c)=>((r+c)%2+r*c%3)%2===0,
-  ];
-
-  function grid(n) { return Array.from({length:n},()=>new Int8Array(n).fill(-1)); }
-
-  function finder(g, r0, c0) {
-    for (let r=-1;r<=7;r++) for (let c=-1;c<=7;c++) {
-      const rr=r0+r,cc=c0+c;
-      if (rr<0||cc<0||rr>=g.length||cc>=g.length) continue;
-      if (r>=0&&r<=6&&c>=0&&c<=6)
-        g[rr][cc]=(r===0||r===6||c===0||c===6||(r>=2&&r<=4&&c>=2&&c<=4))?1:0;
-      else g[rr][cc]=0;
-    }
-  }
-  function align(g,r,c) {
-    for (let dr=-2;dr<=2;dr++) for (let dc=-2;dc<=2;dc++)
-      g[r+dr][c+dc]=(Math.abs(dr)===2||Math.abs(dc)===2||(dr===0&&dc===0))?1:0;
-  }
-  function reserveFmt(g) {
-    const n=g.length;
-    for (let i=0;i<=8;i++) {
-      if (g[8][i]<0) g[8][i]=0; if (g[i][8]<0) g[i][8]=0;
-      if (i<8&&g[8][n-1-i]<0) g[8][n-1-i]=0;
-      if (i<8&&g[n-1-i][8]<0) g[n-1-i][8]=0;
-    }
-    g[n-8][8]=1;
-  }
-  function writeFmt(g,mask) {
-    const n=g.length;
-    let d=(0b00<<3)|mask, rem=d<<10;
-    for (let i=14;i>=10;i--) if ((rem>>i)&1) rem^=(0x537<<(i-10));
-    const f=((d<<10)|(rem&0x3FF))^0b101010000010010;
-    const s1=[[8,0],[8,1],[8,2],[8,3],[8,4],[8,5],[8,7],[8,8],[7,8],[5,8],[4,8],[3,8],[2,8],[1,8],[0,8]];
-    const s2=[[n-1,8],[n-2,8],[n-3,8],[n-4,8],[n-5,8],[n-6,8],[n-7,8],[8,n-8],[8,n-7],[8,n-6],[8,n-5],[8,n-4],[8,n-3],[8,n-2],[8,n-1]];
-    for (let i=0;i<15;i++) { const b=(f>>i)&1; g[s1[i][0]][s1[i][1]]=b; g[s2[i][0]][s2[i][1]]=b; }
-  }
-  function placeData(g,bytes) {
-    const n=g.length; let bi=0,up=true;
-    for (let col=n-1;col>=1;col-=2) {
-      if (col===6) col--;
-      for (let dy=0;dy<n;dy++) {
-        const row=up?n-1-dy:dy;
-        for (const c of [col,col-1]) {
-          if (g[row][c]>=0) continue;
-          const byi=bi>>3,bii=7-(bi&7);
-          g[row][c]=bi<bytes.length*8?(bytes[byi]>>bii)&1:0;
-          bi++;
-        }
-      }
-      up=!up;
-    }
-  }
-  function pen(g) {
-    const n=g.length; let p=0;
-    for (let r=0;r<n;r++) for (let t=0;t<2;t++) {
-      let run=1,prev=t?g[0][r]:g[r][0];
-      for (let i=1;i<n;i++) {
-        const v=t?g[i][r]:g[r][i];
-        if (v===prev){if(++run===5)p+=3;else if(run>5)p++;}else{run=1;prev=v;}
-      }
-    }
-    for (let r=0;r<n-1;r++) for (let c=0;c<n-1;c++)
-      if (g[r][c]===g[r+1][c]&&g[r][c]===g[r][c+1]&&g[r][c]===g[r+1][c+1]) p+=3;
-    let dk=0; for (let r=0;r<n;r++) for (let c=0;c<n;c++) dk+=g[r][c];
-    const pct=dk*100/(n*n);
-    p+=Math.min(Math.abs(Math.floor(pct/5)*5-50),Math.abs(Math.ceil(pct/5)*5-50))/5*10;
-    return p;
-  }
-
-  function encode(text) {
-    const bytes=new TextEncoder().encode(text);
-    const len=bytes.length;
-    let ver=1;
-    while (ver<=10) {
-      const [,g1b,g1dc,g2b,g2dc]=TB[ver];
-      const ccb=ver<=9?8:16;
-      if ((g1b*g1dc+g2b*g2dc)*8>=4+ccb+len*8) break;
-      ver++;
-    }
-    if (ver>10) throw new Error('too long');
-    const [ec,g1b,g1dc,g2b,g2dc]=TB[ver];
-    const totalDC=g1b*g1dc+g2b*g2dc;
-    const n=ver*4+17;
-    const bits=[];
-    const push=(v,l)=>{for(let i=l-1;i>=0;i--)bits.push((v>>i)&1);};
-    push(0b0100,4); push(bytes.length,ver<=9?8:16);
-    for (const b of bytes) push(b,8);
-    const cap=totalDC*8;
-    for (let i=0;i<4&&bits.length<cap;i++) bits.push(0);
-    while (bits.length%8) bits.push(0);
-    const pads=[0xEC,0x11]; let pi=0;
-    while (bits.length<cap) push(pads[pi++%2],8);
-    const cw=[];
-    for (let i=0;i<bits.length;i+=8){let b=0;for(let j=0;j<8;j++)b=(b<<1)|bits[i+j];cw.push(b);}
-    const blks=[],ecbs=[]; let pos=0;
-    for (let i=0;i<g1b+g2b;i++) {
-      const dc=i<g1b?g1dc:g2dc;
-      const blk=cw.slice(pos,pos+dc); pos+=dc;
-      blks.push(blk); ecbs.push([...rsRem(blk,rsPoly(ec))]);
-    }
-    const fin=[]; const mdc=Math.max(g1dc,g2dc||0);
-    for (let i=0;i<mdc;i++) for (const b of blks) if (i<b.length) fin.push(b[i]);
-    for (let i=0;i<ec;i++) for (const b of ecbs) fin.push(b[i]);
-    const g=grid(n);
-    finder(g,0,0); finder(g,0,n-7); finder(g,n-7,0);
-    for (let i=8;i<n-8;i++) g[6][i]=g[i][6]=i%2===0?1:0;
-    if (ver>=2) {
-      const ap=AP[ver];
-      for (const r of ap) for (const c of ap) if (g[r][c]<0) align(g,r,c);
-    }
-    reserveFmt(g);
-    const fg=g.map(r=>Int8Array.from(r));
-    placeData(g,fin);
-    let bm=0,bp=Infinity,bg=null;
-    for (let m=0;m<8;m++) {
-      const h=g.map(r=>Int8Array.from(r));
-      const fn=MF[m];
-      for (let r=0;r<n;r++) for (let c=0;c<n;c++) if (fg[r][c]<0&&fn(r,c)) h[r][c]^=1;
-      writeFmt(h,m);
-      const pp=pen(h);
-      if (pp<bp){bp=pp;bm=m;bg=h;}
-    }
-    return bg;
-  }
-
-  function toSVG(g, px) {
-    const n=g.length, q=px*4, sz=n*px+q*2;
-    const r=[];
-    for (let row=0;row<n;row++) for (let col=0;col<n;col++)
-      if (g[row][col]===1) r.push(`<rect x="${q+col*px}" y="${q+row*px}" width="${px}" height="${px}"/>`);
-    return `<svg xmlns="http://www.w3.org/2000/svg" width="${sz}" height="${sz}" viewBox="0 0 ${sz} ${sz}" shape-rendering="crispEdges"><rect width="${sz}" height="${sz}" fill="#fff"/><g fill="#000">${r.join('')}</g></svg>`;
-  }
-
-  return {
-    svg(text, px=3) {
-      try { return toSVG(encode(text), px); }
-      catch(e) { console.warn('QR:', e.message); return null; }
-    }
-  };
-})();
 
 // CSS compartilhado pelos dois relatórios impressos (Integridade e Auditoria).
 // A regra .meta só é usada pelo de Auditoria; é inofensiva no de Integridade.

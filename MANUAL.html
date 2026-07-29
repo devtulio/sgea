@@ -3,7 +3,7 @@
 <head>
 <meta charset="UTF-8">
 <meta name="viewport" content="width=device-width, initial-scale=1.0">
-<title>Manual Operacional — SGEA v0.35.10</title>
+<title>Manual Operacional — SGEA v0.35.11</title>
 <style>
   * { box-sizing: border-box; margin: 0; padding: 0; }
   body { font-family: 'Times New Roman', Times, serif; font-size: 12pt; color: #000; background: #f5f5f5; }
@@ -54,7 +54,7 @@
       size: A4;
       margin: 20mm 20mm 25mm;
       @top-center {
-        content: "SGEA v0.35.10 — Manual Operacional";
+        content: "SGEA v0.35.11 — Manual Operacional";
         font-family: 'Times New Roman', serif;
         font-size: 9pt;
         color: #666;
@@ -80,7 +80,7 @@
     <div class="cover-title">Manual Operacional</div>
     <div class="cover-subtitle">SGEA — Sistema de Gestão de Estoque do Almoxarifado</div>
     <div class="cover-system">Entradas, Saídas, Lotes/Validade e cadastros de apoio</div>
-    <div class="cover-version">Versão v0.35.10</div>
+    <div class="cover-version">Versão v0.35.11</div>
     <br>
     <div style="font-size:11pt; color:#555; line-height:1.8;">
       Aplicação web multiusuário para o Almoxarifado<br>
@@ -149,7 +149,7 @@
     <li><strong>Frota por Combustível</strong> — distribuição dos veículos por tipo de combustível (útil para dimensionar a compra de combustível)</li>
     <li><strong>Pendências de Peças</strong> — lista os veículos que ainda têm peças sem definição (célula vazia, "FALTA INFORMAÇÃO" ou qualquer valor começando com "PENDENTE - ..."), indicando quais peças faltam — serve de guia para a mecânica completar o cadastro</li>
   </ul>
-  <p>Todos os relatórios seguem o mesmo padrão visual do relatório de Backup e Integridade e da Trilha de Auditoria: cabeçalho com o brasão e nome do órgão, tipografia Times New Roman e numeração de página no rodapé — sem código QR nem bloco de assinatura, por serem documentos gerenciais, não formais.</p>
+  <p>Todos os relatórios seguem o mesmo padrão visual do relatório de Backup e Integridade e da Trilha de Auditoria: cabeçalho com o brasão e nome do órgão, tipografia Times New Roman e numeração de página no rodapé — sem bloco de assinatura, por serem documentos gerenciais, não formais.</p>
 
   <h2 id="sec5">5. Cadastro de Produtos e Estoque</h2>
   <p>Cada produto precisa de um <strong>Código Fiorilli</strong> (a chave usada no sistema oficial do município) e de um nome. Os campos mais importantes:</p>
@@ -217,7 +217,7 @@
     <li><strong>Certidões</strong> — registro manual de certidões (Federal/RFB, Estadual, Municipal, FGTS, Trabalhista ou Outra), cada uma com data de emissão e validade; o sistema calcula automaticamente se está válida, vencendo ou vencida</li>
     <li><strong>Sanções</strong> — registro manual de penalidades aplicadas ao fornecedor (Advertência, Multa, Suspensão Temporária, Impedimento de Licitar ou Declaração de Inidoneidade, conforme o Art. 156 da Lei 14.133/2021), com tipo, data de aplicação, prazo final (se houver) e fundamentação. Uma sanção sem prazo final ou com prazo ainda não vencido aparece como <strong>Vigente</strong>; do contrário, <strong>Encerrada</strong></li>
   </ul>
-  <p>Dois relatórios imprimíveis de sanções estão disponíveis: um por fornecedor (dentro da aba Sanções) e um global com todos os fornecedores (botão <strong>Relatório de Sanções</strong> na tela). São os dois únicos relatórios do SGEA com <strong>código QR de autenticidade</strong> no rodapé — os demais relatórios do sistema são gerenciais e não usam QR.</p>
+  <p>Dois relatórios imprimíveis de sanções estão disponíveis: um por fornecedor (dentro da aba Sanções) e um global com todos os fornecedores (botão <strong>Relatório de Sanções</strong> na tela). São os dois únicos relatórios do SGEA com <strong>código de autenticidade</strong> no rodapé — os demais são gerenciais e não trazem esse carimbo.</p>
   <p>A barra de ações no topo da tela dá conta do resto (padrão idêntico ao SGCA/SGCD): <strong>Exportar CSV</strong> e <strong>Exportar Excel</strong> geram a lista de fornecedores — respeitando a busca e o filtro ativos — em .csv ou planilha .xlsx; <strong>Relatório</strong> abre um relatório imprimível de fornecedores; e <strong>Importar CSV</strong> cadastra fornecedores em lote a partir de uma planilha (basta a coluna <code>cnpj</code> com 14 dígitos; marcando a opção, cada CNPJ é consultado na Receita automaticamente, preenchendo os demais campos). <strong>Exportar cadastro</strong> gera o cadastro de fornecedores em arquivo, e <strong>Sincronizar cadastro</strong> o compara com o dos sistemas irmãos (SGCD/SGCA), casando os fornecedores <strong>pelo CNPJ</strong>: quando o mesmo fornecedor mudou dos dois lados, o sistema abre uma tela de revisão para você decidir o que prevalece antes de gravar. A lista tem busca por CNPJ/razão social e os filtros Todos/Ativos/Inativos/Pendências.</p>
   <div class="nota">Excluir um fornecedor não é definitivo: ele vai para a Lixeira (junto com Entradas e Saídas excluídas) e pode ser restaurado por até 30 dias.</div>
 
@@ -272,6 +272,7 @@
   <h2 id="sec15">15. Histórico de Versões</h2>
   <table>
     <tr><th>Versão</th><th>Data</th><th>Resumo</th></tr>
+    <tr><td>0.35.11</td><td>29/07/2026</td><td>QR Code do rodapé dos documentos removido: codificava o mesmo texto impresso ao lado e não levava a lugar nenhum, já que o sistema é local. O rodapé mantém data, versão e código de autenticidade.</td></tr>
     <tr><td>0.35.10</td><td>28/07/2026</td><td>Três exportações (seleção em massa, produtos e pedidos) passam a abrir a janela "Salvar como", como as demais.</td></tr>
     <tr><td>0.35.9</td><td>28/07/2026</td><td>Aviso técnico no console do servidor ao reportar erro de JavaScript (<code>application-written content was ignored</code>); sem efeito para quem usa.</td></tr>
     <tr><td>0.35.8</td><td>28/07/2026</td><td>O Chrome baixava ~4 GB de modelo de inteligência artificial dentro do perfil usado pela janela do sistema. A abertura passa a desligar esse recurso. O perfil também saiu de dentro da pasta do sistema para a pasta temporária do Windows, como nos sistemas irmãos.</td></tr>

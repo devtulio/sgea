@@ -9,6 +9,13 @@
 
 ---
 
+## [0.35.11] — 2026-07-29
+
+### Removido
+- **QR Code do rodapé dos documentos.** Ele codificava exatamente o mesmo texto que já vinha impresso ao lado — sistema, versão, órgão e código de autenticidade — e não levava a lugar nenhum: o sistema é local, não há página pública para o QR apontar. Era decoração, e custava um gerador de quase 200 linhas dentro do arquivo. **O rodapé continua igual em conteúdo**, com data, versão e o código de autenticidade; só a imagem saiu. Documentos já impressos não são afetados.
+
+---
+
 ## [0.35.10] — 2026-07-28
 
 ### Corrigido
