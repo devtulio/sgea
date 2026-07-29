@@ -9,6 +9,13 @@
 
 ---
 
+## [0.35.12] — 2026-07-29
+
+### Corrigido
+- **A janela do sistema voltava a acumular gigabytes, apesar da correção anterior.** Desligar o modelo de inteligência artificial do navegador impedia que ele fosse *instalado*, mas não que fosse **baixado**: o pacote de 4 GB ia parar em outra pasta de cache do próprio perfil. Medido aqui: o perfil de um dos sistemas estava de volta aos 4,2 GB no mesmo dia. Agora a janela também sobe com a atualização de componentes desligada — ela só abre o sistema local, então não há perda. **Medido depois da correção: 86 MB após três minutos de janela aberta, contra 4,2 GB antes.**
+
+---
+
 ## [0.35.11] — 2026-07-29
 
 ### Removido

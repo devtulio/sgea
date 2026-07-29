@@ -38,7 +38,7 @@ for _stream in (sys.stdout, sys.stderr):
 # Versão do servidor — DEVE acompanhar o SGEA_VERSION do SGEA.html a cada release.
 # Exposta em /health para o frontend detectar quando o processo em execução está
 # desatualizado (HTML novo servido, mas server.py antigo ainda rodando em memória).
-SERVER_VERSION = '0.35.11'
+SERVER_VERSION = '0.35.12'
 
 PORT        = int(os.environ.get('SGEA_PORT', 3003))
 _BASE       = os.path.dirname(os.path.abspath(__file__))
@@ -3759,10 +3759,13 @@ if __name__ == '__main__':
         subprocess.Popen([
             browser, f'--app=http://localhost:{PORT}/SGEA.html', '--start-maximized',
             '--disable-background-mode',
-            # O Chrome baixa ~4 GB de modelo de IA local dentro do perfil (pasta
-            # OptGuideOnDeviceModel) sem que nada aqui use isso. Desligado na
-            # abertura: o perfil do sistema fica em dezenas de MB.
+            # O Chrome baixa ~4 GB de modelo de IA local para dentro do perfil. A
+            # flag abaixo impede que ele seja instalado/usado, mas sozinha nao
+            # impede o DOWNLOAD: o pacote ia parar no component_crx_cache, mesmo
+            # tamanho em outra pasta. Desligar a atualizacao de componentes fecha
+            # a torneira. Esta janela so abre o app local, entao nao ha perda.
             '--disable-features=OptimizationGuideOnDeviceModel',
+            '--disable-component-update',
             f'--user-data-dir={PROFILE_DIR}',
         ])
         print('  App aberto no navegador.')
