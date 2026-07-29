@@ -1349,7 +1349,7 @@
 // ══════════════════════════════════════════════════════════════
 // API / SESSÃO
 // ══════════════════════════════════════════════════════════════
-const SGEA_VERSION = '0.35.9';
+const SGEA_VERSION = '0.35.10';
 document.title = `SGEA v${SGEA_VERSION}`;
 
 let _apiToken = localStorage.getItem('sgea-token') || null;
@@ -1919,17 +1919,15 @@ async function bulkAtivo(v) {
 
 // Gera e baixa um CSV a partir das linhas já montadas. BOM + CRLF: o Excel em
 // português abre assim sem quebrar acento nem juntar tudo numa coluna.
+// Passa pelo _salvarArquivoComo, como as demais exportações do sistema: estas
+// três caíam direto na pasta de downloads, sem perguntar onde salvar.
+// Retorna false se o usuário cancelou o diálogo.
 function _csvDownload(linhas, nomeArquivo) {
-  const blob = new Blob(['﻿' + linhas.join('\r\n')], { type: 'text/csv;charset=utf-8' });
-  const a = document.createElement('a');
-  a.href = URL.createObjectURL(blob);
-  a.download = nomeArquivo;
-  a.click();
-  URL.revokeObjectURL(a.href);
+  return _salvarArquivoComo('﻿' + linhas.join('\r\n'), nomeArquivo, 'text/csv;charset=utf-8');
 }
 const _csvEsc = v => { const t = String(v ?? ''); return /[";\n]/.test(t) ? `"${t.replace(/"/g, '""')}"` : t; };
 
-function bulkExport() {
+async function bulkExport() {
   const itens = _crudSelItens();
   if (!itens.length) return;
   const cfg = CRUD_MODULES[_crudAtual];
@@ -1937,8 +1935,8 @@ function bulkExport() {
   const val = (c, i) => c.kfn ? c.kfn(i) : (i[c.k] ?? '');
   const linhas = [cols.map(c => _csvEsc(c.h)).join(';')];
   itens.forEach(i => linhas.push(cols.map(c => _csvEsc(val(c, i))).join(';')));
-  _csvDownload(linhas, `${cfg.titulo.replace(/\s+/g, '_')}_selecionados.csv`);
-  toast(`${itens.length} registro(s) exportado(s).`, 'success');
+  if (await _csvDownload(linhas, `${cfg.titulo.replace(/\s+/g, '_')}_selecionados.csv`))
+    toast(`${itens.length} registro(s) exportado(s).`, 'success');
 }
 
 // Abre o seletor de centro de custo (modal #bulkcc-overlay) e resolve com o id
@@ -2525,15 +2523,15 @@ async function _prodBulkReatribuirCC() {
   renderProdutos();
 }
 
-function _prodBulkExport() {
+async function _prodBulkExport() {
   const ids = new Set(_prodSelIds());
   const sel = _produtosCache.filter(p => ids.has(String(p.id)));
   if (!sel.length) return;
   const cab = ['codigo_fiorilli', 'nome', 'centro_custo_nome', 'unidade_consumo', 'unidade_licitada',
                'qtd_por_embalagem', 'estoque_fisico', 'estoque_financeiro', 'ativo'];
   const linhas = [cab.join(';'), ...sel.map(p => cab.map(c => _csvEsc(p[c])).join(';'))];
-  _csvDownload(linhas, `produtos_${new Date().toISOString().slice(0, 10)}.csv`);
-  toast(`${sel.length} produto(s) exportado(s).`, 'success');
+  if (await _csvDownload(linhas, `produtos_${new Date().toISOString().slice(0, 10)}.csv`))
+    toast(`${sel.length} produto(s) exportado(s).`, 'success');
 }
 
 async function _toggleLotes(pid, trEl) {
@@ -3977,14 +3975,14 @@ async function _pedBulkCancelar() {
     { title: 'Cancelamento parcial', icon: 'ℹ️', okLabel: 'Entendi', cancelLabel: 'Fechar' });
 }
 
-function _pedBulkExport() {
+async function _pedBulkExport() {
   const ids = new Set([..._pedSel]);
   const sel = _pedidosCache.filter(p => ids.has(String(p.id)));
   if (!sel.length) return;
   const cab = ['numero', 'codigo_licitacao', 'fornecedor_nome', 'data_pedido', 'data_entrega_prevista', 'status', 'origem'];
   const linhas = [cab.join(';'), ...sel.map(p => cab.map(c => _csvEsc(p[c])).join(';'))];
-  _csvDownload(linhas, `pedidos_${new Date().toISOString().slice(0, 10)}.csv`);
-  toast(`${sel.length} pedido(s) exportado(s).`, 'success');
+  if (await _csvDownload(linhas, `pedidos_${new Date().toISOString().slice(0, 10)}.csv`))
+    toast(`${sel.length} pedido(s) exportado(s).`, 'success');
 }
 
 let _pedidoProdutos = [];

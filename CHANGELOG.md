@@ -9,6 +9,13 @@
 
 ---
 
+## [0.35.10] — 2026-07-28
+
+### Corrigido
+- **Três exportações baixavam sem perguntar onde salvar.** As exportações da seleção em massa, de produtos e de pedidos caíam direto na pasta de downloads, enquanto as demais (fornecedores, reconciliação, auditoria e backups) já abriam a janela *"Salvar como"*. As três passam a se comportar como as outras. Onde o navegador não oferece essa janela — acesso pelo endereço de rede —, o download direto continua valendo, como nos demais casos.
+
+---
+
 ## [0.35.9] — 2026-07-28
 
 ### Corrigido
