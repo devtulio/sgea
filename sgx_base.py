@@ -592,11 +592,21 @@ def int_param(qs, nome, default=None, minimo=None, maximo=None):
     return n
 
 
-def ler_diagnostico_erros(data_dir, sigla, limite=400):
+def ler_diagnostico_erros(data_dir, sigla, limite=400, dias=7):
     """Lê o final do <sigla>_errors.log + o <sigla>_crash.log e devolve os erros
     agrupados por (nível + categoria + rota), com contagem e último exemplo —
-    para a tela admin de diagnóstico. Não levanta: em qualquer falha, devolve vazio."""
+    para a tela admin de diagnóstico. Não levanta: em qualquer falha, devolve vazio.
+
+    A tela se chama "Erros recentes": entra só o que é dos últimos <dias> dias.
+    O mais antigo vira uma contagem em 'anteriores'. Sem esse corte, defeito já
+    corrigido ficava no painel para sempre — o log só rotaciona aos 2 MB, o que
+    na prática não acontece — e o painel deixava de responder "o que está
+    quebrado agora". Nada é apagado: o arquivo continua íntegro."""
+    import datetime
     grupos = {}   # chave -> {nivel, tipo, count, ultimo, exemplo}
+    anteriores = 0
+    # timestamp gravado é ISO, então comparar como texto ordena igual à data
+    corte = (datetime.datetime.now() - datetime.timedelta(days=dias)).isoformat(timespec='seconds')
     try:
         caminho = caminho_log_erros(data_dir, sigla)
         if os.path.isfile(caminho):
@@ -607,6 +617,9 @@ def ler_diagnostico_erros(data_dir, sigla, limite=400):
                 if len(partes) < 3:
                     continue   # linha de continuação (traceback) — ignora no agrupamento
                 ts, nivel, resto = partes[0], partes[1], ' | '.join(partes[2:])
+                if ts < corte:
+                    anteriores += 1
+                    continue
                 chave_partes = resto.split(' | ')[:2]   # categoria + rota/detalhe
                 chave = f'{nivel} | ' + ' | '.join(chave_partes)
                 g = grupos.get(chave)
@@ -631,7 +644,8 @@ def ler_diagnostico_erros(data_dir, sigla, limite=400):
                      if any(s in b for s in sinais)][-5:]
     except Exception:
         pass
-    return {'erros': sorted(grupos.values(), key=lambda g: -g['count']), 'crash': crash}
+    return {'erros': sorted(grupos.values(), key=lambda g: -g['count']),
+            'crash': crash, 'anteriores': anteriores, 'dias': dias}
 
 
 # ── Configurações genéricas (sys_settings key/value) ────────────────────────

@@ -5358,7 +5358,7 @@ async function carregarErros() {
   const erros = d.erros || [];
   const cor = n => n === 'ERROR' ? '#dc2626' : '#b45309';
   if (!erros.length) {
-    el.innerHTML = '<p style="color:var(--gray-400);font-style:italic">Nenhum erro registrado. 🎉</p>';
+    el.innerHTML = `<p style="color:var(--gray-400);font-style:italic">Nenhum erro nos últimos ${d.dias || 7} dias. 🎉</p>`;
   } else {
     const rows = erros.map(g => `
       <tr>
@@ -5372,6 +5372,11 @@ async function carregarErros() {
         <th style="padding:6px;font-size:.7rem;color:var(--gray-500)">Qtd</th>
         <th style="text-align:left;padding:6px;font-size:.7rem;color:var(--gray-500)">Tipo</th>
       </tr></thead><tbody>${rows}</tbody></table>`;
+  }
+  // Registro mais antigo que a janela nao some sem aviso: vira uma linha de rodape.
+  if (d.anteriores) {
+    el.innerHTML += `<p style="margin:6px 0 0;font-size:.72rem;color:var(--gray-400)">
+      Mais ${d.anteriores} registro(s) anteriores a ${d.dias || 7} dias, guardados no arquivo de log.</p>`;
   }
   if ((d.crash || []).length) {
     el.innerHTML += `<div style="margin-top:10px;padding:8px 10px;background:#fef2f2;border:1px solid #fecaca;border-radius:6px;font-size:.72rem;color:#991b1b"><strong>⚠ ${d.crash.length} falha(s) fatal(is) do servidor</strong> — o processo caiu. Detalhe no arquivo <code>SGEA_crash.log</code>.</div>`;
