@@ -7,6 +7,10 @@
 
 ## [Não versionado]
 
+---
+
+## [0.35.13] — 2026-07-29
+
 ### Alterado
 - **A tela "Erros recentes" passa a mostrar só os últimos 7 dias.** Antes ela listava tudo o que estivesse no log, então um defeito já corrigido continuava aparecendo indefinidamente — o arquivo só é rotacionado ao chegar a 2 MB, o que na prática não acontece. O que é mais antigo não some sem aviso: aparece como *"mais N registros anteriores a 7 dias, guardados no arquivo de log"*. **Nada é apagado** — o log continua íntegro no disco.
 
