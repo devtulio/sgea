@@ -9,6 +9,17 @@
 
 ---
 
+## [0.35.14] — 2026-07-31
+
+### Alterado
+- **Página do projeto no GitHub revisada.** O selo de versão passa a ser lido da última release publicada, então deixa de precisar de atualização manual a cada lançamento. Novos selos de domínio e plataforma; nova seção **Como citar**, com o DOI do Zenodo; e novo bloco **Sistemas irmãos**, com links para os outros sistemas da família — antes eles eram citados apenas pelo nome.
+
+### Corrigido
+- **O selo de DOI não aparecia** na página do GitHub. O proxy de imagens do GitHub não consegue buscar do Zenodo, e a imagem chegava vazia, sem erro visível — estava assim desde que o selo foi criado. Passa a ser servido pelo mesmo provedor dos demais selos, com o link continuando a levar ao DOI.
+- Comentário de versão no topo do `server.py`, parado na v0.29.0.
+
+---
+
 ## [0.35.13] — 2026-07-29
 
 ### Alterado
