@@ -1,6 +1,6 @@
 # SGEA — Sistema de Gestão de Estoque do Almoxarifado
 
-![Versão](https://img.shields.io/badge/versão-v0.35.13-blue) ![Tecnologia](https://img.shields.io/badge/tecnologia-Python%20%2B%20SQLite-orange) ![Licença](https://img.shields.io/badge/licença-MIT-green) ![Multiusuário](https://img.shields.io/badge/acesso-multiusuário-blueviolet) [![DOI](https://zenodo.org/badge/DOI/10.5281/zenodo.21570250.svg)](https://doi.org/10.5281/zenodo.21570250) [![CI](https://github.com/devtulio/sgea/actions/workflows/ci.yml/badge.svg)](https://github.com/devtulio/sgea/actions/workflows/ci.yml)
+![Versão](https://img.shields.io/github/v/release/devtulio/sgea?label=vers%C3%A3o&color=blue) ![Tecnologia](https://img.shields.io/badge/tecnologia-Python%20%2B%20SQLite-orange) ![Domínio](https://img.shields.io/badge/domínio-almoxarifado-informational) ![FEFO](https://img.shields.io/badge/controle-lote%20%2B%20validade%20%28FEFO%29-teal) ![Plataforma](https://img.shields.io/badge/plataforma-Windows-lightgrey) ![Licença](https://img.shields.io/badge/licença-MIT-green) ![Multiusuário](https://img.shields.io/badge/acesso-multiusuário-blueviolet) [![DOI](https://zenodo.org/badge/DOI/10.5281/zenodo.21570250.svg)](https://doi.org/10.5281/zenodo.21570250) [![CI](https://github.com/devtulio/sgea/actions/workflows/ci.yml/badge.svg)](https://github.com/devtulio/sgea/actions/workflows/ci.yml)
 
 ## Descrição
 
@@ -222,6 +222,32 @@ Roda contra um banco/backups temporários (nunca o `sgea.db` real), criados e de
 ## Versionamento
 
 Consulte o [CHANGELOG.md](CHANGELOG.md) para o histórico completo de versões e alterações.
+
+---
+
+## Sistemas irmãos
+
+Cinco sistemas livres para a administração pública municipal. Os quatro
+primeiros compartilham a mesma arquitetura (servidor Python + SQLite +
+frontend single-file, multiusuário em rede local); o Licitarium é um
+programa de desktop e apenas lê dados públicos.
+
+| Sistema | Cuida de | |
+|---|---|---|
+| **SGCD** — Contratação Direta | dispensas de licitação, do pedido ao contrato | [repositório](https://github.com/devtulio/sgcd) |
+| **SGCA** — Contratos e Atas | contratos administrativos e atas de registro de preços | [repositório](https://github.com/devtulio/sgca) |
+| **SGDP** — Documentos da Procuradoria | leis, decretos, portarias, pareceres e ofícios | [repositório](https://github.com/devtulio/sgdp) |
+| **SGEA** — Estoque do Almoxarifado | entradas, saídas, lote e validade com FEFO | **(este)** |
+| **Licitarium** — Repositório do PNCP | espelho local das contratações do município | [repositório](https://github.com/devtulio/licitarium) |
+
+---
+
+## Como citar
+
+Cada versão publicada recebe um DOI próprio no Zenodo; o DOI abaixo é o do
+projeto e resolve sempre para a versão mais recente.
+
+> SILVA, T. R. M. **SGEA: sistema de gestão de estoque do almoxarifado**. Zenodo. https://doi.org/10.5281/zenodo.21570250
 
 ---
 
