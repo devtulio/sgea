@@ -10,6 +10,15 @@ O sistema nasceu para substituir uma planilha Excel usada em paralelo ao sistema
 
 Funciona em rede local: um único computador executa o servidor e todos os usuários acessam pelo navegador via IP ou `localhost`.
 
+![SGEA — estoque com lote e validade](docs/screenshots/estoque.png)
+
+<p align="center">
+  <img src="docs/screenshots/entradas.png" width="49%" alt="Entradas com fornecedor e nota fiscal">
+  <img src="docs/screenshots/alertas.png" width="49%" alt="Alertas de validade">
+</p>
+
+> As telas acima usam dados fictícios, gerados por `docs/screenshots.spec.js` contra um banco temporário.
+
 ---
 
 ## Funcionalidades Principais

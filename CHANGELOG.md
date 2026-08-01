@@ -7,6 +7,9 @@
 
 ## [Não versionado]
 
+### Documentação
+- **Capturas de tela no README.** As imagens são geradas por `docs/screenshots.spec.js` contra um banco temporário, com dados fictícios e sem brasão — a captura nunca enxerga o banco real. Para atualizá-las depois de mudar a interface: `npx playwright test -c docs/screenshots.config.js`.
+
 ---
 
 ## [0.35.15] — 2026-08-01
