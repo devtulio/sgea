@@ -171,6 +171,22 @@ function parseValorBR(v) {
   return negativo ? -n : n;
 }
 
+/* ── Data local em AAAA-MM-DD ───────────────────────────────────────────────
+   toISOString() converte para UTC. No nosso fuso (UTC-3), depois das 21h ele
+   devolve o DIA SEGUINTE — e "hoje" calculado assim, comparado com uma data de
+   vencimento, marca como vencido o que vence hoje. Já mordeu o SGCD (documento
+   com a data de ontem), o SGEA (lote vencendo hoje pintado de vermelho à noite)
+   e o SGDP (lembrete do dia aparecendo como atrasado).
+
+   Vale para "hoje" e para qualquer Date que precise virar string de data: quem
+   já ancorou em meia-noite LOCAL (new Date(s + 'T00:00:00')) sobrevive ao
+   toISOString por acidente de fuso — aqui não depende de acidente.
+
+   Só para data. Carimbo de tempo continua em toISOString, que é o certo lá. */
+function _isoLocal(d = new Date()) {
+  return `${d.getFullYear()}-${String(d.getMonth() + 1).padStart(2, '0')}-${String(d.getDate()).padStart(2, '0')}`;
+}
+
 function _debounce(fn, ms) {
   let t;
   return (...args) => { clearTimeout(t); t = setTimeout(() => fn(...args), ms); };

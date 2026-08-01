@@ -9,6 +9,13 @@
 
 ---
 
+## [0.35.15] — 2026-08-01
+
+### Corrigido
+- **Lote vencendo hoje aparecia como "Vencido" à noite.** O sistema calculava "hoje" convertendo o horário para o fuso de Greenwich. Depois das 21h, "hoje" já era o dia seguinte lá — e tudo que dependia disso errava um dia, mas só à noite. Um lote com validade para hoje era marcado em vermelho como vencido — na lista de produtos e no painel de lotes — para quem abrisse o sistema depois das 21h. Num sistema de controle de validade e FEFO, é o pior lugar para errar um dia. O mesmo erro afetava o período inicial do relatório mensal, os campos de data que já nascem preenchidos (data de entrega na entrada, data da saída) e a data no nome dos arquivos exportados.
+
+---
+
 ## [0.35.14] — 2026-07-31
 
 ### Alterado

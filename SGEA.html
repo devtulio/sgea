@@ -1349,7 +1349,7 @@
 // ══════════════════════════════════════════════════════════════
 // API / SESSÃO
 // ══════════════════════════════════════════════════════════════
-const SGEA_VERSION = '0.35.14';
+const SGEA_VERSION = '0.35.15';
 document.title = `SGEA v${SGEA_VERSION}`;
 
 let _apiToken = localStorage.getItem('sgea-token') || null;
@@ -2412,7 +2412,7 @@ async function renderProdutos() {
   _produtosCache = items;
   const el = document.getElementById('produtos-list');
   if (!items.length) { el.innerHTML = '<div class="empty">Nenhum produto cadastrado.</div>'; return; }
-  const hoje = new Date().toISOString().slice(0, 10);
+  const hoje = _isoLocal();
   const cols = [
     { h: 'Produto', get: p => p.nome },
     { h: 'Código Fiorilli', k: 'codigo_fiorilli' },
@@ -2530,7 +2530,7 @@ async function _prodBulkExport() {
   const cab = ['codigo_fiorilli', 'nome', 'centro_custo_nome', 'unidade_consumo', 'unidade_licitada',
                'qtd_por_embalagem', 'estoque_fisico', 'estoque_financeiro', 'ativo'];
   const linhas = [cab.join(';'), ...sel.map(p => cab.map(c => _csvEsc(p[c])).join(';'))];
-  if (await _csvDownload(linhas, `produtos_${new Date().toISOString().slice(0, 10)}.csv`))
+  if (await _csvDownload(linhas, `produtos_${_isoLocal()}.csv`))
     toast(`${sel.length} produto(s) exportado(s).`, 'success');
 }
 
@@ -2542,7 +2542,7 @@ async function _toggleLotes(pid, trEl) {
   const r = await API.get(`/api/produtos/${pid}/lotes`);
   const d = await API.json(r);
   const lotes = d?.items || [];
-  const hoje = new Date().toISOString().slice(0, 10);
+  const hoje = _isoLocal();
   const cell = row.querySelector('td');
   cell.innerHTML = lotes.length ? `<div class="lotes-panel"><table>
     <thead><tr><th>Lote</th><th>Validade</th><th>Qtd. Recebida</th><th>Saldo Atual</th><th>Custo Unit.</th></tr></thead>
@@ -3603,14 +3603,14 @@ async function exportarFornecedoresCSV() {
   const lista = await _fornExportLista();
   if (!lista.length) { toast('Nenhum fornecedor para exportar', 'error'); return; }
   const csv = toCSV(_FORN_EXPORT_COLS, _fornExportRows(lista));
-  if (await _salvarArquivoComo(csv, `SGEA_fornecedores_${new Date().toISOString().slice(0, 10)}.csv`, 'text/csv;charset=utf-8;'))
+  if (await _salvarArquivoComo(csv, `SGEA_fornecedores_${_isoLocal()}.csv`, 'text/csv;charset=utf-8;'))
     toast(`${lista.length} fornecedor(es) exportado(s).`, 'success');
 }
 
 async function exportarFornecedoresXlsx() {
   const lista = await _fornExportLista();
   if (!lista.length) { toast('Nenhum fornecedor para exportar', 'error'); return; }
-  if (await _exportarXlsx(`SGEA_fornecedores_${new Date().toISOString().slice(0, 10)}.xlsx`, _FORN_EXPORT_COLS, _fornExportRows(lista)))
+  if (await _exportarXlsx(`SGEA_fornecedores_${_isoLocal()}.xlsx`, _FORN_EXPORT_COLS, _fornExportRows(lista)))
     toast(`${lista.length} fornecedor(es) exportado(s).`, 'success');
 }
 
@@ -3623,7 +3623,7 @@ async function exportarCadastroForn() {
   if (!r?.ok) { toast('Erro ao exportar cadastro.', 'error'); return; }
   const txt = await r.text();
   let n = 0; try { n = (JSON.parse(txt).fornecedores || []).length; } catch {}
-  const nome = `SGX_FORN_${new Date().toISOString().slice(0,10)}_${new Date().toTimeString().slice(0,8).replace(/:/g,'-')}.json`;
+  const nome = `SGX_FORN_${_isoLocal()}_${new Date().toTimeString().slice(0,8).replace(/:/g,'-')}.json`;
   const salvo = await _salvarArquivoComo(txt, nome, 'application/json');
   if (salvo) toast(`${n} fornecedor(es) exportado(s) para sincronização.`, 'success');
 }
@@ -3977,7 +3977,7 @@ async function _pedBulkExport() {
   if (!sel.length) return;
   const cab = ['numero', 'codigo_licitacao', 'fornecedor_nome', 'data_pedido', 'data_entrega_prevista', 'status', 'origem'];
   const linhas = [cab.join(';'), ...sel.map(p => cab.map(c => _csvEsc(p[c])).join(';'))];
-  if (await _csvDownload(linhas, `pedidos_${new Date().toISOString().slice(0, 10)}.csv`))
+  if (await _csvDownload(linhas, `pedidos_${_isoLocal()}.csv`))
     toast(`${sel.length} pedido(s) exportado(s).`, 'success');
 }
 
@@ -4186,7 +4186,7 @@ async function openEntradaModal() {
   document.getElementById('ef-nfe-chave').value = '';
   document.getElementById('ef-requisicao').value = '';
   document.getElementById('ef-data-requisicao').value = '';
-  document.getElementById('ef-data-entrega').value = new Date().toISOString().slice(0, 10);
+  document.getElementById('ef-data-entrega').value = _isoLocal();
   document.getElementById('ef-observacao').value = '';
   document.getElementById('ef-itens').innerHTML = '';
   _addEntradaItemRow();
@@ -4338,7 +4338,7 @@ async function openSaidaModal() {
   const frotas = await _fetchList('frota');
   document.getElementById('sf-frota').innerHTML = '<option value="">—</option>' + frotas.map(f => `<option value="${f.id}">${esc(f.numero)} — ${esc(f.placa || '')}</option>`).join('');
   _saidaProdutos = await _fetchList('produtos?somente_ativos=1');
-  document.getElementById('sf-data').value = new Date().toISOString().slice(0, 10);
+  document.getElementById('sf-data').value = _isoLocal();
   document.getElementById('sf-numero-solicitacao').value = '';
   document.getElementById('sf-observacao').value = '';
   document.getElementById('sf-itens').innerHTML = '';
@@ -4680,7 +4680,7 @@ async function exportarBackupJson() {
   const r = await API.get('/api/backup');
   if (!r || !r.ok) { toast('Erro ao exportar backup.', 'error'); return; }
   const blob = await r.blob();
-  await _salvarArquivoComo(blob, `SIS_SGEA_BACKUP_${new Date().toISOString().slice(0, 10)}.json`, 'application/json');
+  await _salvarArquivoComo(blob, `SIS_SGEA_BACKUP_${_isoLocal()}.json`, 'application/json');
 }
 
 async function fazerBackupAgora() {
@@ -4884,8 +4884,8 @@ function showRelatorios() {
 
 function renderRelatoriosList() {
   const hoje = new Date();
-  const primeiroDia = new Date(hoje.getFullYear(), hoje.getMonth(), 1).toISOString().slice(0, 10);
-  const ultimoDia = hoje.toISOString().slice(0, 10);
+  const primeiroDia = _isoLocal(new Date(hoje.getFullYear(), hoje.getMonth(), 1));
+  const ultimoDia = _isoLocal(hoje);
   document.getElementById('relatorios-list').innerHTML = `
     <div class="rel-grid">
       <div class="rel-card">
@@ -5324,7 +5324,7 @@ async function _wipeConfirmarFrase() {
   try {
     const r = await API.get('/api/backup');
     const blob = await r.blob();
-    await _salvarArquivoComo(blob, `SGEA_wipe_backup_${new Date().toISOString().slice(0, 10)}.json`, 'application/json');
+    await _salvarArquivoComo(blob, `SGEA_wipe_backup_${_isoLocal()}.json`, 'application/json');
   } catch (e) { /* segue mesmo se o download falhar — o servidor também faz backup */ }
 
   let restante = 5;
@@ -5520,7 +5520,7 @@ async function editarProdutoRecon(codigo) {
   await openProdutoModal(prod.id);
 }
 
-function _hojeISO() { return new Date().toISOString().slice(0, 10); }
+function _hojeISO() { return _isoLocal(); }
 
 function showReconciliacao() {
   _showView('view-reconciliacao', 'nav-reconciliacao');
@@ -5773,7 +5773,7 @@ async function exportarAuditoriaCSV() {
   const linhas = lista.map(a => [
     fmtDateTime(a.ts), a.user_nome || '', _AUDIT_EVENT_LABELS[a.type] || a.type || '', a.detail || '',
   ]);
-  const salvou = await _salvarArquivoComo(toCSV(header, linhas), `SGEA_auditoria_${new Date().toISOString().slice(0, 10)}.csv`, 'text/csv;charset=utf-8;');
+  const salvou = await _salvarArquivoComo(toCSV(header, linhas), `SGEA_auditoria_${_isoLocal()}.csv`, 'text/csv;charset=utf-8;');
   if (salvou) toast(`${lista.length} registro(s) exportado(s).`, 'success');
 }
 

@@ -128,3 +128,29 @@ test('importa funcionários da folha do Fiorilli (dedup + campos novos)', async 
   expect(utilizada.forma).toBe('CONCURSO PUBLICO');
   expect(utilizada.data).toBe('01/01/2020');
 });
+
+// toISOString() devolve a data em UTC: depois das 21h no nosso fuso ele já está
+// no dia seguinte, e "hoje" calculado assim marcava como VENCIDO o lote que
+// vence hoje. Num sistema de validade/FEFO isso é o pior lugar para errar.
+// O relógio é fixado às 23h30 do dia da validade do lote L1 (criado no primeiro
+// teste): é a única janela em que o defeito aparece.
+test.describe('data local em fuso brasileiro', () => {
+  test.use({ timezoneId: 'America/Sao_Paulo' });
+
+  test('lote que vence hoje nao aparece como vencido a noite', async ({ page }) => {
+    await page.clock.setFixedTime(new Date('2026-08-01T23:30:00-03:00'));
+    await page.goto('/SGEA.html');
+    await page.fill('#pin-username', 'admin');
+    await page.fill('#pin-input', 'novaSenhaE2E123');
+    await page.click('#login-form button[type=submit]');
+    await expect(page.locator('#overlay-pin')).toBeHidden();
+
+    // o helper compartilhado tem de ler a data LOCAL, nao a de UTC (02/08)
+    expect(await page.evaluate(() => _isoLocal()), 'data local saiu em UTC').toBe('2026-08-01');
+
+    await page.click('#nav-produtos');
+    const linha = page.locator('#produtos-list tr', { hasText: 'Água Sanitária 2L' });
+    await expect(linha).toBeVisible();
+    await expect(linha, 'lote vencendo hoje foi marcado como vencido').not.toContainText('Vencido');
+  });
+});
