@@ -7,6 +7,10 @@
 
 ## [Não versionado]
 
+---
+
+## [0.35.16] — 2026-08-02
+
 ### Alterado
 - **Data por extenso passa a vir do esqueleto compartilhado.** O fecho "local, data" dos documentos usava uma expressão repetida em cada gerador — 18 cópias somadas nos quatro sistemas. Agora todas chamam `fmtExtenso()`, no `base.js`, que já trata a armadilha de fuso (string só-data lida sem âncora volta um dia). Nada muda no que sai impresso; o que muda é haver um só lugar para corrigir.
 
