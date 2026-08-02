@@ -187,6 +187,19 @@ function _isoLocal(d = new Date()) {
   return `${d.getFullYear()}-${String(d.getMonth() + 1).padStart(2, '0')}-${String(d.getDate()).padStart(2, '0')}`;
 }
 
+/* ── Data por extenso ("31 de julho de 2026") ───────────────────────────────
+   É o formato do fecho "local, data" de todo documento oficial da família.
+   Sem argumento devolve hoje — que é o uso na maioria dos geradores.
+
+   Mesma armadilha de fuso do _isoLocal, do outro lado: string só-data lida sem
+   âncora vira meia-noite UTC e, no nosso fuso, volta um dia. Por isso o
+   'T00:00:00'. Havia 18 cópias desta expressão espalhadas pelos sistemas; a que
+   formatava data específica em vez do dia corrente foi a que saiu errada. */
+function fmtExtenso(dt) {
+  const d = !dt ? new Date() : (typeof dt === 'number' ? new Date(dt) : new Date(dt + 'T00:00:00'));
+  return d.toLocaleDateString('pt-BR', { day: 'numeric', month: 'long', year: 'numeric' });
+}
+
 function _debounce(fn, ms) {
   let t;
   return (...args) => { clearTimeout(t); t = setTimeout(() => fn(...args), ms); };
