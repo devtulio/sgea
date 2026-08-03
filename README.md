@@ -238,10 +238,9 @@ Consulte o [CHANGELOG.md](CHANGELOG.md) para o histórico completo de versões e
 
 ## Sistemas irmãos
 
-Cinco sistemas livres para a administração pública municipal. Os quatro
-primeiros compartilham a mesma arquitetura (servidor Python + SQLite +
-frontend single-file, multiusuário em rede local); o Licitarium é um
-programa de desktop e apenas lê dados públicos.
+Quatro sistemas livres para a administração pública municipal, com a mesma
+arquitetura: servidor Python + SQLite e frontend single-file, multiusuário em
+rede local.
 
 | Sistema | Cuida de | |
 |---|---|---|
@@ -249,7 +248,6 @@ programa de desktop e apenas lê dados públicos.
 | **SGCA** — Contratos e Atas | contratos administrativos e atas de registro de preços | [repositório](https://github.com/devtulio/sgca) |
 | **SGDP** — Documentos da Procuradoria | leis, decretos, portarias, pareceres e ofícios | [repositório](https://github.com/devtulio/sgdp) |
 | **SGEA** — Estoque do Almoxarifado | entradas, saídas, lote e validade com FEFO | **(este)** |
-| **Licitarium** — Repositório do PNCP | espelho local das contratações do município | [repositório](https://github.com/devtulio/licitarium) |
 
 ---
 
