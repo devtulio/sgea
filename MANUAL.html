@@ -3,7 +3,7 @@
 <head>
 <meta charset="UTF-8">
 <meta name="viewport" content="width=device-width, initial-scale=1.0">
-<title>Manual Operacional — SGEA v0.35.16</title>
+<title>Manual Operacional — SGEA v0.35.17</title>
 <style>
   * { box-sizing: border-box; margin: 0; padding: 0; }
   body { font-family: 'Times New Roman', Times, serif; font-size: 12pt; color: #000; background: #f5f5f5; }
@@ -54,7 +54,7 @@
       size: A4;
       margin: 20mm 20mm 25mm;
       @top-center {
-        content: "SGEA v0.35.16 — Manual Operacional";
+        content: "SGEA v0.35.17 — Manual Operacional";
         font-family: 'Times New Roman', serif;
         font-size: 9pt;
         color: #666;
@@ -80,7 +80,7 @@
     <div class="cover-title">Manual Operacional</div>
     <div class="cover-subtitle">SGEA — Sistema de Gestão de Estoque do Almoxarifado</div>
     <div class="cover-system">Entradas, Saídas, Lotes/Validade e cadastros de apoio</div>
-    <div class="cover-version">Versão v0.35.16</div>
+    <div class="cover-version">Versão v0.35.17</div>
     <br>
     <div style="font-size:11pt; color:#555; line-height:1.8;">
       Aplicação web multiusuário para o Almoxarifado<br>
@@ -223,6 +223,7 @@
 
   <h2 id="sec11">11. Configurações</h2>
 <p><strong>Dois tipos de backup, para usos diferentes.</strong> O arquivo <strong>JSON</strong> guarda os dados de trabalho (produtos, entradas, saídas, cadastros e configurações) e é o que se envia a outra máquina para sincronizar — ele <strong>não</strong> contém as contas de usuário nem as senhas. Para recuperação completa depois de perda de disco ou formatação, use o <strong>backup do banco</strong>, gerado automaticamente e disponível em Configurações → Backup: desde a versão 0.28.0 ele é um <strong>pacote <code>.zip</code></strong> (o banco mais os anexos), e é uma cópia integral do sistema, contas inclusive. Os backups <code>.db</code> antigos continuam podendo ser restaurados normalmente. Guarde-o em local seguro, pois contém todos os dados.</p>
+<div class="nota"><strong>Os dois arquivos, pelo nome:</strong> o Cofre é o <code>DB_SGEA_BACKUP_[data-hora].zip</code> — cópia da instalação, restaura tudo, inclusive as contas; guarde-o fora da máquina. O de sincronização é o <code>SYNC_SGEA_BACKUP_[data-hora].json</code> — leva os dados de trabalho a outra instalação, sem contas. Ele se chamava <code>SIS_</code> até agosto/2026; os arquivos gravados antes continuam na lista e continuam restauráveis, porque o sistema reconhece o backup pelo conteúdo, não pelo nome.</div>
   <p>A tela <strong>Configurações</strong> reúne, em sete abas, tudo que não é operação de estoque no dia a dia. Um único botão <strong>Salvar</strong>, fixo no topo, grava as alterações das abas Interface/Organização/Comunicação/Dados de uma só vez — ele pulsa quando há alterações não salvas. O botão "← Voltar" retorna para o Estoque.</p>
   <ul>
     <li><strong>Interface</strong> — tema claro/escuro; <strong>largura do conteúdo</strong> (compacta ou expandida); <strong>tamanho da fonte</strong> (Normal/Pequena/Grande); e <strong>cor de destaque</strong> (Institucional, Azul, Verde ou Roxo). Essas escolhas ficam salvas no navegador de cada usuário e só entram em vigor ao clicar em Salvar</li>
@@ -272,6 +273,7 @@
   <h2 id="sec15">15. Histórico de Versões</h2>
   <table>
     <tr><th>Versão</th><th>Data</th><th>Resumo</th></tr>
+    <tr><td>0.35.17</td><td>02/08/2026</td><td>O backup JSON passou a se chamar SYNC_ em vez de SIS_ — o nome agora diz o papel (o Cofre .zip é que restaura tudo). Arquivos antigos continuam na lista e restauráveis.</td></tr>
     <tr><td>0.35.16</td><td>02/08/2026</td><td>Função única do esqueleto para a data por extenso dos documentos, e capturas de tela no README do projeto (geradas por script, com dados fictícios).</td></tr>
     <tr><td>0.35.15</td><td>01/08/2026</td><td>Lote com validade para HOJE aparecia como "Vencido" para quem usava o sistema depois das 21h. O sistema calculava "hoje" convertendo o horário para o fuso de Greenwich. Depois das 21h, "hoje" já era o dia seguinte lá — e tudo que dependia disso errava um dia, mas só à noite. Afetava a lista de produtos, o painel de lotes, o período do relatório mensal e os campos de data que já nascem preenchidos (entrada e saída).</td></tr>
     <tr><td>0.35.14</td><td>31/07/2026</td><td>Página do projeto no GitHub revisada: selo de versão lido da última release, seção Como citar com o DOI e links para os sistemas irmãos. Corrigido o selo de DOI, que não aparecia.</td></tr>

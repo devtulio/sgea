@@ -9,6 +9,13 @@
 
 ---
 
+## [0.35.17] — 2026-08-02
+
+### Alterado
+- **O backup JSON passou a se chamar `SYNC_` em vez de `SIS_`.** O nome agora diz o papel: quem restaura tudo é o Cofre (`DB_..._.zip`, banco + anexos + contas); o JSON serve para levar os dados de trabalho a outra instalação. Os arquivos gravados antes continuam aparecendo na lista de restauração e continuam entrando na rotação — a identificação do backup sempre foi pelo conteúdo (envelope `_sgx`), nunca pelo nome do arquivo.
+
+---
+
 ## [0.35.16] — 2026-08-02
 
 ### Alterado

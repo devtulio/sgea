@@ -1349,7 +1349,7 @@
 // ══════════════════════════════════════════════════════════════
 // API / SESSÃO
 // ══════════════════════════════════════════════════════════════
-const SGEA_VERSION = '0.35.16';
+const SGEA_VERSION = '0.35.17';
 document.title = `SGEA v${SGEA_VERSION}`;
 
 let _apiToken = localStorage.getItem('sgea-token') || null;
@@ -4680,7 +4680,7 @@ async function exportarBackupJson() {
   const r = await API.get('/api/backup');
   if (!r || !r.ok) { toast('Erro ao exportar backup.', 'error'); return; }
   const blob = await r.blob();
-  await _salvarArquivoComo(blob, `SIS_SGEA_BACKUP_${_isoLocal()}.json`, 'application/json');
+  await _salvarArquivoComo(blob, `SYNC_SGEA_BACKUP_${_isoLocal()}.json`, 'application/json');
 }
 
 async function fazerBackupAgora() {

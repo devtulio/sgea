@@ -38,7 +38,7 @@ for _stream in (sys.stdout, sys.stderr):
 # Versão do servidor — DEVE acompanhar o SGEA_VERSION do SGEA.html a cada release.
 # Exposta em /health para o frontend detectar quando o processo em execução está
 # desatualizado (HTML novo servido, mas server.py antigo ainda rodando em memória).
-SERVER_VERSION = '0.35.16'
+SERVER_VERSION = '0.35.17'
 
 PORT        = int(os.environ.get('SGEA_PORT', 3003))
 _BASE       = os.path.dirname(os.path.abspath(__file__))
@@ -3194,7 +3194,7 @@ class SGEAHandler(http.server.SimpleHTTPRequestHandler):
     def _export_backup(self):
         payload = _build_backup_payload()
         body = json.dumps(payload, ensure_ascii=False).encode('utf-8')
-        name = time.strftime('SIS_SGEA_BACKUP_%Y-%m-%d_%H-%M-%S.json')
+        name = time.strftime('SYNC_SGEA_BACKUP_%Y-%m-%d_%H-%M-%S.json')
         self.send_response(200); self._cors()
         self.send_header('Content-Type', 'application/json')
         self.send_header('Content-Length', str(len(body)))
@@ -3326,7 +3326,7 @@ class SGEAHandler(http.server.SimpleHTTPRequestHandler):
             reverse=True
         ) if os.path.isdir(bdir) else []
         backups_json = sorted(
-            (f for f in os.listdir(bdir) if f.startswith('SIS_SGEA_BACKUP_') and f.endswith('.json')),
+            (f for f in os.listdir(bdir) if f.startswith(_SYNC_PREFIXOS) and f.endswith('.json')),
             reverse=True
         ) if os.path.isdir(bdir) else []
 
@@ -3537,6 +3537,13 @@ _SGX_SIGLA = 'SGEA'
 _BACKUP_SCHEMA = 1
 _BACKUP_INCLUI_USUARIOS = False
 _COFRE_EXTS = ('.zip', '.db')   # casa o .zip novo e o .db legado
+# Prefixo do JSON portatil: SYNC_ desde 2026-08-02 (antes SIS_). A listagem e a
+# rotacao casam os dois — arquivo gravado antes do renome continua aparecendo na
+# tela de restauracao e continua entrando na conta dos N mantidos. Trocar so o
+# prefixo novo deixaria os antigos orfaos no disco, fora de qualquer limpeza.
+# A identificacao do conteudo nunca dependeu do nome: quem valida e o envelope
+# (_sgx/schema), via sgx_base.eh_backup.
+_SYNC_PREFIXOS = ('SYNC_SGEA_BACKUP_', 'SIS_SGEA_BACKUP_')
 
 def _settings_para(result, s):
     """Recorta o que /api/settings devolve conforme quem pergunta.
@@ -3568,7 +3575,7 @@ def _do_json_backup(cfg=None):
     if cfg is None: cfg = _get_backup_cfg()
     bdir = cfg['path']
     os.makedirs(bdir, exist_ok=True)
-    name = time.strftime('SIS_SGEA_BACKUP_%Y-%m-%d_%H-%M-%S.json')
+    name = time.strftime('SYNC_SGEA_BACKUP_%Y-%m-%d_%H-%M-%S.json')
     dst = os.path.join(bdir, name)
     try:
         with open(dst, 'w', encoding='utf-8') as f:
@@ -3583,7 +3590,7 @@ def _rotate_backups(cfg=None):
     if cfg is None: cfg = _get_backup_cfg()
     bdir, keep = cfg['path'], cfg['keep']
     if not os.path.isdir(bdir): return
-    for prefix, ext in [('DB_SGEA_BACKUP_', _COFRE_EXTS), ('SIS_SGEA_BACKUP_', '.json')]:
+    for prefix, ext in [('DB_SGEA_BACKUP_', _COFRE_EXTS), (_SYNC_PREFIXOS, '.json')]:
         files = sorted(f for f in os.listdir(bdir) if f.startswith(prefix) and f.endswith(ext))
         for old in (files[:-keep] if keep else files):
             fp = os.path.join(bdir, old)

@@ -677,12 +677,19 @@ def add_audit(get_db, table, audit_id, ts, user_id, user_nome, tipo, detail, pro
         )
 
 
+_TS_NO_NOME = re.compile(r'(\d{4}-\d{2}-\d{2})_(\d{2}-\d{2}-\d{2})')
+
+
 def backup_ts(filename):
-    """Timestamp ISO a partir do nome do backup no formato
-    DB_XXXX_BACKUP_YYYY-MM-DD_HH-MM-SS.db. O prefixo tem sempre 15 chars nos 4
-    sistemas (DB_ + código de 4 letras + _BACKUP_), então os offsets são fixos."""
-    d = filename[15:25]; t = filename[26:34].replace('-', ':')
-    return f'{d}T{t}'
+    """Timestamp ISO a partir do nome do backup (DB_XXXX_BACKUP_ / SYNC_XXXX_BACKUP_).
+
+    Procura a data no nome em vez de fatiar por posição fixa. A versão anterior
+    usava filename[15:25], contando com prefixo de 15 chars (DB_ + sigla de 4 +
+    _BACKUP_) — verdade só para o Cofre. SIS_ tinha 16 e SYNC_ tem 17, então
+    qualquer chamada com o JSON devolvia data deslocada, sem erro nenhum.
+    """
+    m = _TS_NO_NOME.search(filename or '')
+    return f"{m.group(1)}T{m.group(2).replace('-', ':')}" if m else ''
 
 
 # ── Backup: contrato de envelope e Cofre (.zip = banco + anexos) ────────────────
