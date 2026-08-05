@@ -138,7 +138,12 @@ test.describe('data local em fuso brasileiro', () => {
   test.use({ timezoneId: 'America/Sao_Paulo' });
 
   test('lote que vence hoje nao aparece como vencido a noite', async ({ page }) => {
-    await page.clock.setFixedTime(new Date('2026-08-01T23:30:00-03:00'));
+    // A data do cenario vem do relogio fixado, nunca do dia real: a primeira versao
+    // deste teste fixava 2026-08-01 e semeava o lote com a data do dia da execucao —
+    // passou em 01/08 e quebrou em 03/08, quando o lote "de hoje" ja tinha vencido
+    // aos olhos do relogio congelado. Teste de data nao pode ter um pe em cada tempo.
+    const DIA = '2026-08-01';
+    await page.clock.setFixedTime(new Date(`${DIA}T23:30:00-03:00`));
     await page.goto('/SGEA.html');
     await page.fill('#pin-username', 'admin');
     await page.fill('#pin-input', 'novaSenhaE2E123');
@@ -146,10 +151,25 @@ test.describe('data local em fuso brasileiro', () => {
     await expect(page.locator('#overlay-pin')).toBeHidden();
 
     // o helper compartilhado tem de ler a data LOCAL, nao a de UTC (02/08)
-    expect(await page.evaluate(() => _isoLocal()), 'data local saiu em UTC').toBe('2026-08-01');
+    expect(await page.evaluate(() => _isoLocal()), 'data local saiu em UTC').toBe(DIA);
+
+    // produto e lote proprios, com validade EXATAMENTE no dia do relogio: nao
+    // depende do cenario dos outros testes nem da data em que a suite roda
+    const nome = `Produto que vence hoje ${Date.now()}`;
+    await page.evaluate(async ({ nome, dia }) => {
+      const r = await API.post('/api/produtos', {
+        nome, codigo_fiorilli: 'E2E.' + Date.now(), qtd_por_embalagem: 1,
+        unidade_consumo: 'UN', ativo: true });
+      const prod = await API.json(r);
+      await API.post('/api/entradas', {
+        tipo: 'compra_direta', data_entrega: dia,
+        itens: [{ produto_id: prod.id, quantidade_embalagem: 3, valor_unitario: 10,
+                  lote_numero: 'L-HOJE', data_validade: dia }],
+      });
+    }, { nome, dia: DIA });
 
     await page.click('#nav-produtos');
-    const linha = page.locator('#produtos-list tr', { hasText: 'Água Sanitária 2L' });
+    const linha = page.locator('#produtos-list tr', { hasText: nome });
     await expect(linha).toBeVisible();
     await expect(linha, 'lote vencendo hoje foi marcado como vencido').not.toContainText('Vencido');
   });

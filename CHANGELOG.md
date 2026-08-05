@@ -9,6 +9,14 @@
 
 ---
 
+## [0.35.18] — 2026-08-05
+
+### Documentação
+- **Teste de validade deixou de depender do dia em que a suíte roda.** Ele fixava o relógio em 01/08 mas criava o lote com a data da execução: passou enquanto as duas coincidiam e quebrou em 03/08, acusando como vencido o lote que deveria vencer "hoje". Agora o cenário inteiro sai do relógio fixado.
+- **Página do projeto no GitHub revisada: a seção de sistemas irmãos passa a citar só a família SG (o Licitarium tem arquitetura própria e sai da lista), a linha de licença segue o padrão dos quatro e o aviso sobre backup dos dados virou parágrafo simples.**
+
+---
+
 ## [0.35.17] — 2026-08-02
 
 ### Alterado
