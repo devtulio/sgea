@@ -1821,5 +1821,95 @@ class TestBackupCofre(SGEATestCase):
         self.assertEqual(self._raw('POST', '/api/backups/db/restore', b'lixo', token)[0], 400)
 
 
+class TestEdicaoEntradaSaida(SGEATestCase):
+    """Editar movimento mexe em estoque: entrada É lote, saída consumiu lote.
+
+    A regra de cada lado espelha o que a exclusão já fazia — entrada só se o lote
+    estiver intacto, saída estorna e volta a consumir.
+    """
+
+    def _entrada(self, token, pid, qtd, valor=10.0, lote='L1'):
+        st, e = self.request('POST', '/api/entradas', {
+            'tipo': 'compra_direta', 'data_entrega': '2026-07-01',
+            'itens': [{'produto_id': pid, 'quantidade_unidades': qtd, 'valor_unitario': valor,
+                       'lote_numero': lote}]}, token)
+        self.assertEqual(st, 201, e)
+        return e
+
+    def _saldo(self, token, pid):
+        _, prod = self.request('GET', f'/api/produtos/{pid}', token=token)
+        return prod['estoque_fisico']
+
+    def test_editar_cabecalho_da_entrada_nao_mexe_no_estoque(self):
+        token = self.login()
+        pid = self._criar_produto(token)
+        ent = self._entrada(token, pid, 10)
+        st, d = self.request('PUT', f"/api/entradas/{ent['id']}",
+                             {'nfe_numero': '12345', 'observacao': 'nota corrigida'}, token)
+        self.assertEqual(st, 200, d)
+        self.assertEqual(d['nfe_numero'], '12345')
+        self.assertEqual(self._saldo(token, pid), 10)
+
+    def test_editar_itens_da_entrada_refaz_o_lote(self):
+        token = self.login()
+        pid = self._criar_produto(token)
+        ent = self._entrada(token, pid, 10, valor=10.0)
+        st, d = self.request('PUT', f"/api/entradas/{ent['id']}", {
+            'itens': [{'produto_id': pid, 'quantidade_unidades': 25, 'valor_unitario': 4.0,
+                       'lote_numero': 'L-CORRIGIDO', 'data_validade': '2027-01-31'}]}, token)
+        self.assertEqual(st, 200, d)
+        self.assertEqual(self._saldo(token, pid), 25, 'o estoque não acompanhou a correção do item')
+        self.assertEqual(d['itens'][0]['lote_numero'], 'L-CORRIGIDO')
+        # o lote antigo não pode continuar por aí somando estoque
+        _, prod = self.request('GET', f'/api/produtos/{pid}', token=token)
+        self.assertAlmostEqual(prod['estoque_financeiro'], 25 * 4.0)
+
+    def test_entrada_com_lote_ja_consumido_recusa_editar_itens(self):
+        token = self.login()
+        pid = self._criar_produto(token)
+        ent = self._entrada(token, pid, 10)
+        st, _ = self.request('POST', '/api/saidas', {
+            'data': '2026-07-02', 'itens': [{'produto_id': pid, 'quantidade': 4}]}, token)
+        self.assertEqual(st, 201)
+        st, d = self.request('PUT', f"/api/entradas/{ent['id']}",
+                             {'itens': [{'produto_id': pid, 'quantidade_unidades': 2, 'valor_unitario': 10}]}, token)
+        self.assertEqual(st, 409, d)
+        self.assertEqual(self._saldo(token, pid), 6, 'a recusa deixou o estoque alterado')
+        # cabeçalho continua editável mesmo com lote consumido
+        st, d = self.request('PUT', f"/api/entradas/{ent['id']}", {'observacao': 'só o cabeçalho'}, token)
+        self.assertEqual(st, 200, d)
+
+    def test_editar_saida_estorna_e_consome_de_novo(self):
+        token = self.login()
+        pid = self._criar_produto(token)
+        self._entrada(token, pid, 20)
+        st, sai = self.request('POST', '/api/saidas', {
+            'data': '2026-07-02', 'itens': [{'produto_id': pid, 'quantidade': 5}]}, token)
+        self.assertEqual(st, 201, sai)
+        self.assertEqual(self._saldo(token, pid), 15)
+
+        st, d = self.request('PUT', f"/api/saidas/{sai['id']}",
+                             {'itens': [{'produto_id': pid, 'quantidade': 8}]}, token)
+        self.assertEqual(st, 200, d)
+        self.assertEqual(self._saldo(token, pid), 12, 'estorno + novo consumo não bateram')
+        self.assertEqual(d['itens'][0]['quantidade'], 8)
+
+    def test_saida_sem_saldo_para_a_nova_quantidade_nao_muda_nada(self):
+        token = self.login()
+        pid = self._criar_produto(token)
+        self._entrada(token, pid, 10)
+        st, sai = self.request('POST', '/api/saidas', {
+            'data': '2026-07-02', 'itens': [{'produto_id': pid, 'quantidade': 4}]}, token)
+        self.assertEqual(st, 201, sai)
+
+        st, d = self.request('PUT', f"/api/saidas/{sai['id']}",
+                             {'itens': [{'produto_id': pid, 'quantidade': 99}]}, token)
+        self.assertEqual(st, 409, d)
+        # o estorno aconteceu dentro da transação: precisa ter voltado atrás inteiro
+        self.assertEqual(self._saldo(token, pid), 6, 'a recusa deixou o estoque estornado pela metade')
+        _, lido = self.request('GET', f"/api/saidas/{sai['id']}", token=token)
+        self.assertEqual(lido['itens'][0]['quantidade'], 4, 'a saída não voltou ao que era')
+
+
 if __name__ == '__main__':
     unittest.main()

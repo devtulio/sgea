@@ -38,7 +38,7 @@ for _stream in (sys.stdout, sys.stderr):
 # Versão do servidor — DEVE acompanhar o SGEA_VERSION do SGEA.html a cada release.
 # Exposta em /health para o frontend detectar quando o processo em execução está
 # desatualizado (HTML novo servido, mas server.py antigo ainda rodando em memória).
-SERVER_VERSION = '0.35.18'
+SERVER_VERSION = '0.36.0'
 
 PORT        = int(os.environ.get('SGEA_PORT', 3003))
 _BASE       = os.path.dirname(os.path.abspath(__file__))
@@ -872,10 +872,14 @@ def _pedido_item_status(pedida, recebida, anulada):
         return 'parcial'
     return 'aberto'
 
-def _pedido_itens_com_saldo(conn, pedido_id):
+def _pedido_itens_com_saldo(conn, pedido_id, ignorar_entrada_id=None):
     """Itens do pedido com quantidade_recebida/saldo/status calculados a partir das
     entradas vinculadas — quantidade_recebida nunca é armazenada, só derivada, pra não
-    correr o risco de um contador desalinhar da soma real de entrada_itens."""
+    correr o risco de um contador desalinhar da soma real de entrada_itens.
+
+    `ignorar_entrada_id` tira uma entrada da conta. Serve à edição: ao regravar os
+    itens de uma entrada já lançada, o que ela mesma trouxe não pode contar contra
+    o saldo do pedido — senão editar qualquer coisa nela acusaria excesso."""
     rows = conn.execute('''
         SELECT pi.id, pi.produto_id, pi.quantidade_pedida, pi.quantidade_anulada,
                pi.valor_unitario, pi.marca,
@@ -883,12 +887,13 @@ def _pedido_itens_com_saldo(conn, pedido_id):
                COALESCE((
                    SELECT SUM(ei.quantidade_unidades)
                    FROM entrada_itens ei JOIN entradas e ON e.id = ei.entrada_id
-                   WHERE e.pedido_id = pi.pedido_id AND ei.produto_id = pi.produto_id AND e.deleted_at IS NULL
+                   WHERE e.pedido_id = pi.pedido_id AND ei.produto_id = pi.produto_id
+                     AND e.deleted_at IS NULL AND (? IS NULL OR e.id <> ?)
                ), 0) AS quantidade_recebida
         FROM pedido_itens pi JOIN produtos p ON p.id = pi.produto_id
         WHERE pi.pedido_id = ?
         ORDER BY pi.id
-    ''', (pedido_id,)).fetchall()
+    ''', (ignorar_entrada_id, ignorar_entrada_id, pedido_id)).fetchall()
     itens = []
     for r in rows:
         d = dict(r)
@@ -1549,6 +1554,8 @@ class SGEAHandler(http.server.SimpleHTTPRequestHandler):
             self._update_pedido(p.split('/')[-1], data)
         elif re.fullmatch(r'/api/entradas/[^/]+', p):
             self._update_entrada(p.split('/')[-1], data)
+        elif re.fullmatch(r'/api/saidas/[^/]+', p):
+            self._update_saida(p.split('/')[-1], data)
         elif p in ('/api/settings', '/api/settings/'):
             if not s['admin']: self._json(403, {'error': 'Acesso restrito'}); return
             # portal_transparencia_key é credencial: fica aqui, não na rota de
@@ -2687,6 +2694,107 @@ class SGEAHandler(http.server.SimpleHTTPRequestHandler):
         result['itens'] = [dict(i) for i in itens]
         return result
 
+    # ── Itens: mesmos passos na criacao e na edicao ──────────────────────────
+    # Extraidos do _create_entrada/_create_saida para a edicao nao virar uma
+    # segunda implementacao das mesmas regras (conversao de embalagem, saldo do
+    # pedido, FEFO). Editar = trocar os itens pelos novos, com o mesmo codigo que
+    # os gravou da primeira vez.
+
+    @staticmethod
+    def _resolver_itens_entrada(conn, itens):
+        """Valida e normaliza os itens da entrada (embalagem -> unidades)."""
+        resolvidos = []
+        for it in itens:
+            pid = it.get('produto_id')
+            if not pid:
+                raise ValueError('Item sem produto_id')
+            produto = conn.execute('SELECT qtd_por_embalagem FROM produtos WHERE id=?', (pid,)).fetchone()
+            if not produto:
+                raise ValueError(f'Produto {pid} não encontrado')
+            qtd_emb = _float(it.get('quantidade_embalagem'))
+            qtd_un = it.get('quantidade_unidades')
+            if qtd_un is None:
+                if qtd_emb is None:
+                    raise ValueError('Informe quantidade_embalagem ou quantidade_unidades')
+                qtd_un = round(qtd_emb * produto['qtd_por_embalagem'])
+            qtd_un = int(qtd_un)
+            if qtd_un <= 0:
+                raise ValueError('Quantidade deve ser maior que zero')
+            resolvidos.append({
+                'produto_id': pid, 'qtd_emb': qtd_emb, 'qtd_un': qtd_un,
+                'valor_unit': _float(it.get('valor_unitario')) or 0,
+                'lote_numero': it.get('lote_numero'), 'data_validade': it.get('data_validade'),
+            })
+        return resolvidos
+
+    @staticmethod
+    def _validar_saldo_pedido(conn, pedido_id, resolvidos, ignorar_entrada_id=None):
+        if not pedido_id:
+            return
+        agregado = {}
+        for r in resolvidos:
+            agregado[r['produto_id']] = agregado.get(r['produto_id'], 0) + r['qtd_un']
+        pedido_itens = {i['produto_id']: i for i in _pedido_itens_com_saldo(conn, pedido_id, ignorar_entrada_id)}
+        for produto_id, qtd_solicitada in agregado.items():
+            pi = pedido_itens.get(produto_id)
+            if not pi:
+                raise SaldoPedidoExcedido(f'Produto {produto_id} não faz parte deste pedido')
+            if qtd_solicitada > pi['saldo']:
+                raise SaldoPedidoExcedido(
+                    f'Quantidade solicitada ({qtd_solicitada}) excede o saldo do pedido '
+                    f'para {pi["produto_nome"]} (saldo: {pi["saldo"]})')
+
+    @staticmethod
+    def _gravar_itens_entrada(conn, eid, resolvidos):
+        """Grava entrada_itens + o lote correspondente de cada item."""
+        for r in resolvidos:
+            valor_total = round(r['valor_unit'] * r['qtd_un'], 2)
+            cur = conn.execute("""INSERT INTO entrada_itens
+                (entrada_id,produto_id,quantidade_embalagem,quantidade_unidades,valor_unitario,valor_total,lote_numero,data_validade)
+                VALUES (?,?,?,?,?,?,?,?)""",
+                (eid, r['produto_id'], r['qtd_emb'], r['qtd_un'], r['valor_unit'], valor_total,
+                 r['lote_numero'], r['data_validade']))
+            conn.execute("""INSERT INTO lotes
+                (produto_id,lote_numero,data_validade,quantidade_recebida,quantidade_atual,valor_unitario_custo,entrada_item_id)
+                VALUES (?,?,?,?,?,?,?)""",
+                (r['produto_id'], r['lote_numero'], r['data_validade'], r['qtd_un'], r['qtd_un'],
+                 r['valor_unit'], cur.lastrowid))
+
+    @staticmethod
+    def _entrada_tem_lote_consumido(conn, eid):
+        return conn.execute("""
+            SELECT COUNT(*) FROM lotes l JOIN entrada_itens ei ON ei.id=l.entrada_item_id
+            WHERE ei.entrada_id=? AND l.quantidade_atual < l.quantidade_recebida
+        """, (eid,)).fetchone()[0] > 0
+
+    @staticmethod
+    def _saida_estornar(conn, sid):
+        """Devolve aos lotes tudo que esta saida consumiu (mesmo passo da exclusao)."""
+        rows = conn.execute("""
+            SELECT sil.lote_id, sil.quantidade FROM saida_item_lotes sil
+            JOIN saida_itens si ON si.id=sil.saida_item_id
+            WHERE si.saida_id=?""", (sid,)).fetchall()
+        for r in rows:
+            conn.execute('UPDATE lotes SET quantidade_atual = quantidade_atual + ? WHERE id=?',
+                         (r['quantidade'], r['lote_id']))
+
+    @staticmethod
+    def _gravar_itens_saida(conn, sid, itens):
+        """Grava saida_itens consumindo do estoque por FEFO."""
+        for it in itens:
+            pid = it.get('produto_id')
+            qtd = int(it.get('quantidade') or 0)
+            if not pid or qtd <= 0:
+                raise ValueError('Item inválido: produto e quantidade são obrigatórios')
+            consumos, valor_medio, valor_total = _consumir_fefo(conn, pid, qtd)
+            cur = conn.execute("""INSERT INTO saida_itens
+                (saida_id,produto_id,quantidade,valor_unitario_medio,valor_total)
+                VALUES (?,?,?,?,?)""", (sid, pid, qtd, valor_medio, valor_total))
+            for lote_id, qtd_consumida, custo in consumos:
+                conn.execute("""INSERT INTO saida_item_lotes
+                    (saida_item_id,lote_id,quantidade,valor_unitario_custo)
+                    VALUES (?,?,?,?)""", (cur.lastrowid, lote_id, qtd_consumida, custo))
+
     def _create_entrada(self, data, s):
         tipo = data.get('tipo') or ('pedido' if data.get('pedido_id') else 'compra_direta')
         if tipo not in ('pedido', 'compra_direta'):
@@ -2707,42 +2815,9 @@ class SGEAHandler(http.server.SimpleHTTPRequestHandler):
                 # embalagem→unidade incluída) antes de inserir qualquer coisa —
                 # precisamos do total por produto pra validar contra o saldo do
                 # pedido (passo seguinte) sem já ter gravado nada.
-                resolvidos = []
-                for it in itens:
-                    pid = it.get('produto_id')
-                    if not pid:
-                        raise ValueError('Item sem produto_id')
-                    produto = conn.execute('SELECT qtd_por_embalagem FROM produtos WHERE id=?', (pid,)).fetchone()
-                    if not produto:
-                        raise ValueError(f'Produto {pid} não encontrado')
-                    qtd_emb = _float(it.get('quantidade_embalagem'))
-                    qtd_un = it.get('quantidade_unidades')
-                    if qtd_un is None:
-                        if qtd_emb is None:
-                            raise ValueError('Informe quantidade_embalagem ou quantidade_unidades')
-                        qtd_un = round(qtd_emb * produto['qtd_por_embalagem'])
-                    qtd_un = int(qtd_un)
-                    if qtd_un <= 0:
-                        raise ValueError('Quantidade deve ser maior que zero')
-                    valor_unit = _float(it.get('valor_unitario')) or 0
-                    resolvidos.append({
-                        'produto_id': pid, 'qtd_emb': qtd_emb, 'qtd_un': qtd_un, 'valor_unit': valor_unit,
-                        'lote_numero': it.get('lote_numero'), 'data_validade': it.get('data_validade'),
-                    })
+                resolvidos = self._resolver_itens_entrada(conn, itens)
 
-                if pedido_id:
-                    agregado = {}
-                    for r in resolvidos:
-                        agregado[r['produto_id']] = agregado.get(r['produto_id'], 0) + r['qtd_un']
-                    pedido_itens = {i['produto_id']: i for i in _pedido_itens_com_saldo(conn, pedido_id)}
-                    for produto_id, qtd_solicitada in agregado.items():
-                        pi = pedido_itens.get(produto_id)
-                        if not pi:
-                            raise SaldoPedidoExcedido(f'Produto {produto_id} não faz parte deste pedido')
-                        if qtd_solicitada > pi['saldo']:
-                            raise SaldoPedidoExcedido(
-                                f'Quantidade solicitada ({qtd_solicitada}) excede o saldo do pedido '
-                                f'para {pi["produto_nome"]} (saldo: {pi["saldo"]})')
+                self._validar_saldo_pedido(conn, pedido_id, resolvidos)
 
                 conn.execute('''INSERT INTO entradas
                     (id,pedido_id,tipo,fornecedor_id,nfe_numero,nfe_chave_acesso,data_entrega,
@@ -2753,19 +2828,7 @@ class SGEAHandler(http.server.SimpleHTTPRequestHandler):
                      data.get('centro_custo_id'), data.get('observacao'), s['user_id'],
                      (data.get('requisicao') or '').strip(), (data.get('data_requisicao') or '').strip(),
                      (data.get('tipo_fiorilli') or '').strip()))
-                for r in resolvidos:
-                    valor_total = round(r['valor_unit'] * r['qtd_un'], 2)
-                    cur = conn.execute('''INSERT INTO entrada_itens
-                        (entrada_id,produto_id,quantidade_embalagem,quantidade_unidades,valor_unitario,valor_total,lote_numero,data_validade)
-                        VALUES (?,?,?,?,?,?,?,?)''',
-                        (eid, r['produto_id'], r['qtd_emb'], r['qtd_un'], r['valor_unit'], valor_total,
-                         r['lote_numero'], r['data_validade']))
-                    item_id = cur.lastrowid
-                    conn.execute('''INSERT INTO lotes
-                        (produto_id,lote_numero,data_validade,quantidade_recebida,quantidade_atual,valor_unitario_custo,entrada_item_id)
-                        VALUES (?,?,?,?,?,?,?)''',
-                        (r['produto_id'], r['lote_numero'], r['data_validade'], r['qtd_un'], r['qtd_un'],
-                         r['valor_unit'], item_id))
+                self._gravar_itens_entrada(conn, eid, resolvidos)
         except SaldoPedidoExcedido as e:
             self._json(409, {'error': str(e)}); return
         except ValueError as e:
@@ -2862,29 +2925,93 @@ class SGEAHandler(http.server.SimpleHTTPRequestHandler):
         self._json(200, r)
 
     def _update_entrada(self, eid, data):
-        # Só campos de cabeçalho — quantidades/valores já viraram lote(s) e são imutáveis.
-        cols = ['nfe_numero', 'nfe_chave_acesso', 'observacao', 'recebedor_id', 'fornecedor_id', 'centro_custo_id']
+        """Edita a entrada. Cabeçalho sempre; itens só enquanto o lote está intacto.
+
+        Item de entrada VIRA lote — mexer nele mexe no estoque. Enquanto nenhuma
+        saída consumiu daquele lote, regravar é seguro: apaga os lotes desta entrada
+        (todos com quantidade_atual == quantidade_recebida) e recria pelo mesmo
+        caminho da criação. Depois que alguém consumiu, não dá: reduzir a quantidade
+        deixaria saída baixada de estoque que não existiu. Aí a resposta é 409, com a
+        mesma regra da exclusão — quem precisa corrigir estorna a saída antes.
+        """
+        cols = ['nfe_numero', 'nfe_chave_acesso', 'observacao', 'recebedor_id', 'fornecedor_id',
+                'centro_custo_id', 'data_entrega', 'requisicao', 'data_requisicao']
         fields = {k: data[k] for k in cols if k in data}
-        with get_db() as conn:
-            row = conn.execute('SELECT id FROM entradas WHERE id=? AND deleted_at IS NULL', (eid,)).fetchone()
-            if not row:
-                self._json(404, {'error': 'Não encontrada'}); return
-            if fields:
+        itens = data.get('itens')
+        try:
+            with get_db() as conn:
+                row = conn.execute('SELECT id, pedido_id FROM entradas WHERE id=? AND deleted_at IS NULL', (eid,)).fetchone()
+                if not row:
+                    self._json(404, {'error': 'Não encontrada'}); return
+
+                if itens is not None:
+                    if not itens:
+                        raise ValueError('Informe ao menos um item')
+                    if self._entrada_tem_lote_consumido(conn, eid):
+                        self._json(409, {'error': 'Não é possível editar os itens: já há saída consumindo lote(s) desta entrada. '
+                                                  'Estorne a saída antes, ou corrija apenas os dados do cabeçalho.'}); return
+                    resolvidos = self._resolver_itens_entrada(conn, itens)
+                    # o que ESTA entrada trouxe sai da conta do saldo do pedido: o
+                    # confronto é entre os itens novos e o saldo sem ela
+                    self._validar_saldo_pedido(conn, row['pedido_id'], resolvidos, ignorar_entrada_id=eid)
+                    conn.execute('DELETE FROM lotes WHERE entrada_item_id IN '
+                                 '(SELECT id FROM entrada_itens WHERE entrada_id=?)', (eid,))
+                    conn.execute('DELETE FROM entrada_itens WHERE entrada_id=?', (eid,))
+                    self._gravar_itens_entrada(conn, eid, resolvidos)
+
                 fields['updated_at'] = _now()
                 conn.execute(f'UPDATE entradas SET {",".join(f"{k}=?" for k in fields)} WHERE id=?',
                              list(fields.values()) + [eid])
+        except SaldoPedidoExcedido as e:
+            self._json(409, {'error': str(e)}); return
+        except ValueError as e:
+            self._json(400, {'error': str(e)}); return
         self._json(200, self._get_entrada_dict(eid))
+
+    def _update_saida(self, sid, data):
+        """Edita a saída. Cabeçalho sempre; itens estornam e voltam a consumir.
+
+        Editar item de saída é devolver aos lotes o que ela tinha baixado e consumir
+        de novo por FEFO, com os itens novos — a mesma dupla que a Lixeira já usa ao
+        excluir e restaurar. Se faltar saldo para a nova composição, a transação
+        inteira volta atrás e a saída fica exatamente como estava.
+
+        A composição por lote pode mudar em relação à original, se o estoque mudou
+        nesse meio-tempo. É o mesmo comportamento (e a mesma justificativa) da
+        restauração pela Lixeira: o efeito no saldo é o correto, e é o que importa.
+        """
+        cols = ['data', 'solicitante_id', 'solicitante_nome', 'solicitante_cargo',
+                'centro_custo_id', 'frota_id', 'numero_solicitacao', 'observacao']
+        fields = {k: data[k] for k in cols if k in data}
+        itens = data.get('itens')
+        try:
+            with get_db() as conn:
+                row = conn.execute('SELECT id FROM saidas WHERE id=? AND deleted_at IS NULL', (sid,)).fetchone()
+                if not row:
+                    self._json(404, {'error': 'Não encontrada'}); return
+
+                if itens is not None:
+                    if not itens:
+                        raise ValueError('Informe ao menos um item')
+                    self._saida_estornar(conn, sid)
+                    conn.execute('DELETE FROM saida_itens WHERE saida_id=?', (sid,))  # cascata limpa saida_item_lotes
+                    self._gravar_itens_saida(conn, sid, itens)
+
+                if fields:
+                    conn.execute(f'UPDATE saidas SET {",".join(f"{k}=?" for k in fields)} WHERE id=?',
+                                 list(fields.values()) + [sid])
+        except EstoqueInsuficiente as e:
+            self._json(409, {'error': str(e)}); return
+        except ValueError as e:
+            self._json(400, {'error': str(e)}); return
+        self._json(200, self._get_saida_dict(sid))
 
     def _delete_entrada(self, eid):
         with get_db() as conn:
             row = conn.execute('SELECT id FROM entradas WHERE id=? AND deleted_at IS NULL', (eid,)).fetchone()
             if not row:
                 self._json(404, {'error': 'Não encontrada'}); return
-            consumido = conn.execute('''
-                SELECT COUNT(*) FROM lotes l JOIN entrada_itens ei ON ei.id=l.entrada_item_id
-                WHERE ei.entrada_id=? AND l.quantidade_atual < l.quantidade_recebida
-            ''', (eid,)).fetchone()[0]
-            if consumido:
+            if self._entrada_tem_lote_consumido(conn, eid):
                 self._json(409, {'error': 'Não é possível excluir: já há saída consumindo lote(s) desta entrada'}); return
             # O bloqueio acima garante que, neste ponto, todo lote desta entrada
             # está intacto (quantidade_atual == quantidade_recebida) — zera para
@@ -2975,20 +3102,7 @@ class SGEAHandler(http.server.SimpleHTTPRequestHandler):
                     (sid, data['data'], data.get('solicitante_id'), data.get('solicitante_nome'),
                      data.get('solicitante_cargo'), data.get('centro_custo_id'), data.get('frota_id'),
                      data.get('numero_solicitacao'), data.get('observacao'), s['user_id']))
-                for it in itens:
-                    pid = it.get('produto_id')
-                    qtd = int(it.get('quantidade') or 0)
-                    if not pid or qtd <= 0:
-                        raise ValueError('Item inválido: produto e quantidade são obrigatórios')
-                    consumos, valor_medio, valor_total = _consumir_fefo(conn, pid, qtd)
-                    cur = conn.execute('''INSERT INTO saida_itens
-                        (saida_id,produto_id,quantidade,valor_unitario_medio,valor_total)
-                        VALUES (?,?,?,?,?)''', (sid, pid, qtd, valor_medio, valor_total))
-                    item_id = cur.lastrowid
-                    for lote_id, qtd_consumida, custo in consumos:
-                        conn.execute('''INSERT INTO saida_item_lotes
-                            (saida_item_id,lote_id,quantidade,valor_unitario_custo)
-                            VALUES (?,?,?,?)''', (item_id, lote_id, qtd_consumida, custo))
+                self._gravar_itens_saida(conn, sid, itens)
         except EstoqueInsuficiente as e:
             self._json(409, {'error': str(e)}); return
         except ValueError as e:
@@ -3089,13 +3203,7 @@ class SGEAHandler(http.server.SimpleHTTPRequestHandler):
             row = conn.execute('SELECT id FROM saidas WHERE id=? AND deleted_at IS NULL', (sid,)).fetchone()
             if not row:
                 self._json(404, {'error': 'Não encontrada'}); return
-            rows = conn.execute('''
-                SELECT sil.lote_id, sil.quantidade FROM saida_item_lotes sil
-                JOIN saida_itens si ON si.id=sil.saida_item_id
-                WHERE si.saida_id=?''', (sid,)).fetchall()
-            for r in rows:
-                conn.execute('UPDATE lotes SET quantidade_atual = quantidade_atual + ? WHERE id=?',
-                             (r['quantidade'], r['lote_id']))
+            self._saida_estornar(conn, sid)
             conn.execute('UPDATE saidas SET deleted_at=? WHERE id=?', (_now(), sid))
         self._json(200, {'ok': True})
 

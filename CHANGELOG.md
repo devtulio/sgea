@@ -9,6 +9,19 @@
 
 ---
 
+## [0.36.0] — 2026-08-05
+
+### Adicionado
+- **Editar entradas e saídas.** O botão **Editar** na linha do lançamento reabre o mesmo formulário, preenchido.
+  - **Entrada:** cabeçalho sempre editável; os itens também, enquanto nenhuma saída tiver consumido do lote que aquela entrada criou. Nesse caso o lote é refeito com os valores novos. Se já houve consumo, a alteração dos itens é recusada com a explicação — reduzir a quantidade deixaria uma saída baixada de estoque que não existiu. É a mesma regra que a exclusão já aplicava.
+  - **Saída:** ao salvar, o sistema devolve aos lotes tudo que a saída havia baixado e consome de novo por FEFO com os itens corrigidos. Faltando saldo para a nova composição, a alteração é recusada por inteiro e a saída fica como estava.
+  - A trilha de auditoria distingue edição de lançamento novo.
+
+### Corrigido
+- **O botão "Importar do Fiorilli" não aparecia na tela de Saídas quando não havia nenhuma saída.** A linha que revela o botão estava depois do retorno que trata a lista vazia — ou seja, ele sumia exatamente no momento em que era o único caminho para trazer a primeira importação. Entradas e Pedidos já revelavam antes; agora as três telas seguem o mesmo padrão.
+
+---
+
 ## [0.35.18] — 2026-08-05
 
 ### Documentação

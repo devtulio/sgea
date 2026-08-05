@@ -3,7 +3,7 @@
 <head>
 <meta charset="UTF-8">
 <meta name="viewport" content="width=device-width, initial-scale=1.0">
-<title>Manual Operacional — SGEA v0.35.18</title>
+<title>Manual Operacional — SGEA v0.36.0</title>
 <style>
   * { box-sizing: border-box; margin: 0; padding: 0; }
   body { font-family: 'Times New Roman', Times, serif; font-size: 12pt; color: #000; background: #f5f5f5; }
@@ -54,7 +54,7 @@
       size: A4;
       margin: 20mm 20mm 25mm;
       @top-center {
-        content: "SGEA v0.35.18 — Manual Operacional";
+        content: "SGEA v0.36.0 — Manual Operacional";
         font-family: 'Times New Roman', serif;
         font-size: 9pt;
         color: #666;
@@ -80,7 +80,7 @@
     <div class="cover-title">Manual Operacional</div>
     <div class="cover-subtitle">SGEA — Sistema de Gestão de Estoque do Almoxarifado</div>
     <div class="cover-system">Entradas, Saídas, Lotes/Validade e cadastros de apoio</div>
-    <div class="cover-version">Versão v0.35.18</div>
+    <div class="cover-version">Versão v0.36.0</div>
     <br>
     <div style="font-size:11pt; color:#555; line-height:1.8;">
       Aplicação web multiusuário para o Almoxarifado<br>
@@ -176,13 +176,18 @@
   <h3 id="sec6-1">6.1. Importar a requisição de entrada do Fiorilli</h3>
   <p>O administrador pode lançar uma entrada inteira a partir do arquivo <strong>REQUISIÇÃO DE ENTRADA</strong> exportado do Fiorilli (CSV). Na tela de Entradas, use <strong>⬆️ Importar do Fiorilli</strong> e escolha o arquivo: o sistema cria a entrada, seus itens e os <strong>lotes com validade</strong> de uma só vez. Produtos (pelo código Fiorilli), fornecedores (pelo CNPJ) e centros de custo (pelo código) que ainda não existirem são criados a partir do próprio arquivo.</p>
   <div class="dica">O número da requisição é a chave: importar o mesmo arquivo de novo não duplica nada — as requisições já lançadas são apenas contadas como existentes.</div>
-  <div class="nota">Depois de criada, uma entrada só permite editar os dados de cabeçalho (NF, observação, recebedor) — quantidades e valores dos itens são imutáveis, porque já viraram saldo de lote. Para corrigir uma quantidade errada, exclua a entrada (se ainda não tiver sido consumida por nenhuma saída) e registre novamente.</div>
+  <h3 id="sec6-2">6.2. Editar uma entrada</h3>
+  <p>O botão <strong>Editar</strong> na linha da entrada reabre o mesmo formulário, já preenchido. Os dados de cabeçalho — nota fiscal, fornecedor, data de entrega, requisição, recebedor, observação — podem ser corrigidos a qualquer momento.</p>
+  <p><strong>Os itens também podem ser corrigidos, enquanto o lote estiver intacto.</strong> O item de entrada é o que cria o lote no estoque: se ninguém consumiu dele ainda, o sistema refaz o lote com os valores novos. Quantidade, valor, número do lote e validade — tudo pode ser ajustado.</p>
+  <div class="aviso">Se alguma saída já consumiu do lote daquela entrada, os <strong>itens</strong> deixam de ser editáveis e o sistema recusa a alteração, explicando o motivo. Reduzir a quantidade nesse ponto deixaria uma saída baixada de um estoque que não existiu. Para corrigir, estorne primeiro a saída (excluí-la devolve as quantidades aos lotes) e então edite a entrada. O cabeçalho continua editável mesmo nesse caso.</div>
 
   <h2 id="sec7">7. Saídas e Consumo por Lote (FEFO)</h2>
   <p>A saída é lançada diretamente pelo almoxarife: produto, quantidade (sempre em unidade), solicitante, centro de custo de destino e, opcionalmente, um veículo da Frota (para correlacionar saídas de combustível ou peças).</p>
   <p>Ao salvar, o sistema decide automaticamente de qual lote tirar a quantidade pedida, seguindo a regra <strong>FEFO</strong>: primeiro os lotes com validade mais próxima, depois os lotes sem validade cadastrada (na ordem em que entraram no estoque). Se um único lote não tiver saldo suficiente, o sistema divide o consumo entre dois ou mais lotes automaticamente — o usuário não precisa se preocupar com isso.</p>
   <div class="aviso">Se o estoque total do produto for menor que a quantidade pedida, a saída é recusada por inteiro (nenhum lote é alterado) e o sistema informa o saldo disponível.</div>
   <div class="dica">Excluir uma saída devolve exatamente as quantidades consumidas aos mesmos lotes de origem — é seguro reverter um lançamento feito por engano.</div>
+  <p><strong>Editar uma saída</strong> (botão na linha) reabre o formulário preenchido. Ao salvar, o sistema devolve aos lotes tudo que aquela saída havia baixado e consome de novo, por FEFO, com os itens corrigidos. Se o estoque não comportar a nova quantidade, a alteração é recusada por inteiro e a saída permanece exatamente como estava.</p>
+  <div class="nota">A composição por lote pode mudar em relação à original, se o estoque se alterou entre o lançamento e a correção — é o mesmo comportamento de restaurar uma saída pela Lixeira. O efeito no saldo é sempre o correto.</div>
   <p>A lista de Saídas mostra o <strong>nº da requisição</strong> e a <strong>origem</strong> de cada lançamento (<strong>Manual</strong> ou <strong>Import Fiorilli</strong>), além de data, solicitante, centro de custo e veículo. Clicar no título de qualquer coluna ordena por ela.</p>
 
   <h3 id="sec7-1">7.1. Importar a requisição de saída do Fiorilli</h3>
@@ -273,6 +278,7 @@
   <h2 id="sec15">15. Histórico de Versões</h2>
   <table>
     <tr><th>Versão</th><th>Data</th><th>Resumo</th></tr>
+    <tr><td>0.36.0</td><td>05/08/2026</td><td>Entradas e saídas passam a ser editáveis: o botão Editar reabre o lançamento preenchido. Item de entrada só enquanto o lote não foi consumido; saída estorna e volta a consumir por FEFO. Corrigido: o botão de importar do Fiorilli não aparecia na tela de Saídas enquanto não houvesse nenhuma saída — justamente quando ele era o único caminho.</td></tr>
     <tr><td>0.35.18</td><td>05/08/2026</td><td>Página do projeto no GitHub revisada: a seção de sistemas irmãos passa a citar só a família SG (o Licitarium tem arquitetura própria e sai da lista), a linha de licença segue o padrão dos quatro e o aviso sobre backup dos dados virou parágrafo simples.</td></tr>
     <tr><td>0.35.17</td><td>02/08/2026</td><td>O backup JSON passou a se chamar SYNC_ em vez de SIS_ — o nome agora diz o papel (o Cofre .zip é que restaura tudo). Arquivos antigos continuam na lista e restauráveis.</td></tr>
     <tr><td>0.35.16</td><td>02/08/2026</td><td>Função única do esqueleto para a data por extenso dos documentos, e capturas de tela no README do projeto (geradas por script, com dados fictícios).</td></tr>

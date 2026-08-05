@@ -1284,7 +1284,7 @@
     </div>
     <div class="modal-footer">
       <button class="btn btn-outline" onclick="closeEntradaModal()">Cancelar</button>
-      <button class="btn btn-primary" onclick="saveEntrada()">Registrar Entrada</button>
+      <button class="btn btn-primary" id="ef-salvar" onclick="saveEntrada()">Registrar Entrada</button>
     </div>
   </div>
 </div>
@@ -1311,7 +1311,7 @@
     </div>
     <div class="modal-footer">
       <button class="btn btn-outline" onclick="closeSaidaModal()">Cancelar</button>
-      <button class="btn btn-primary" onclick="saveSaida()">Registrar Saída</button>
+      <button class="btn btn-primary" id="sf-salvar" onclick="saveSaida()">Registrar Saída</button>
     </div>
   </div>
 </div>
@@ -1349,7 +1349,7 @@
 // ══════════════════════════════════════════════════════════════
 // API / SESSÃO
 // ══════════════════════════════════════════════════════════════
-const SGEA_VERSION = '0.35.18';
+const SGEA_VERSION = '0.36.0';
 document.title = `SGEA v${SGEA_VERSION}`;
 
 let _apiToken = localStorage.getItem('sgea-token') || null;
@@ -4163,7 +4163,7 @@ async function renderEntradas() {
       <td>${esc(e.pedido_numero || '—')}</td>
       <td>${esc(e.fornecedor_nome || '—')}</td>
       <td>${esc(e.nfe_numero || '—')}</td>
-      <td class="col-actions"><button class="btn btn-ghost btn-sm" onclick="deleteEntrada('${e.id}')">Excluir</button></td>
+      <td class="col-actions"><button class="btn btn-ghost btn-sm" onclick="editarEntrada('${e.id}')">Editar</button><button class="btn btn-ghost btn-sm" onclick="deleteEntrada('${e.id}')">Excluir</button></td>
     </tr>`).join('')}</tbody>
   </table></div>`;
 }
@@ -4174,22 +4174,49 @@ async function _toggleEntradaTipo() {
 }
 
 let _entradaProdutos = [];
-async function openEntradaModal() {
-  document.querySelector('input[name="ef-tipo"][value="pedido"]').checked = true;
+// id da entrada/saida em edicao; null = registro novo. O mesmo modal serve aos
+// dois casos — formulario separado para editar seria a mesma tela duas vezes,
+// divergindo na primeira mudanca de campo.
+let _entradaEditId = null;
+
+async function openEntradaModal(entrada = null) {
+  _entradaEditId = entrada?.id || null;
+  document.getElementById('entrada-modal-titulo').textContent = entrada ? 'Editar Entrada' : 'Nova Entrada';
+  document.getElementById('ef-salvar').textContent = entrada ? 'Salvar alterações' : 'Registrar Entrada';
+  document.querySelector(`input[name="ef-tipo"][value="${entrada?.tipo || 'pedido'}"]`).checked = true;
   _toggleEntradaTipo();
   await _fillSelect('ef-pedido', 'pedidos', 'numero');
   await _fillSelect('ef-fornecedor', 'fornecedores', 'razao_social');
   await _fillSelect('ef-recebedor', 'funcionarios', 'nome');
   await _fillSelect('ef-centro-custo', 'centros-custo', 'nome');
   _entradaProdutos = await _fetchList('produtos?somente_ativos=1');
-  document.getElementById('ef-nfe').value = '';
-  document.getElementById('ef-nfe-chave').value = '';
-  document.getElementById('ef-requisicao').value = '';
-  document.getElementById('ef-data-requisicao').value = '';
-  document.getElementById('ef-data-entrega').value = _isoLocal();
-  document.getElementById('ef-observacao').value = '';
+  document.getElementById('ef-pedido').value = entrada?.pedido_id || '';
+  document.getElementById('ef-fornecedor').value = entrada?.fornecedor_id || '';
+  document.getElementById('ef-recebedor').value = entrada?.recebedor_id || '';
+  document.getElementById('ef-centro-custo').value = entrada?.centro_custo_id || '';
+  document.getElementById('ef-nfe').value = entrada?.nfe_numero || '';
+  document.getElementById('ef-nfe-chave').value = entrada?.nfe_chave_acesso || '';
+  document.getElementById('ef-requisicao').value = entrada?.requisicao || '';
+  document.getElementById('ef-data-requisicao').value = entrada?.data_requisicao || '';
+  document.getElementById('ef-data-entrega').value = entrada?.data_entrega || _isoLocal();
+  document.getElementById('ef-observacao').value = entrada?.observacao || '';
   document.getElementById('ef-itens').innerHTML = '';
-  _addEntradaItemRow();
+  if (entrada?.itens?.length) {
+    for (const it of entrada.itens) {
+      _addEntradaItemRow();
+      const row = document.getElementById('ef-itens').lastElementChild;
+      row.querySelector('.ei-produto').value = it.produto_id;
+      // grava-se embalagem OU unidades; o que veio em unidades volta como unidades
+      row.querySelector('.ei-qtd').value = it.quantidade_embalagem ?? it.quantidade_unidades;
+      row.querySelector('.ei-qtd').dataset.emUnidades = it.quantidade_embalagem == null ? '1' : '';
+      row.querySelector('.ei-valor').value = it.valor_unitario ?? '';
+      row.querySelector('.ei-lote').value = it.lote_numero || '';
+      row.querySelector('.ei-validade').value = it.data_validade || '';
+      _updateConversao(row.querySelector('.ei-produto'));
+    }
+  } else {
+    _addEntradaItemRow();
+  }
   document.getElementById('entrada-modal-overlay').classList.remove('hidden');
 }
 function closeEntradaModal() { document.getElementById('entrada-modal-overlay').classList.add('hidden'); }
@@ -4228,7 +4255,9 @@ async function saveEntrada() {
   if (!dataEntrega) { toast('Data de entrega é obrigatória.', 'error'); return; }
   const itens = [...document.querySelectorAll('#ef-itens .item-row')].map(row => ({
     produto_id: row.querySelector('.ei-produto').value,
-    quantidade_embalagem: parseFloat(row.querySelector('.ei-qtd').value) || null,
+    ...(row.querySelector('.ei-qtd').dataset.emUnidades
+        ? { quantidade_unidades: parseFloat(row.querySelector('.ei-qtd').value) || null }
+        : { quantidade_embalagem: parseFloat(row.querySelector('.ei-qtd').value) || null }),
     valor_unitario: parseFloat(row.querySelector('.ei-valor').value) || 0,
     lote_numero: row.querySelector('.ei-lote').value.trim() || null,
     data_validade: row.querySelector('.ei-validade').value || null,
@@ -4248,13 +4277,23 @@ async function saveEntrada() {
     observacao: document.getElementById('ef-observacao').value.trim() || null,
     itens,
   };
-  const r = await API.post('/api/entradas', data);
+  const editando = !!_entradaEditId;
+  const r = editando ? await API.put(`/api/entradas/${_entradaEditId}`, data)
+                     : await API.post('/api/entradas', data);
   const d = await API.json(r);
-  if (!r || !r.ok) { toast(d?.error || 'Erro ao registrar entrada.', 'error'); return; }
-  await _auditEvento('ENTRADA_REGISTRADA', `Entrada de ${itens.length} item(ns) — ${tipo === 'pedido' ? 'com pedido' : 'compra direta'}`, d.id);
+  if (!r || !r.ok) { toast(d?.error || `Erro ao ${editando ? 'salvar' : 'registrar'} entrada.`, 'error', 12000); return; }
+  await _auditEvento(editando ? 'ENTRADA_EDITADA' : 'ENTRADA_REGISTRADA',
+    `${editando ? 'Entrada editada' : 'Entrada'} de ${itens.length} item(ns) — ${tipo === 'pedido' ? 'com pedido' : 'compra direta'}`, d.id);
   closeEntradaModal();
-  toast('Entrada registrada.', 'success');
+  toast(editando ? 'Entrada atualizada.' : 'Entrada registrada.', 'success');
   renderEntradas();
+}
+
+async function editarEntrada(id) {
+  const r = await API.get(`/api/entradas/${id}`);
+  const e = await API.json(r);
+  if (!r || !r.ok || !e) { toast('Não consegui carregar a entrada.', 'error'); return; }
+  await openEntradaModal(e);
 }
 
 async function deleteEntrada(id) {
@@ -4304,10 +4343,14 @@ async function importarSaidaFiorilli(file) {
 }
 
 async function renderSaidas() {
+  // Antes do return de lista vazia, como em renderEntradas: o botao de importar
+  // estava DEPOIS dele, entao sumia justamente com zero saidas — o unico momento
+  // em que nao ha outro jeito de trazer a primeira.
+  const btnImp = document.getElementById('btn-import-saida');
+  if (btnImp) btnImp.style.display = _apiUser?.admin ? '' : 'none';
   const items = await _fetchList('saidas');
   const el = document.getElementById('saidas-list');
   if (!items.length) { el.innerHTML = '<div class="empty">Nenhuma saída registrada.</div>'; return; }
-  document.getElementById('btn-import-saida').style.display = _apiUser?.admin ? '' : 'none';
   const cols = [
     { h: 'Data', get: s => s.data || '' },
     { h: 'Requisição', get: s => s.numero_solicitacao || '' },
@@ -4326,23 +4369,41 @@ async function renderSaidas() {
       <td>${esc(s.centro_custo_nome || '—')}</td>
       <td>${esc(s.frota_numero || '—')}</td>
       <td>${_saidaOrigemBadge(s)}</td>
-      <td class="col-actions"><button class="btn btn-ghost btn-sm" onclick="deleteSaida('${s.id}')">Excluir</button></td>
+      <td class="col-actions"><button class="btn btn-ghost btn-sm" onclick="editarSaida('${s.id}')">Editar</button><button class="btn btn-ghost btn-sm" onclick="deleteSaida('${s.id}')">Excluir</button></td>
     </tr>`).join('')}</tbody>
   </table></div>`;
 }
 
 let _saidaProdutos = [];
-async function openSaidaModal() {
+let _saidaEditId = null;
+
+async function openSaidaModal(saida = null) {
+  _saidaEditId = saida?.id || null;
+  document.getElementById('saida-modal-titulo').textContent = saida ? 'Editar Saída' : 'Nova Saída';
+  document.getElementById('sf-salvar').textContent = saida ? 'Salvar alterações' : 'Registrar Saída';
   await _fillSelect('sf-solicitante', 'funcionarios', 'nome');
   await _fillSelect('sf-centro-custo', 'centros-custo', 'nome');
   const frotas = await _fetchList('frota');
   document.getElementById('sf-frota').innerHTML = '<option value="">—</option>' + frotas.map(f => `<option value="${f.id}">${esc(f.numero)} — ${esc(f.placa || '')}</option>`).join('');
   _saidaProdutos = await _fetchList('produtos?somente_ativos=1');
-  document.getElementById('sf-data').value = _isoLocal();
-  document.getElementById('sf-numero-solicitacao').value = '';
-  document.getElementById('sf-observacao').value = '';
+  document.getElementById('sf-data').value = saida?.data || _isoLocal();
+  document.getElementById('sf-solicitante').value = saida?.solicitante_id || '';
+  document.getElementById('sf-centro-custo').value = saida?.centro_custo_id || '';
+  document.getElementById('sf-frota').value = saida?.frota_id || '';
+  document.getElementById('sf-numero-solicitacao').value = saida?.numero_solicitacao || '';
+  document.getElementById('sf-observacao').value = saida?.observacao || '';
   document.getElementById('sf-itens').innerHTML = '';
-  _addSaidaItemRow();
+  if (saida?.itens?.length) {
+    for (const it of saida.itens) {
+      _addSaidaItemRow();
+      const row = document.getElementById('sf-itens').lastElementChild;
+      row.querySelector('.si-produto').value = it.produto_id;
+      row.querySelector('.si-qtd').value = it.quantidade;
+      _updateEstoqueHint(row.querySelector('.si-produto'));
+    }
+  } else {
+    _addSaidaItemRow();
+  }
   document.getElementById('saida-modal-overlay').classList.remove('hidden');
 }
 function closeSaidaModal() { document.getElementById('saida-modal-overlay').classList.add('hidden'); }
@@ -4387,13 +4448,23 @@ async function saveSaida() {
     observacao: document.getElementById('sf-observacao').value.trim() || null,
     itens,
   };
-  const r = await API.post('/api/saidas', data);
+  const editando = !!_saidaEditId;
+  const r = editando ? await API.put(`/api/saidas/${_saidaEditId}`, data)
+                     : await API.post('/api/saidas', data);
   const d = await API.json(r);
-  if (!r || !r.ok) { toast(d?.error || 'Erro ao registrar saída.', 'error'); return; }
-  await _auditEvento('SAIDA_REGISTRADA', `Saída de ${itens.length} item(ns)${data.solicitante_nome ? ' — ' + data.solicitante_nome : ''}`, d.id);
+  if (!r || !r.ok) { toast(d?.error || `Erro ao ${editando ? 'salvar' : 'registrar'} saída.`, 'error', 12000); return; }
+  await _auditEvento(editando ? 'SAIDA_EDITADA' : 'SAIDA_REGISTRADA',
+    `${editando ? 'Saída editada' : 'Saída'} de ${itens.length} item(ns)${data.solicitante_nome ? ' — ' + data.solicitante_nome : ''}`, d.id);
   closeSaidaModal();
-  toast('Saída registrada.', 'success');
+  toast(editando ? 'Saída atualizada.' : 'Saída registrada.', 'success');
   renderSaidas();
+}
+
+async function editarSaida(id) {
+  const r = await API.get(`/api/saidas/${id}`);
+  const sa = await API.json(r);
+  if (!r || !r.ok || !sa) { toast('Não consegui carregar a saída.', 'error'); return; }
+  await openSaidaModal(sa);
 }
 
 async function deleteSaida(id) {

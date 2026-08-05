@@ -174,3 +174,86 @@ test.describe('data local em fuso brasileiro', () => {
     await expect(linha, 'lote vencendo hoje foi marcado como vencido').not.toContainText('Vencido');
   });
 });
+
+// O botao de importar do Fiorilli aparecia so depois que existia movimento: a
+// linha que o revela estava abaixo do return de "lista vazia". Justamente com
+// zero saidas, que e quando nao ha outro caminho para trazer a primeira.
+test('botao de importar do Fiorilli aparece com a lista vazia', async ({ page }) => {
+  await page.goto('/SGEA.html');
+  await page.fill('#pin-username', 'admin');
+  await page.fill('#pin-input', 'novaSenhaE2E123');
+  await page.click('#login-form button[type=submit]');
+  await expect(page.locator('#overlay-pin')).toBeHidden();
+
+  // apaga o movimento para cair no estado de lista vazia
+  await page.evaluate(async () => {
+    const d = await API.json(await API.get('/api/saidas'));
+    for (const s of (d.items || d)) await API.del(`/api/saidas/${s.id}`);
+  });
+
+  await page.click('#nav-saidas');
+  await expect(page.locator('#saidas-list')).toContainText('Nenhuma saída registrada');
+  await expect(page.locator('#btn-import-saida'),
+    'sem saídas, o botão de importar sumia — e é quando ele mais importa').toBeVisible();
+
+  // as outras duas telas do mesmo padrao
+  await page.click('#nav-entradas');
+  await expect(page.locator('#btn-import-entrada')).toBeVisible();
+  await page.click('#nav-pedidos');
+  await expect(page.locator('#btn-import-pedido')).toBeVisible();
+});
+
+// Editar movimento pela tela: o mesmo modal abre preenchido e grava por PUT.
+// O que se prova aqui é o caminho do usuário — o efeito no estoque tem teste
+// próprio no servidor (TestEdicaoEntradaSaida).
+test('editar entrada e saida pela tela ajusta o estoque', async ({ page }) => {
+  page.on('dialog', d => d.accept());
+  await page.goto('/SGEA.html');
+  await page.fill('#pin-username', 'admin');
+  await page.fill('#pin-input', 'novaSenhaE2E123');
+  await page.click('#login-form button[type=submit]');
+  await expect(page.locator('#overlay-pin')).toBeHidden();
+
+  const nome = `Produto editavel ${Date.now()}`;
+  await page.evaluate(async nome => {
+    const r = await API.post('/api/produtos', { nome, codigo_fiorilli: 'E2E.' + Date.now(),
+      qtd_por_embalagem: 1, unidade_consumo: 'UN', ativo: true });
+    const p = await API.json(r);
+    await API.post('/api/entradas', { tipo: 'compra_direta', data_entrega: '2026-07-01',
+      itens: [{ produto_id: p.id, quantidade_unidades: 10, valor_unitario: 5, lote_numero: 'LE' }] });
+  }, nome);
+
+  // entrada: 10 -> 30 unidades
+  await page.click('#nav-entradas');
+  const linhaEnt = page.locator('#entradas-list tr', { hasText: '01/07/2026' }).first();
+  await linhaEnt.getByRole('button', { name: 'Editar' }).click();
+  await expect(page.locator('#entrada-modal-titulo')).toHaveText('Editar Entrada');
+  await expect(page.locator('.item-row .ei-qtd').first(), 'modal abriu sem os itens').toHaveValue('10');
+  await page.locator('.item-row .ei-qtd').first().fill('30');
+  await page.click('#ef-salvar');
+  await expect(page.locator('#entrada-modal-overlay')).toBeHidden();
+
+  await page.click('#nav-produtos');
+  await expect(page.locator('#produtos-list tr', { hasText: nome })).toContainText('30 UN');
+
+  // saida de 4, depois editada para 9 — estoque tem de refletir 30 - 9
+  await page.evaluate(async nome => {
+    const prods = await API.json(await API.get('/api/produtos'));
+    const p = (prods.items || prods).find(x => x.nome === nome);
+    await API.post('/api/saidas', { data: '2026-07-02', itens: [{ produto_id: p.id, quantidade: 4 }] });
+  }, nome);
+
+  await page.click('#nav-saidas');
+  const linhaSai = page.locator('#saidas-list tr', { hasText: '02/07/2026' }).first();
+  await linhaSai.getByRole('button', { name: 'Editar' }).click();
+  await expect(page.locator('#saida-modal-titulo')).toHaveText('Editar Saída');
+  await expect(page.locator('.item-row .si-qtd').first()).toHaveValue('4');
+  await page.locator('.item-row .si-qtd').first().fill('9');
+  await expect(page.locator('#sf-salvar'), 'editando, o botão não pode dizer "Registrar"').toHaveText('Salvar alterações');
+  await page.click('#sf-salvar');
+  await expect(page.locator('#saida-modal-overlay')).toBeHidden();
+
+  await page.click('#nav-produtos');
+  await expect(page.locator('#produtos-list tr', { hasText: nome }),
+    'estorno + novo consumo não bateram na tela').toContainText('21 UN');
+});
